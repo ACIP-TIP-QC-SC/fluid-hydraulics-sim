@@ -10,12 +10,14 @@ American Concrete Institute Philippines T.I.P. QC Student Chapter · by CEM Juma
 
 - **Fluid Mechanics:** Viscosity, Pressure, Hydrostatic Forces, Analysis of Dams, Buoyancy, Relative Equilibrium
 - **Hydraulics Engineering:** Orifices & Tanks, Pipe Systems, Specific Energy & Jump, Pumps & Siphons, Weirs, Open Channels, Water Hammer
+- **Geotechnical Engineering** (in progress): Permeability & Seepage (constant and falling head tests, layered soil, flow nets under sheet piles and dams)
 
 ## Layout
 
-- `index.html`: the shared header and the two discipline tabs
+- `index.html`: the shared header and the three discipline tabs
 - `fm/`: Fluid Mechanics solver
 - `hyd/`: Hydraulics Engineering solver
+- `geo/`: Geotechnical Engineering solver (reuses `fm/ui.js`, `fm/iso3d.js` and `fm/styles.css`)
 - `report.js`: the "Print PDF" report shared by both solvers
 - `vendor/`: html2canvas 1.4.1 and jsPDF 2.5.1 (MIT licensed), hosted here so the PDF feature needs no outside scripts
 

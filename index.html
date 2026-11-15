@@ -47,7 +47,7 @@ header.app {
 .brand h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(22px, 3vw, 34px); line-height: 1.02; letter-spacing: 0.01em; text-wrap: balance; }
 .brand p.by { margin-top: 1px; color: var(--accent); font-weight: 600; }
 .brand p { margin: 4px 0 0; font-family: var(--f-display); font-weight: 500; font-size: clamp(13px, 1.4vw, 16px); letter-spacing: 0.04em; color: var(--muted); }
-.side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; align-self: stretch; }
+.side { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; align-self: stretch; }
 .theme { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; padding: 2px; background: var(--tab-bg); }
 .theme button {
   display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 6px; background: transparent;
@@ -68,6 +68,15 @@ nav.disc button svg { width: 20px; height: 20px; flex: none; }
 nav.disc button:hover { color: var(--ink); }
 nav.disc button[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: inset 0 3px 0 var(--accent); }
 nav.disc button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav.disc .short { display: none; }
+/* Wide screens: the theme switch sits in the top-right corner, so the discipline tabs can wrap onto their own row. */
+@media (min-width: 721px) {
+  header.app { position: relative; }
+  .theme { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); }
+  .brand { max-width: calc(100% - 290px); }
+  .side { justify-content: flex-end; min-height: 40px; }
+}
+@media (max-width: 1240px) { nav.disc button { font-size: 16px; padding: 9px 13px 8px; } }
 main { flex: 1; position: relative; min-height: 0; }
 main iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: var(--paper); }
 main iframe[hidden] { display: none; }
@@ -98,6 +107,7 @@ footer.site .base {
   nav.disc { width: 100%; }
   nav.disc button { flex: 1; justify-content: center; font-size: 16px; padding: 9px 8px 8px; white-space: nowrap; }
   nav.disc button svg { display: none; }
+  nav.disc .full { display: none; } nav.disc .short { display: inline; }
   .shell { height: auto; min-height: 100dvh; }
   main { flex: none; height: 80vh; height: 80dvh; }
   footer.site .inner { padding-top: 28px; gap: 24px; }
@@ -127,11 +137,15 @@ footer.site .base {
   <nav class="disc" role="tablist" aria-label="Discipline">
     <button role="tab" id="tab-fm" aria-controls="pane-fm" data-pane="fm">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v16H3z"/><path d="M3 10c3 0 3 1.5 6 1.5S12 10 15 10s3 1.5 6 1.5"/><path d="M12 13v5m-2.5-2.5L12 18l2.5-2.5"/></svg>
-      Fluid Mechanics
+      <span class="full">Fluid Mechanics</span><span class="short">Fluid Mech.</span>
     </button>
     <button role="tab" id="tab-hyd" aria-controls="pane-hyd" data-pane="hyd">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8h8v8H2z"/><path d="M10 12h12"/><path d="M14 9.5l2.5 2.5-2.5 2.5"/><path d="M2 11c2 0 2 1 4 1s2-1 4-1"/></svg>
-      Hydraulics Engineering
+      <span class="full">Hydraulics Engineering</span><span class="short">Hydraulics</span>
+    </button>
+    <button role="tab" id="tab-geo" aria-controls="pane-geo" data-pane="geo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18M3 14h18M3 19h18"/><path d="M6 4v5M17 9v5"/><circle cx="10" cy="16.5" r=".6"/><circle cx="15" cy="16.5" r=".6"/><path d="M12 4l3 3-3 3"/></svg>
+      <span class="full">Geotechnical Engineering</span><span class="short">Geotechnical</span>
     </button>
   </nav>
   </div>
@@ -139,6 +153,7 @@ footer.site .base {
 <main>
   <iframe id="pane-fm" role="tabpanel" aria-labelledby="tab-fm" title="Fluid Mechanics solver" data-src="fm/index.html" hidden></iframe>
   <iframe id="pane-hyd" role="tabpanel" aria-labelledby="tab-hyd" title="Hydraulics Engineering solver" data-src="hyd/index.html" hidden></iframe>
+  <iframe id="pane-geo" role="tabpanel" aria-labelledby="tab-geo" title="Geotechnical Engineering solver" data-src="geo/index.html" hidden></iframe>
 </main>
 </div>
 <footer class="site">
@@ -187,7 +202,7 @@ footer.site .base {
   function frames() { return Array.prototype.slice.call(document.querySelectorAll('main iframe')); }
 
   function select(id) {
-    if (id !== 'fm' && id !== 'hyd') id = 'fm';
+    if (id !== 'fm' && id !== 'hyd' && id !== 'geo') id = 'fm';
     tabs.forEach(function (b) {
       var on = b.dataset.pane === id;
       b.setAttribute('aria-selected', on ? 'true' : 'false');

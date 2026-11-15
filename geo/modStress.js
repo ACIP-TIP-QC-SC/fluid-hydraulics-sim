@@ -43,7 +43,7 @@
       const sl = (p, o, k, label, min, max, step, unit) => C.slider(p, { label, min, max, step, get: () => o[k], set: (v) => (o[k] = v), unit });
       const qmax = en ? 20000 : 1000, Lmax = en ? 100 : 30;
       if (s.type === 'point') {
-        C.layers(g, { layers: s.points, max: 4, soil: false, title: (i) => `Load ${i + 1}`, fields: [{ k: 'Q', label: 'Q', unit: U.force }, { k: 'x', label: 'x', unit: U.len }, { k: 'y', label: 'y', unit: U.len }], make: (ls) => ({ Q: en ? 50000 : 200, x: (ls.length) * (en ? 6 : 2), y: 0 }) });
+        C.layers(g, { layers: s.points, max: 4, soil: false, add: '+ Add load', title: (i) => `Load ${i + 1}`, fields: [{ k: 'Q', label: 'Q', unit: U.force }, { k: 'x', label: 'x', unit: U.len }, { k: 'y', label: 'y', unit: U.len }], make: (ls) => ({ Q: en ? 50000 : 200, x: (ls.length) * (en ? 6 : 2), y: 0 }) });
         C.note(g, 'Plan coordinates x, y of each load; the 2D section is taken through point P (y = y_P).');
       } else if (s.type === 'line') {
         sl(g, s.line, 'q', 'Line load q (per unit length)', 1, en ? 20000 : 1000, 0.1, U.fpl);
@@ -57,7 +57,7 @@
         sl(g, s.circle, 'R', 'Radius R', 0.1, Lmax, 0.01, U.len);
         sl(g, s.circle, 'q', 'Uniform pressure q', 1, qmax, 0.1, U.press);
       } else {
-        C.layers(g, { layers: s.rects, max: 3, soil: false, title: (i) => `Rectangle ${i + 1}`, fields: [{ k: 'B', label: 'B (along x)', unit: U.len }, { k: 'L', label: 'L (along y)', unit: U.len }, { k: 'x', label: 'centre x', unit: U.len }, { k: 'y', label: 'centre y', unit: U.len }, { k: 'q', label: 'q', unit: U.press }], make: (ls) => { const l = ls[ls.length - 1]; return { B: l.B, L: l.L, x: l.x + l.B, y: l.y, q: l.q }; } });
+        C.layers(g, { layers: s.rects, max: 3, soil: false, add: '+ Add rectangle', title: (i) => `Rectangle ${i + 1}`, fields: [{ k: 'B', label: 'B (along x)', unit: U.len }, { k: 'L', label: 'L (along y)', unit: U.len }, { k: 'x', label: 'centre x', unit: U.len }, { k: 'y', label: 'centre y', unit: U.len }, { k: 'q', label: 'q', unit: U.press }], make: (ls) => { const l = ls[ls.length - 1]; return { B: l.B, L: l.L, x: l.x + l.B, y: l.y, q: l.q }; } });
         C.note(g, 'Several rectangles make an L, T or U footprint; each may carry its own q. The stress is found by superposition of corner influence factors.');
       }
       const p = C.section(el, 'Point P');

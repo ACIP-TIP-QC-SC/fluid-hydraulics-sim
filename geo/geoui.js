@@ -118,7 +118,7 @@
       });
       wrap.append(h('div', { class: 'lyr' }, head, grid));
     });
-    if (o.layers.length < (o.max || 5)) wrap.append(h('button', { type: 'button', class: 'btn small', onclick: () => { o.layers.push(o.make(o.layers)); app.rebuild(true); } }, '+ Add layer'));
+    if (o.layers.length < (o.max || 5)) wrap.append(h('button', { type: 'button', class: 'btn small', onclick: () => { o.layers.push(o.make(o.layers)); app.rebuild(true); } }, o.add || '+ Add layer'));
     parent.append(wrap);
     return wrap;
   }
@@ -195,7 +195,7 @@
     leg.forEach((q, i) => {
       const yy = T + 14 + i * 15, xx = R - 8;
       const t = txt(xx, yy + 4, q.label, { 'text-anchor': 'end', fill: '#34495e' }); t.setAttribute('class', 'lbl');
-      const tw = Math.min(170, q.label.length * 5.6);
+      const tw = Math.min(300, q.label.length * 5.9);
       s('line', { x1: xx - tw - 26, y1: yy, x2: xx - tw - 6, y2: yy, stroke: q.color, 'stroke-width': q.w || 2, 'stroke-dasharray': q.dash }, g);
     });
     return { X, Y, L, R, T, B, g };

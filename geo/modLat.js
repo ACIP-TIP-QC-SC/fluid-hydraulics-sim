@@ -354,4 +354,5 @@
   };
 
   root.GLat = GLat;
+  G.clipY = clipY; G.infoBox = infoBox;
 })(window);

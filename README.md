@@ -10,7 +10,7 @@ American Concrete Institute Philippines T.I.P. QC Student Chapter · by CEM Juma
 
 - **Fluid Mechanics:** Viscosity, Pressure, Hydrostatic Forces, Analysis of Dams, Buoyancy, Relative Equilibrium
 - **Hydraulics Engineering:** Orifices & Tanks, Pipe Systems, Specific Energy & Jump, Pumps & Siphons, Weirs, Open Channels, Water Hammer
-- **Geotechnical Engineering** (in progress): Permeability & Seepage, Effective Stress, Stresses in Soil, Consolidation, Shear Strength, Lateral Earth Pressure & Retaining Walls
+- **Geotechnical Engineering**: Permeability & Seepage, Effective Stress, Stresses in Soil, Consolidation, Shear Strength, Lateral Earth Pressure & Retaining Walls, Slope Stability
 
 ## Layout
 

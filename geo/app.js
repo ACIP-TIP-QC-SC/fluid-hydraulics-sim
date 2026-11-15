@@ -207,7 +207,7 @@
       finally { if (hi) { try { delete root.devicePixelRatio; } catch (e) {} } }
     } finally { App.view = was; renderDiagram(); }
     const images = [{ cap: '2D section', src: await p2d }];
-    if (pPlot) images.push({ cap: m.plotCaption || 'Charts', src: await pPlot });
+    if (pPlot) images.push({ cap: (typeof m.plotCaption === 'function' ? m.plotCaption() : m.plotCaption) || 'Charts', src: await pPlot });
     images.push({ cap: '3D isometric view', src: p3d });
     return {
       app: APP_NAME, module: m.title, mode: $('statusPill').textContent, units: U.id === 'SI' ? 'SI units' : 'English units',

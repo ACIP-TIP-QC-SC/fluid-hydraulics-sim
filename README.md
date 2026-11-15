@@ -4,7 +4,7 @@ An interactive, browser-only solver for Fluid Mechanics and Hydraulics Engineeri
 
 American Concrete Institute Philippines T.I.P. QC Student Chapter · by CEM Jumawan
 
-**Live site:** https://engr-concrete.github.io/fluid-hydraulics-sim/
+**Live site:** https://acip-tip-qc-sc.github.io/fluid-hydraulics-sim/
 
 ## Modules
 

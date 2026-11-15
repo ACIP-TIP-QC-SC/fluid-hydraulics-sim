@@ -165,8 +165,16 @@
   });
 
   function syncUnits() { $('uSI').setAttribute('aria-pressed', App.units === 'SI'); $('uEN').setAttribute('aria-pressed', App.units === 'EN'); }
-  $('uSI').addEventListener('click', () => { App.units = 'SI'; syncUnits(); App.rebuild(true); });
-  $('uEN').addEventListener('click', () => { App.units = 'EN'; syncUnits(); App.rebuild(true); });
+  // Shared data (e.g. the soil profile) is converted when the viewer switches units.
+  function setUnits(u) {
+    if (u === App.units) return;
+    const from = App.units; App.units = u;
+    if (root.GeoProfile) root.GeoProfile.convert(from, u);
+    Object.values(App.modules).forEach((m) => { if (m.onUnits) m.onUnits(from, u); });
+    syncUnits(); App.rebuild(true);
+  }
+  $('uSI').addEventListener('click', () => setUnits('SI'));
+  $('uEN').addEventListener('click', () => setUnits('EN'));
   $('showP').addEventListener('change', (e) => { App.showP = e.target.checked; renderDiagram(); });
   $('viewSeg').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
     App.view = b.dataset.v;

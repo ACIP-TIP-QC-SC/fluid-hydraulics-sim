@@ -169,6 +169,15 @@
     if (_cache.has(key)) return _cache.get(key);
     const T = g.T;
     let ny = ny0 || 40;
+    // pick a cell count near ny0 for which the base width and wall depths fall on cell faces
+    // (otherwise e.g. B = 20 m on 0.3 m cells is solved, drawn and integrated as 20.1 m)
+    {
+      const lens = [g.B, g.D, g.du, g.dd].filter((v) => v > 0);
+      const miss = (m) => lens.reduce((s, v) => s + Math.abs(v / (T / m) - Math.round(v / (T / m))), 0);
+      let best = ny, bestE = miss(ny);
+      for (let d = 1; d <= Math.round(0.2 * ny) && bestE > 1e-9; d++) [ny - d, ny + d].forEach((m) => { const e = miss(m); if (e < bestE - 1e-9) { bestE = e; best = m; } });
+      ny = best;
+    }
     const span = g.type === 'dam' ? g.B : 0;
     const M = 3 * T * Math.max(1, Math.sqrt(g.rx / g.rz));
     let h = T / ny;

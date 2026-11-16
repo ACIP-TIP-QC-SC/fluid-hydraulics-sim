@@ -311,8 +311,8 @@
     stroke(ctx, [[X(-w1), Y(e1)], [X(0), Y(e1)]], C.water_deep, 1.5); stroke(ctx, [[X(0), Y(e2)], [X(w2), Y(e2)]], C.water_deep, 1.5);
     stroke(ctx, [[X(0), Y(e1)], [X(w2 * 0.85), Y(e1)]], C.muted, 1, [3, 3]);
     dimV(ctx, X(w2 * 0.8), Y(e2), Y(e1), `ΔH = ${fmt(z)} ${L}`);
-    txt(ctx, `Tank 1, A₁ = ${fmt(A1)} ${S.U.A}`, X(-w1 / 2), Y(top) - 12, { align: 'center', size: 12, bold: true });
-    txt(ctx, `Tank 2, A₂ = ${fmt(A2)} ${S.U.A}`, X(w2 / 2), Y(top) - 12, { align: 'center', size: 12, bold: true });
+    txt(ctx, `Tank 1, A₁ = ${fmt(A1)} ${S.U.A}`, X(0) - 8, Y(top) - 12, { align: 'right', size: 12, bold: true }); // labels sit either side of the shared wall so they never overlap
+    txt(ctx, `Tank 2, A₂ = ${fmt(A2)} ${S.U.A}`, X(0) + 8, Y(top) - 12, { align: 'left', size: 12, bold: true });
     const v = d.Cv * Math.sqrt(2 * g * Math.max(0, z));
     A.parts = A.parts || []; const dt = T.pdt;
     if (dt > 0 && v > 1e-4) { let n = dt * 60 * clamp(v / (d.v0 || 1), 0.2, 1); while (n > 0 && A.parts.length < 400) { if (rnd() < n) A.parts.push({ k: 'j', x: 0, y: (rnd() - 0.5) * ro / V.sy * 2, vx: v, vy: (rnd() - 0.5) * 0.3 * v, life: 0 }); n -= 1; } }
@@ -626,7 +626,8 @@
       { name: 'Test 6 — jump: q = 3 m²/s, y₁ = 0.5 m', mode: 'jump', set: { q: 3, y: 0.5, qmode: 'q' } },
       { name: 'Sluice gate: q = 3 m²/s, a = 0.6 m, Cc = 0.61', mode: 'gate', set: { q: 3, a: 0.6, Cc: 0.61 } },
       { name: 'Subcritical flow over a 0.2 m step (q = 3, y = 2)', mode: 'curve', set: { shape: 'rect', q: 3, y: 2, dz: 0.2 } },
-      { name: 'Choking at a 0.6 m step (q = 3, y = 2)', mode: 'curve', set: { shape: 'rect', q: 3, y: 2, dz: 0.6 } },
+      { name: 'Step of 0.6 m, just under choking (q = 3, y = 2, Δz_max = 0.657 m)', mode: 'curve', set: { shape: 'rect', q: 3, y: 2, dz: 0.6 } },
+      { name: 'Choking at a 0.8 m step (q = 3, y = 2): critical depth over the step', mode: 'curve', set: { shape: 'rect', q: 3, y: 2, dz: 0.8 } },
       { name: 'Trapezoidal channel, Q = 9 m³/s, z = 1', mode: 'curve', set: { shape: 'trap', qmode: 'Q', Q: 9, z: 1, y: 1 } }
     ]
   };
@@ -1177,7 +1178,7 @@
       { name: 'Test 11a — rigid pipe, v = 2 m/s, instant closure', mode: 'main', set: { mat: 'rigid', v: 2, tc: 0, Lp: 1500 } },
       { name: 'Test 11b — slow closure t_c = 5 s', mode: 'main', set: { mat: 'rigid', v: 2, tc: 5, Lp: 1500 } },
       { name: 'Test 11c — steel pipe D = 600 mm, t = 10 mm', mode: 'main', set: { mat: 'steel', E: 200, Dp: 600, tw: 10, v: 2, tc: 0 } },
-      { name: 'PVC pipe, partial closure to 0.5 m/s', mode: 'main', set: { mat: 'pvc', E: 3, Dp: 300, tw: 15, v: 2, vf: 0.5, tc: 0 } }
+      { name: 'PVC pipe, partial closure to 0.5 m/s', mode: 'main', set: { mat: 'pvc', E: 3, Dp: 300, tw: 15, v: 2, vf: 0.5, tc: 0, sall: 12 } }
     ]
   };
   MODS.push(M7);
@@ -1204,7 +1205,7 @@
     // velocity arrows
     for (let i = 1; i < N; i += Math.max(1, Math.floor(N / 10))) { const v = vk(i), x = x0 + ((x1 - x0) * i) / N, l = clamp((v / d.v0) * 16, -16, 16); if (Math.abs(l) > 1.5) arrow(ctx, x - l / 2, yc, x + l / 2, yc, '#ffffff', 1.5, 5); }
     // valve
-    const clos = d.tc <= 0 ? (S.simT > 0 ? 1 : 0) : clamp(S.simT / d.tc, 0, 1) * (1 - d.vf / d.v0);
+    const clos = (d.tc <= 0 ? (S.simT > 0 ? 1 : 0) : clamp(S.simT / d.tc, 0, 1)) * (1 - d.vf / d.v0);
     ctx.fillStyle = C.wall; ctx.beginPath(); ctx.moveTo(x1, yc - ph / 2 - 10); ctx.lineTo(x1 + 30, yc + ph / 2 + 10); ctx.lineTo(x1 + 30, yc - ph / 2 - 10); ctx.lineTo(x1, yc + ph / 2 + 10); ctx.closePath(); ctx.fill();
     ctx.fillStyle = C.danger; ctx.fillRect(x1 + 12, yc - ph / 2, 6, ph * clos); stroke(ctx, [[x1 + 15, yc - ph / 2 - 10], [x1 + 15, yc - ph / 2 - 26]], C.wall, 3);
     txt(ctx, `valve ${Math.round(clos * 100)}% closed`, x1 + 15, yc + ph / 2 + 26, { align: 'center', size: 11 });
@@ -1535,7 +1536,7 @@
     const dx = P(-Lu * 0.25, bh, 0)[0];
     dimV(ctx, dx, P(-Lu * 0.25, bh, Pw)[1], P(-Lu * 0.25, bh, Pw + Hh)[1], `H = ${fmt(Hh)} ${L}`);
     if (Pw > 0.01) dimV(ctx, dx, P(-Lu * 0.25, bh, 0)[1], P(-Lu * 0.25, bh, Pw)[1], `P = ${fmt(Pw)} ${L}`);
-    dim3(ctx, P(-Lu, -bh, Hch * 1.02), P(-Lu, bh, Hch * 1.02), `b = ${fmt(b)} ${L}`);
+    if (mode !== 'vnotch') dim3(ctx, P(-Lu, -bh, Hch * 1.02), P(-Lu, bh, Hch * 1.02), `b = ${fmt(b)} ${L}`); // the V-notch view is drawn narrower than the channel, so it gets no width label
     if (ht > 0) txt(ctx, 'SUBMERGED — tailwater above the crest', W / 2, 18, { align: 'center', bold: true, color: C.danger });
     txt(ctx, `Q = ${fmt(Q)} ${U.Q}`, 16, 40, { size: 13, bold: true, mono: true });
     txt(ctx, 'Isometric 3D view', 16, 18, { bold: true, size: 12, color: C.muted });

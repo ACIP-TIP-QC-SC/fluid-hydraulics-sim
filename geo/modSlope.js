@@ -284,7 +284,7 @@
         G.chart(svg, R[0], { title: 'FS on trial planes through the toe', xlab: 'plane angle θ (°)', ylab: 'FS', xmin: 0, xmax: o.beta, ymin: 0, ymax: Math.min(6, Math.max(2, mn[1] * 2.5)), series: [{ pts, color: SL, w: 2.4 }], hlines: [{ y: 1, label: 'FS = 1', color: '#7f8c8d' }], marks: [{ x: mn[0], y: mn[1], label: `min ${f(mn[1], 4)} at ${f(mn[0])}°`, color: SL }] });
         const hs = [];
         for (let bt = Math.max(o.phi + 1, 20); bt <= 90; bt += 1) { const bb = bt * DEG; hs.push([bt, (4 * o.c / o.g) * Math.sin(bb) * Math.cos(phi) / (1 - Math.cos(bb - phi))]); }
-        G.chart(svg, R[1], { title: 'Critical height versus slope angle', xlab: 'β (°)', ylab: `H_cr (${U.len})`, xmin: Math.max(o.phi + 1, 20), xmax: 90, ymin: 0, ymax: Math.max(o.H * 2, g.Hcr * 1.3), series: [{ pts: hs.map((p) => [p[0], Math.min(p[1], Math.max(o.H * 2, g.Hcr * 1.3))]), color: NN, w: 2.4 }], hlines: [{ y: o.H, label: `H = ${f(o.H)}`, color: '#7f8c8d' }], marks: [{ x: o.beta, y: g.Hcr, label: f(g.Hcr), color: NN }] });
+        G.chart(svg, R[1], { title: 'Critical height versus slope angle', xlab: 'β (°)', ylab: `H_cr (${U.len})`, xmin: Math.max(o.phi + 1, 20), xmax: 90, ymin: 0, ymax: Math.max(o.H * 2, g.Hcr * 1.3), series: [{ pts: hs, color: NN, w: 2.4 }], hlines: [{ y: o.H, label: `H = ${f(o.H)}`, color: '#7f8c8d' }], marks: [{ x: o.beta, y: g.Hcr, label: f(g.Hcr), color: NN }] });
       }
       return true;
     },

@@ -380,7 +380,7 @@
       // panel 2: stresses on a plane versus its angle
       let C, Rr, a0 = 0, xlab = 'plane angle θ from the major principal plane (°)', mark;
       if (g.sub === 'stress') { C = g.state.c0; Rr = g.state.R; a0 = Math.atan2(g.state.txy, g.state.sx - C); xlab = 'plane angle θ, normal from the x axis (°)'; mark = g.state.theta; }
-      else { const ref = g.sub === 'direct' ? g.circles[g.circles.length - 1] : (s.sub === 'triax' && s.triax.type === 'CU' ? g.circles.find((c) => c.col === 'eff') : g.ref || g.circles[0]); C = (ref.s1 + ref.s3) / 2; Rr = (ref.s1 - ref.s3) / 2; mark = g.fpl ? g.fpl.th / DEG : 45; }
+      else { const ref = g.sub === 'direct' ? g.circles[g.circles.length - 1] : (s.sub === 'triax' && s.triax.type === 'CU' ? g.circles.find((c) => c.col === 'eff') : g.ref || g.circles[0]); C = (ref.s1 + ref.s3) / 2; Rr = (ref.s1 - ref.s3) / 2; mark = g.fpl ? g.fpl.th / DEG : 45 + (g.phi || 0) / DEG / 2; } // direct shear: the horizontal failure plane lies 45° + φ/2 from the major principal plane of the last test
       const sg = [], tu = [], tf = [], cc = g.sub === 'stress' ? g.env[0].c : g.cc, tp = Math.tan(g.phi);
       for (let i = 0; i <= 180; i += 2) { const a = a0 - 2 * i * DEG, sn = C + Rr * Math.cos(a), tn = Rr * Math.sin(a); sg.push([i, sn]); tu.push([i, Math.abs(tn)]); tf.push([i, cc + Math.max(0, sn) * tp]); }
       const ym = Math.max(...sg.map((p) => p[1]), ...tf.map((p) => p[1])) * 1.08, yn = Math.min(0, ...sg.map((p) => p[1]));

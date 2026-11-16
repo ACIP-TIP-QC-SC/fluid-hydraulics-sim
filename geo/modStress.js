@@ -191,7 +191,11 @@
       const hl = [{ y: s.zP, label: `z = ${f(s.zP)}`, color: PT }];
       if (s.avg && s.z2 > s.z1) hl.push({ y: s.z1, label: 'layer top', color: '#8e44ad' }, { y: s.z2, label: 'layer bottom', color: '#8e44ad' });
       const zM = Math.max(s.zMax, s.zP * 1.2);
-      G.chart(svg, { x: 0, y: 0, w: W, h: H }, { title: `Vertical stress increase below (x, y) = (${f(s.xP)}, ${f(s.yP)})`, xlab: `Δσz (${U.press})`, ylab: `depth z (${U.len})`, ydown: true, ymin: 0, ymax: zM, xmin: 0, series, hlines: hl, marks: [{ x: g.ds, y: s.zP, label: f(g.ds), color: PT }].concat(g.avg !== null ? [{ x: g.avg, y: 0.5 * (s.z1 + s.z2), label: `avg ${f(g.avg)}`, color: '#8e44ad' }] : []) });
+      // a point or line load gives Δσz → ∞ at the surface; cap the axis so the curve near P stays readable
+      const top = Math.max(...g.prof.map((q) => Math.max(q[0], g.t21 !== null ? q[2] : 0)));
+      const deep = Math.max(...g.prof.filter((q) => q[1] >= 0.2 * zM).map((q) => q[0]), 0);
+      const xmax = Math.min(top, Math.max(4 * g.ds, 2 * (g.avg || 0), 2 * deep)) || undefined;
+      G.chart(svg, { x: 0, y: 0, w: W, h: H }, { title: `Vertical stress increase below (x, y) = (${f(s.xP)}, ${f(s.yP)})`, xlab: `Δσz (${U.press})`, ylab: `depth z (${U.len})`, ydown: true, ymin: 0, ymax: zM, xmin: 0, xmax, series, hlines: hl, marks: [{ x: g.ds, y: s.zP, label: f(g.ds), color: PT }].concat(g.avg !== null ? [{ x: g.avg, y: 0.5 * (s.z1 + s.z2), label: `avg ${f(g.avg)}`, color: '#8e44ad' }] : []) });
       return true;
     },
   };

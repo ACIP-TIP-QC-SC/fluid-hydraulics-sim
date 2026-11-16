@@ -30,7 +30,7 @@
       { name: 'Sheet pile from a hand-drawn net: N_f = 4, N_d = 8, ΔH = 4.5 m, k = 5 × 10⁻³ cm/s', apply: (s) => { s.sub = 'pile'; Object.assign(s.net, net0, { T: 12, D: 6, h1: 5, h2: 0.5, k: 5e-3, counts: 'given', NfG: 4, NdG: 8, xp: -3, dp: 6 }); } },
       { name: 'Short sheet pile in sand that boils (FS < 1)', apply: (s) => { s.sub = 'pile'; Object.assign(s.net, net0, { T: 10, D: 1.5, h1: 7, h2: 0, k: 2e-2, soilBy: 'gamma', gsat: 18.5, counts: 'computed', Nd: 10, xp: 1, dp: 1 }); } },
       { name: 'Concrete dam B = 18 m on a 10 m layer, no cut-off, h₁ = 8 m', apply: (s) => { s.sub = 'dam'; Object.assign(s.net, net0, { T: 10, B: 18, Hd: 10, crest: 4, cutU: false, cutD: false, h1: 8, h2: 0, k: 2e-3, counts: 'computed', Nd: 12, xp: 9, dp: 3 }); } },
-      { name: 'Dam with upstream cut-off 5 m (lower uplift)', apply: (s) => { s.sub = 'dam'; Object.assign(s.net, net0, { T: 12, B: 20, Hd: 11, crest: 4, cutU: true, du: 5, cutD: false, h1: 9, h2: 1, k: 2e-3, counts: 'computed', Nd: 12, xp: 10, dp: 3 }); } },
+      { name: 'Same dam with an upstream cut-off 5 m deep (lower uplift and exit gradient)', apply: (s) => { s.sub = 'dam'; Object.assign(s.net, net0, { T: 10, B: 18, Hd: 10, crest: 4, cutU: true, du: 5, cutD: false, h1: 8, h2: 0, k: 2e-3, counts: 'computed', Nd: 12, xp: 9, dp: 3 }); } },
       { name: 'Dam with upstream and downstream cut-offs, anisotropic soil k_x = 4 k_z', apply: (s) => { s.sub = 'dam'; Object.assign(s.net, net0, { T: 10, B: 15, Hd: 9, crest: 3, cutU: true, du: 4, cutD: true, dd: 3, h1: 8, h2: 1, aniso: true, kx: 4e-3, kz: 1e-3, counts: 'computed', Nd: 12, xp: 7, dp: 2 }); } },
     ],
     toggle: () => (GSeep.state.sub === 'pile' || GSeep.state.sub === 'dam' ? 'Flow net' : null),

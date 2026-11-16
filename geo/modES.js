@@ -15,7 +15,7 @@
     presets: [
       { name: 'Test E1 — sand 4 m (γ 17 / γ_sat 19) over clay 5 m (γ_sat 18.5), GWT at 2 m → σ′ = 52.38 kPa at 4 m, 95.83 kPa at 9 m', apply: (s) => { GP.set({ by: 'gamma', layers: two, wt: 2 }); s.zP = 9; } },
       { name: 'Test E2 — unit weights from G_s and e: dry sand 3 m (e 0.5), saturated sand 3 m, clay 4 m (e 1.1)', apply: (s) => { GP.set({ by: 'phase', wt: 3, layers: [{ soil: 'sand', H: 3, Gs: 2.65, e: 0.5, S: 0 }, { soil: 'sand', H: 3, Gs: 2.65, e: 0.5, S: 0 }, { soil: 'clay', H: 4, Gs: 2.72, e: 1.1, S: 100 }] }); s.zP = 10; } },
-      { name: 'Capillary rise 1.5 m in silt, negative pore pressure (S = 100 %)', apply: (s) => { GP.set({ by: 'gamma', wt: 3.5, cap: 1.5, capS: 100, capNeg: true, layers: [{ soil: 'silt', H: 5, g: 16.5, gsat: 19.2 }, { soil: 'clay', H: 4, g: 17.8, gsat: 18.6 }] }); s.zP = 2; } },
+      { name: 'Capillary rise 1.5 m in silt, negative pore pressure (S = 100 %)', apply: (s) => { GP.set({ by: 'gamma', wt: 3.5, cap: 1.5, capS: 100, capNeg: true, layers: [{ soil: 'silt', H: 5, g: 16.5, gsat: 19.2 }, { soil: 'clay', H: 4, g: 17.8, gsat: 18.6 }] }); s.zP = 3; } },
       { name: 'Artesian (upward) seepage in clay: piezometer 2.5 m above the GWT', apply: (s) => { GP.set({ by: 'gamma', wt: 1.5, seep: 'up', seepLayer: 1, dh: 2.5, layers: [{ soil: 'sand', H: 3, g: 16.8, gsat: 19.6 }, { soil: 'clay', H: 4, g: 17.5, gsat: 18.2 }, { soil: 'gravel', H: 2, g: 19, gsat: 21 }] }); s.zP = 7; } },
       { name: 'Upward seepage strong enough to cause a quick condition', apply: (s) => { GP.set({ by: 'gamma', wt: 0, seep: 'up', seepLayer: 0, dh: 4.5, layers: [{ soil: 'sand', H: 4, g: 18, gsat: 19.5 }, { soil: 'gravel', H: 3, g: 19, gsat: 21 }] }); s.zP = 4; } },
       { name: 'Downward seepage (drainage) through a 3 m clay layer, Δh = 1.2 m', apply: (s) => { GP.set({ by: 'gamma', wt: 2, seep: 'down', seepLayer: 1, dh: 1.2, layers: [{ soil: 'sand', H: 4, g: 17, gsat: 19 }, { soil: 'clay', H: 3, g: 17.5, gsat: 18.5 }, { soil: 'sand', H: 3, g: 18, gsat: 20 }] }); s.zP = 7; } },
@@ -113,7 +113,7 @@
     plot(svg, res, U) {
       const pr = res.geo.pr, { W, H } = G.chartSurface(svg);
       const ser = (key) => pr.pts.map((p) => [p[key], p.z]);
-      const xmin = Math.min(0, ...pr.pts.map((p) => p.u));
+      const xmin = Math.min(0, ...pr.pts.map((p) => Math.min(p.u, p.e)));
       G.chart(svg, { x: 0, y: 0, w: W, h: H }, { title: 'Total stress, pore pressure and effective stress versus depth', xlab: `stress (${U.press})`, ylab: `depth z (${U.len})`, ydown: true, ymin: 0, ymax: pr.Ht, xmin,
         series: [{ pts: ser('s'), color: CS, label: 'σ total' }, { pts: ser('u'), color: CU, label: 'u pore water' }, { pts: ser('e'), color: CE, w: 2.6, label: 'σ′ effective' }],
         hlines: [{ y: res.geo.zP, label: 'P', color: '#16a085' }].concat(pr.zw > 0 && pr.zw < pr.Ht ? [{ y: pr.zw, label: 'GWT', color: '#1f6fa8' }] : []),

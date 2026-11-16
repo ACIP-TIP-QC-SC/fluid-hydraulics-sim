@@ -195,7 +195,7 @@
   };
 
   // presets that do not mention ballast must switch it off
-  M2.presets.forEach((p) => { const ap = p.apply; p.apply = (s) => { s.layer3 = false; if (!/Ballast/.test(p.name)) s.ballast.on = false; ap(s); }; });
+  M2.presets.forEach((p) => { const ap = p.apply; p.apply = (s) => { s.layer3 = false; if (!/Ballast/.test(p.name)) s.ballast.on = false; s.stab = false; s.zG = null; ap(s); }; });
 
   /* ---------------- ballast panel & drawing ---------------- */
   function ballastControls(el, C, s, U, B, d) {

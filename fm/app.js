@@ -98,7 +98,7 @@
   $('copySol').addEventListener('click', async () => {
     const res = App.res; if (!res) return;
     const m = App.mod(), U = App.U();
-    let txt = `Fluid Mechanics & Hydraulics Engineering by CEM Jumawan — Fluid Mechanics: ${m.title} (${U.id} units)\n\n`;
+    let txt = `Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator by CEM Jumawan — Fluid Mechanics: ${m.title} (${U.id} units)\n\n`;
     (res.err || []).forEach((e) => (txt += `ERROR: ${e}\n`));
     (res.warn || []).forEach((e) => (txt += `WARNING: ${e}\n`));
     txt += 'RESULTS\n';

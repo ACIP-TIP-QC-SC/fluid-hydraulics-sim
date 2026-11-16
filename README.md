@@ -1,6 +1,6 @@
-# Fluid Mechanics & Hydraulics Engineering
+# Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator
 
-An interactive, browser-only solver for Fluid Mechanics and Hydraulics Engineering problems, with 2D and 3D diagrams, step-by-step solutions and a printable PDF report.
+An interactive, browser-only solver for Fluid Mechanics, Hydraulics Engineering and Geotechnical Engineering problems, with 2D and 3D diagrams, step-by-step solutions and a printable PDF report.
 
 American Concrete Institute Philippines T.I.P. QC Student Chapter · by CEM Jumawan
 

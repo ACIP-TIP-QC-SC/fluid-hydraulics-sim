@@ -1740,7 +1740,7 @@
     R.warnings.forEach((w) => (t += `[${w.lvl.toUpperCase()}] ${w.text}\n`));
     if (!R.invalid) { t += '\nRESULTS\n'; R.results.forEach((r) => (t += `  ${r.label}: ${typeof r.value === 'number' ? fmt(r.value) : r.value} ${r.unit}\n`)); }
     t += '\nSOLUTION\n'; R.steps.forEach((s, i) => { t += `${i + 1}. ${s.t}\n   ${s.f || ''}\n   ${s.s || ''}\n   = ${s.r || ''}\n   (${s.n || ''})\n`; if (s.table) { t += '   ' + s.table.head.join(' | ') + '\n'; s.table.rows.forEach((r) => (t += '   ' + r.join(' | ') + '\n')); } });
-    return t + '\nFluid Mechanics & Hydraulics Engineering by CEM Jumawan — ACI Philippines T.I.P. QC Student Chapter\n';
+    return t + '\nHydraulics and Principles of Geotechnical Engineering (HPGE) Calculator by CEM Jumawan — ACI Philippines T.I.P. QC Student Chapter\n';
   }
 
   /* ------------------------------------------------------------------ canvases & loop */

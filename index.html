@@ -9,7 +9,7 @@
   if (m === 'system') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', m === 'dark' ? 'dark' : 'light'); })();
 </script>
-<title>Fluid Mechanics &amp; Hydraulics Engineering</title>
+<title>Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
@@ -109,7 +109,11 @@ footer.site .base {
   nav.disc button svg { display: none; }
   nav.disc .full { display: none; } nav.disc .short { display: inline; }
   .shell { height: auto; min-height: 100dvh; }
-  main { flex: none; height: 80vh; height: 80dvh; }
+  /* On phones the solver frame is sized to its whole content (see fitFrames below), so the page
+     scrolls as one and the footer follows the solver. A swipe inside a frame never scrolls the
+     page on iOS or Android, so a fixed-height frame hid the footer. */
+  main { flex: none; height: auto; }
+  main iframe { position: static; height: 80vh; height: 80dvh; }
   footer.site .inner { padding-top: 28px; gap: 24px; }
 }
 </style>
@@ -120,7 +124,7 @@ footer.site .base {
   <div class="brand">
     <img src="logo.png" width="64" height="64" alt="ACI Philippines T.I.P. Quezon City Student Chapter logo">
     <div>
-      <h1>Fluid Mechanics &amp; Hydraulics Engineering</h1>
+      <h1>Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator</h1>
       <p>American Concrete Institute Philippines T.I.P. QC Student Chapter</p>
       <p class="by">by CEM Jumawan</p>
     </div>
@@ -181,7 +185,7 @@ footer.site .base {
       </div>
     </section>
   </div>
-  <div class="base">ACIP T.I.P. QC SC · Fluid Mechanics &amp; Hydraulics Engineering</div>
+  <div class="base">ACIP T.I.P. QC SC · Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator</div>
 </footer>
 <script>
 (function () {
@@ -201,6 +205,34 @@ footer.site .base {
   }
   function frames() { return Array.prototype.slice.call(document.querySelectorAll('main iframe')); }
 
+  // Phones: grow the visible solver frame to the height of its content, so the solver scrolls with
+  // the page and About Us / Mission / Vision / Developer are reached by scrolling down.
+  var phone = window.matchMedia('(max-width: 720px)');
+  function fit(fr) {
+    try {
+      var d = fr.contentDocument; if (!d || !d.documentElement || !d.body) return;
+      // The solvers size some panels with vh; inside a content-sized frame that would track the
+      // frame, so hand them the phone's own viewport height instead.
+      d.documentElement.style.setProperty('--vh', (window.innerHeight / 100) + 'px');
+      if (!phone.matches) { fr.style.height = ''; return; }
+      if (fr.hidden) return;
+      var h = Math.ceil(d.documentElement.getBoundingClientRect().height);
+      if (h > 0 && Math.abs(h - fr.offsetHeight) > 1) fr.style.height = h + 'px';
+    } catch (e) {}
+  }
+  function fitFrames() { frames().forEach(fit); }
+  function watch(fr) {
+    try {
+      var w = fr.contentWindow, d = fr.contentDocument;
+      if (!w || !d || fr._watched === d) return;
+      fr._watched = d;
+      if (w.ResizeObserver) new w.ResizeObserver(function () { fit(fr); }).observe(d.body);
+      fit(fr);
+    } catch (e) {}
+  }
+  window.addEventListener('resize', fitFrames);
+  if (phone.addEventListener) phone.addEventListener('change', fitFrames); else if (phone.addListener) phone.addListener(fitFrames);
+
   function select(id) {
     if (id !== 'fm' && id !== 'hyd' && id !== 'geo') id = 'fm';
     tabs.forEach(function (b) {
@@ -211,11 +243,11 @@ footer.site .base {
     frames().forEach(function (fr) {
       var on = fr.id === 'pane-' + id;
       if (on && !fr.getAttribute('src')) {
-        fr.addEventListener('load', function () { syncTheme(fr); });
+        fr.addEventListener('load', function () { syncTheme(fr); watch(fr); });
         fr.setAttribute('src', fr.dataset.src);
       }
       fr.hidden = !on;
-      if (on) { try { fr.contentWindow && fr.contentWindow.dispatchEvent(new Event('resize')); } catch (e) {} }
+      if (on) { try { fr.contentWindow && fr.contentWindow.dispatchEvent(new Event('resize')); } catch (e) {} fit(fr); }
     });
     store(id);
     if (location.hash !== '#' + id) { try { history.replaceState(null, '', '#' + id); } catch (e) {} }

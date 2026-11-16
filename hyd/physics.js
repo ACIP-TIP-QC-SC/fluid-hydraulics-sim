@@ -1,5 +1,5 @@
 /* =====================================================================
-   physics.js — Hydraulics formulas for "Fluid Mechanics & Hydraulics Engineering by CEM Jumawan"
+   physics.js — Hydraulics formulas for "Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator by CEM Jumawan"
    ---------------------------------------------------------------------
    Pure functions only (no DOM, no drawing). Every module function takes
    an input object I in the BASE units of the chosen unit system and a

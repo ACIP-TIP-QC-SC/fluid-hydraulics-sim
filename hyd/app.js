@@ -143,6 +143,25 @@
      MODULE DEFINITIONS
      ================================================================== */
   const SG_CHIPS = [['Water', 1], ['Seawater', 1.03], ['Oil', 0.8], ['Mercury', 13.6]];
+  const LSG_CHIPS = [['Water', 1], ['Oil', 0.8], ['Kerosene', 0.82], ['Gasoline', 0.68], ['Glycerin', 1.26]];
+  const nLayOf = (P, m) => (m === 'steady' || m === 'drain' ? +P.nLay || 1 : 1);
+  // liquid layers: colour by layer number (layer 1 = bottom, at the orifice)
+  const layCol = (j) => (j === 0 ? C.water : ['#e0a526', '#3fae7a', '#9b6bd1'][(j - 1) % 3]);
+  // world-height bands [z0, z1] of each layer when the surface is at h above the orifice (zb = tank bottom)
+  function layerBands(d, h, zb) {
+    if (!d.layers) return null;
+    let tops;
+    if (d.layZ) tops = d.layZ(Math.max(0, h));
+    else { let z = 0; tops = d.layers.map((l) => (z += l.t)); tops[tops.length - 1] = h; }
+    return d.layers.map((l, j) => ({ j, sg: l.sg, z0: j === 0 ? zb : Math.max(0, tops[j - 1]), z1: j === 0 ? Math.max(zb, tops[0]) : Math.max(0, tops[j]) })).filter((b) => b.z1 - b.z0 > 1e-9);
+  }
+  function layerLegend(ctx, d, h, xr, y) {
+    const b = layerBands(d, h, 0) || [], k = d.layerAt ? d.layerAt(Math.max(0, h)) : 0, L = S.U.L;
+    const rows = d.layers.map((l, j) => { const bb = b.find((q) => q.j === j); return { j, txt: `Layer ${j + 1}: Sg ${fmt(l.sg)}, t = ${fmt(bb ? bb.z1 - bb.z0 : 0)} ${L}${j === k && h > 1e-6 ? ' (outflow)' : ''}` }; }).reverse();
+    ctx.font = '11px ' + MONO; const w = Math.max(...rows.map((r) => ctx.measureText(r.txt).width)) + 34, x = xr - w; // right-aligned under the velocity scale
+    ctx.fillStyle = C.bg; ctx.globalAlpha = 0.85; ctx.fillRect(x - 6, y - 10, w, rows.length * 17 + 6); ctx.globalAlpha = 1;
+    rows.forEach((r, i) => { const yy = y + i * 17; ctx.fillStyle = layCol(r.j); ctx.globalAlpha = 0.6; ctx.fillRect(x, yy - 6, 16, 12); ctx.globalAlpha = 1; ctx.strokeStyle = layCol(r.j); ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, yy - 5.5, 15, 11); txt(ctx, r.txt, x + 22, yy, { size: 11, mono: true, color: C.ink }); });
+  }
   const MODS = [];
 
   /* ---------------------------------------------------------------- M1 */
@@ -153,7 +172,7 @@
     modeDefaults: { inflow: { Qin: 0.004 }, twotank: { shape: 'vcyl' } },
     stopAtEnd: true,
     params: [
-      { k: 'H', label: 'Head on the orifice H', labelFn: (P, m) => (m === 'steady' ? 'Head on the orifice H' : m === 'twotank' ? 'Initial head difference H₁' : 'Initial head H₁'), dim: 'len', min: 0.05, max: 20, step: 0.01, def: 4 },
+      { k: 'H', label: 'Head on the orifice H', labelFn: (P, m) => (nLayOf(P, m) > 1 ? (m === 'steady' ? 'Total liquid depth above the orifice H' : 'Initial total depth H₁') : m === 'steady' ? 'Head on the orifice H' : m === 'twotank' ? 'Initial head difference H₁' : 'Initial head H₁'), dim: 'len', min: 0.05, max: 20, step: 0.01, def: 4 },
       { k: 'H2', label: 'Final head H₂', labelFn: (P, m) => (m === 'twotank' ? 'Final head difference H₂' : 'Final head H₂'), dim: 'len', min: 0, max: 20, step: 0.01, def: 1, modes: ['drain', 'twotank', 'inflow'], maxFn: (P, m) => (m === 'inflow' ? 20 : P.H) },
       { k: 'tq', label: 'Solve for head after time t', dim: 's', min: 0, max: 100000, step: 1, def: 600, modes: ['drain', 'twotank', 'inflow'] },
       { k: 'd', label: 'Orifice diameter d', dim: 'mm', min: 5, max: 500, step: 1, def: 50 },
@@ -163,7 +182,14 @@
       { k: 'Cv', label: 'Coefficient of velocity Cv', min: 0.8, max: 1, step: 0.001, def: 0.98, onSet: (P) => { P.Cc = clamp(+(P.Cd / P.Cv).toFixed(4), 0.5, 1); P.mouth = 'custom'; } },
       { k: 'Cc', label: 'Coefficient of contraction Cc', min: 0.5, max: 1, step: 0.001, def: 0.612, onSet: (P) => { P.Cd = clamp(+(P.Cc * P.Cv).toFixed(4), 0.5, 1); P.mouth = 'custom'; } },
       { k: 'ps', label: 'Gauge pressure on the surface p_s', dim: 'kPa', min: -80, max: 500, step: 0.1, def: 0, modes: ['steady', 'drain', 'inflow'] },
-      { k: 'Sg', label: 'Liquid specific gravity Sg', min: 0.5, max: 13.6, step: 0.01, def: 1, chips: SG_CHIPS },
+      { k: 'Sg', label: 'Liquid specific gravity Sg', labelFn: (P, m) => (nLayOf(P, m) > 1 ? 'Layer 1 (bottom) specific gravity Sg₁' : 'Liquid specific gravity Sg'), min: 0.5, max: 13.6, step: 0.01, def: 1, chips: SG_CHIPS },
+      { k: 'nLay', type: 'select', label: 'Liquid layers in the tank', def: '1', options: [['1', 'One liquid'], ['2', '2 layers'], ['3', '3 layers'], ['4', '4 layers']], modes: ['steady', 'drain'] },
+      { k: 't2', label: 'Layer 2 thickness t₂', dim: 'len', min: 0.01, max: 20, step: 0.01, def: 1, show: (P, m) => nLayOf(P, m) >= 2 },
+      { k: 'sg2', label: 'Layer 2 specific gravity Sg₂', min: 0.5, max: 13.6, step: 0.01, def: 0.8, chips: LSG_CHIPS, show: (P, m) => nLayOf(P, m) >= 2 },
+      { k: 't3', label: 'Layer 3 thickness t₃', dim: 'len', min: 0.01, max: 20, step: 0.01, def: 0.5, show: (P, m) => nLayOf(P, m) >= 3 },
+      { k: 'sg3', label: 'Layer 3 specific gravity Sg₃', min: 0.5, max: 13.6, step: 0.01, def: 0.68, chips: LSG_CHIPS, show: (P, m) => nLayOf(P, m) >= 3 },
+      { k: 't4', label: 'Layer 4 thickness t₄ (top)', dim: 'len', min: 0.01, max: 20, step: 0.01, def: 0.3, show: (P, m) => nLayOf(P, m) >= 4 },
+      { k: 'sg4', label: 'Layer 4 specific gravity Sg₄', min: 0.5, max: 13.6, step: 0.01, def: 0.6, chips: LSG_CHIPS, show: (P, m) => nLayOf(P, m) >= 4 },
       { k: 'y', label: 'Orifice height above ground y', dim: 'len', min: 0, max: 20, step: 0.01, def: 1.5, modes: ['steady', 'drain', 'inflow'] },
       { k: 'shape', type: 'select', label: 'Tank shape', def: 'vcyl', modes: ['drain', 'twotank', 'inflow'], options: [['vcyl', 'Vertical cylinder'], ['rect', 'Rectangular'], ['cone', 'Cone (apex down)'], ['sphere', 'Sphere'], ['hcyl', 'Horizontal cylinder'], ['frustum', 'Frustum']] },
       { k: 'D', label: 'Tank diameter D', dim: 'len', min: 0.1, max: 20, step: 0.01, def: 2, show: (P, m) => m !== 'steady' && P.shape === 'vcyl' },
@@ -188,7 +214,10 @@
       { name: 'Spherical tank drains 4 m → 0.5 m', mode: 'drain', set: { H: 4, H2: 0.5, d: 75, shape: 'sphere', Ds: 5 } },
       { name: 'Two tanks, A₁ = π m², A₂ = 2 m²', mode: 'twotank', set: { H: 4, H2: 0.5, shape: 'vcyl', D: 2, A2: 2 } },
       { name: 'Inflow 4 L/s while draining', mode: 'inflow', set: { H: 4, H2: 1, Qin: 0.004 } },
-      { name: 'Closed tank, 50 kPa on the surface', mode: 'steady', set: { H: 2, ps: 50 } }
+      { name: 'Closed tank, 50 kPa on the surface', mode: 'steady', set: { H: 2, ps: 50 } },
+      { name: 'Steady orifice under 1 m of oil (Sg 0.8) on 3 m of water', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, nLay: '2', t2: 1, sg2: 0.8 } },
+      { name: 'Oil over water: cylinder D = 2 m drains 4 m → 0', mode: 'drain', set: { H: 4, H2: 0, d: 50, Cd: 0.6, shape: 'vcyl', D: 2, nLay: '2', t2: 1, sg2: 0.8 } },
+      { name: 'Three liquids in a spherical tank, 4 m → 0.5 m', mode: 'drain', set: { H: 4, H2: 0.5, d: 75, shape: 'sphere', Ds: 5, nLay: '3', t2: 1, sg2: 0.8, t3: 0.5, sg3: 0.68 } }
     ]
   };
   MODS.push(M1);
@@ -220,12 +249,13 @@
     const G = tankGeom(I, mode);
     let hT = mode === 'steady' ? I.H : d.hAt ? d.hAt(S.simT) : I.H;
     const h = sm(A, 'h', hT, T.rdt, 14);
-    const hp = d.hp || 0, v = d.Cv * Math.sqrt(2 * g * Math.max(0, h + hp));
+    const hp = d.hp || 0, heqNow = d.layers ? (d.heqOf ? d.heqOf(Math.max(0, h)) : d.H1 + hp) : h + hp, v = d.Cv * Math.sqrt(2 * g * Math.max(0, heqNow));
+    const jetCol = d.layers ? layCol(d.layerAt ? d.layerAt(Math.max(0, h)) : 0) : C.water;
     const yo = I.y, fl = Math.max((I.d / 2) * 1.6, 0.03 * G.Ht);
     const cx = G.side ? -G.Wt / 2 : 0;
     const xLand0 = G.side ? 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo) : 0;
     const span = Math.max(G.Wt + xLand0, yo + G.Ht, 1);
-    const b = smB(A, 'b', { x0: (G.side ? -G.Wt : -G.Wt / 2) - 0.22 * span, x1: Math.max(xLand0, G.side ? 0.3 * G.Wt : G.Wt / 2) + 0.12 * span, y0: -0.07 * span, y1: yo + G.Ht + 0.08 * span }, T.rdt);
+    const b = smB(A, 'b', { x0: (G.side ? -G.Wt : -G.Wt / 2) - 0.22 * span, x1: Math.max(xLand0, G.side ? 0.3 * G.Wt : G.Wt / 2) + 0.12 * span + (d.layers && !G.side ? 0.65 * span : 0), y0: -0.07 * span, y1: yo + G.Ht + 0.08 * span }, T.rdt);
     const V = view(b, W, H, { l: 20, r: 20, t: 26, b: 26 }, true);
     const X = V.X, Y = V.Y;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
@@ -237,8 +267,11 @@
     // water
     const lvl = yo + Math.max(0, h);
     ctx.save(); tankPath(ctx, V, G, cx, yo, fl); ctx.clip();
-    ctx.fillStyle = C.water; ctx.globalAlpha = 0.33; ctx.fillRect(0, Y(lvl), W, Y(yo - fl - 1) - Y(lvl)); ctx.globalAlpha = 1;
+    const bands = layerBands(d, h, -fl - 1);
+    if (bands) bands.forEach((q) => { ctx.fillStyle = layCol(q.j); ctx.globalAlpha = 0.36; ctx.fillRect(0, Y(yo + q.z1), W, Y(yo + q.z0) - Y(yo + q.z1)); ctx.globalAlpha = 1; });
+    else { ctx.fillStyle = C.water; ctx.globalAlpha = 0.33; ctx.fillRect(0, Y(lvl), W, Y(yo - fl - 1) - Y(lvl)); ctx.globalAlpha = 1; }
     ctx.restore();
+    if (bands) bands.forEach((q) => { const zi = q.z1; if (zi <= 1e-9 || zi >= h - 1e-9) return; const hw = G.hw(zi); stroke(ctx, [[X(cx - hw), Y(yo + zi)], [X(cx + hw), Y(yo + zi)]], layCol(q.j), 1.5, [6, 3]); });
     // outline
     tankPath(ctx, V, G, cx, yo, fl); ctx.strokeStyle = C.wall; ctx.lineWidth = 3; ctx.stroke();
     if (G.side) { ctx.fillStyle = C.bg; const ro = Math.max(2, (I.d / 2) * V.sy); ctx.fillRect(X(0) - 3, Y(yo) - ro, 6, 2 * ro); }
@@ -261,7 +294,7 @@
       if (G.side) { const tL = Math.sqrt((2 * Math.max(yo, 1e-4)) / g); for (let i = 0; i <= 40; i++) { const t = (tL * i) / 40; jet.push([v * t, yo - (g * t * t) / 2]); } }
       else { const tL = (-v + Math.sqrt(v * v + 2 * g * Math.max(yo, 1e-4))) / g; for (let i = 0; i <= 20; i++) { const t = (tL * i) / 20; jet.push([0, yo - v * t - (g * t * t) / 2]); } }
       const wpx = Math.max(2.5, dj * V.sx);
-      ctx.strokeStyle = C.water; ctx.globalAlpha = 0.55; ctx.lineCap = 'round'; ctx.lineWidth = wpx; poly(ctx, jet.map((p) => [X(p[0]), Y(p[1])])); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+      ctx.strokeStyle = jetCol; ctx.globalAlpha = 0.55; ctx.lineCap = 'round'; ctx.lineWidth = wpx; poly(ctx, jet.map((p) => [X(p[0]), Y(p[1])])); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
       // vena contracta (narrowing just outside the opening)
       if (G.side) { const x0 = X(0), r0 = Math.max(2, (I.d / 2) * V.sy), r1 = Math.max(1.3, (dj / 2) * V.sy), lx = Math.max(8, I.d * 0.6 * V.sx); ctx.beginPath(); ctx.moveTo(x0, Y(yo) - r0); ctx.quadraticCurveTo(x0 + lx * 0.4, Y(yo) - r1, x0 + lx, Y(yo) - r1); ctx.lineTo(x0 + lx, Y(yo) + r1); ctx.quadraticCurveTo(x0 + lx * 0.4, Y(yo) + r1, x0, Y(yo) + r0); ctx.closePath(); ctx.fillStyle = C.water_deep; ctx.globalAlpha = 0.6; ctx.fill(); ctx.globalAlpha = 1; txt(ctx, 'vena contracta', x0 + lx + 4, Y(yo) - r0 - 8, { size: 10, color: C.muted }); }
       const end = jet[jet.length - 1];
@@ -291,6 +324,7 @@
     A.parts = keep;
     txt(ctx, `v = ${fmt(v)} ${S.U.v}`, G.side ? X(0) + 10 : X(0) + 12, Y(yo) + 14, { size: 11, mono: true, bg: C.bg });
     velScale(ctx, W - 210, 40, V.sx, S.U.v);
+    if (d.layers) layerLegend(ctx, d, h, W - 12, 78);
     if (mode !== 'steady' && S.simT >= d.tEnd - 1e-9) txt(ctx, isFinite(d.tEnd) ? 'H₂ reached — press Reset to run again' : '', W / 2, 18, { align: 'center', bold: true, color: C.egl });
   };
   function drawTwoTank(ctx, W, H, R, A, T) {
@@ -331,9 +365,9 @@
     const d = R.data, U = S.U;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     if (d.mode === 'steady') {
-      const hs = [], qs = []; const Hm = Math.max(S.I.H * 2, 1);
+      const hs = [], qs = [], xh = d.layers ? d.H1 : S.I.H; const Hm = Math.max(xh * 2, 1);
       for (let i = 0; i <= 80; i++) { const h = (Hm * i) / 80; hs.push(h); qs.push(d.K * Math.sqrt(Math.max(0, h + d.hp))); }
-      plot(ctx, { x: 0, y: 0, w: W, h: H }, { title: 'Discharge vs head (Q = Cd·A_o·√(2gH))', xs: hs, series: [{ ys: qs, color: C.water_deep, fill: true }], xlab: `H (${U.L})`, ylab: '', ymin: 0, pts: [{ x: S.I.H, y: d.Q0, color: C.egl, label: `Q = ${fmt(d.Q0)} ${U.Q}` }] });
+      plot(ctx, { x: 0, y: 0, w: W, h: H }, { title: d.layers ? 'Discharge vs equivalent head of layer 1 (Q = Cd·A_o·√(2g·H_eq))' : 'Discharge vs head (Q = Cd·A_o·√(2gH))', xs: hs, series: [{ ys: qs, color: C.water_deep, fill: true }], xlab: `${d.layers ? 'H_eq' : 'H'} (${U.L})`, ylab: '', ymin: 0, pts: [{ x: xh, y: d.Q0, color: C.egl, label: `Q = ${fmt(d.Q0)} ${U.Q}` }] });
       return;
     }
     const tb = d.table; if (!tb) return;
@@ -903,7 +937,9 @@
     speed: { unsteady: 100 }, stopAtEnd: true,
     params: [
       { k: 'L', label: 'Crest length L', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, modes: ['rect', 'trap', 'broad', 'unsteady'] },
-      { k: 'H', label: 'Head over the crest H', dim: 'len', min: 0.01, max: 3, step: 0.001, def: 0.4, modes: ['rect', 'vnotch', 'trap', 'broad'] },
+      { k: 'solveFor', type: 'select', label: 'Solve for', def: 'Q', options: [['Q', 'Discharge Q (head H given)'], ['H', 'Head H (discharge Q given)']], modes: ['rect', 'vnotch', 'trap', 'broad'] },
+      { k: 'H', label: 'Head over the crest H', dim: 'len', min: 0.01, max: 3, step: 0.001, def: 0.4, modes: ['rect', 'vnotch', 'trap', 'broad'], show: (P) => P.solveFor !== 'H' },
+      { k: 'Qw', label: 'Discharge Q', dim: 'Q', min: 0.0001, max: 100, step: 0.0001, def: 1.396, log: true, modes: ['rect', 'vnotch', 'trap', 'broad'], show: (P) => P.solveFor === 'H' },
       { k: 'n', type: 'select', label: 'End contractions n', def: '0', options: [['0', 'n = 0 (suppressed)'], ['1', 'n = 1'], ['2', 'n = 2']], modes: ['rect'] },
       { k: 'P', label: 'Weir height P', dim: 'len', min: 0, max: 10, step: 0.01, def: 1 },
       { k: 'b', label: 'Channel width b (≥ L)', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, modes: ['rect', 'vnotch', 'trap', 'broad'] },
@@ -926,6 +962,14 @@
       { name: 'Velocity of approach, P = 0.5 m', mode: 'rect', set: { L: 3, H: 0.4, P: 0.5, approach: true } },
       { name: 'Broad-crested, L = 3 m, H = 0.4 m', mode: 'broad', set: { L: 3, H: 0.4 } },
       { name: 'Submerged weir, tailwater 0.15 m above crest', mode: 'rect', set: { H: 0.4, ht: 0.15 } },
+      { name: 'Find H — suppressed, L = 3 m, Q = 1.396 m³/s', mode: 'rect', set: { solveFor: 'H', L: 3, Qw: 1.396, n: '0' } },
+      { name: 'Find H — two end contractions, Q = 1.3 m³/s', mode: 'rect', set: { solveFor: 'H', L: 3, Qw: 1.3, n: '2', b: 4 } },
+      { name: 'Find H — velocity of approach, Q = 1.5 m³/s', mode: 'rect', set: { solveFor: 'H', L: 3, Qw: 1.5, P: 0.5, approach: true } },
+      { name: 'Find H — 90° V-notch, Q = 0.069 m³/s', mode: 'vnotch', set: { solveFor: 'H', Qw: 0.069, theta: 90 } },
+      { name: 'Find H — Cipolletti, L = 3 m, Q = 1.4 m³/s', mode: 'trap', set: { solveFor: 'H', L: 3, Qw: 1.4, zs: 0.25 } },
+      { name: 'Find H — trapezoid z = 0.5, Q = 1.5 m³/s', mode: 'trap', set: { solveFor: 'H', L: 3, Qw: 1.5, zs: 0.5 } },
+      { name: 'Find H — broad-crested, L = 3 m, Q = 1.3 m³/s', mode: 'broad', set: { solveFor: 'H', L: 3, Qw: 1.3 } },
+      { name: 'Find H — submerged, tailwater 0.15 m, Q = 1.2 m³/s', mode: 'rect', set: { solveFor: 'H', L: 3, Qw: 1.2, ht: 0.15 } },
       { name: 'Lower a 10,000 m² reservoir 0.8 → 0.4 m', mode: 'unsteady', set: { As: 10000, H1: 0.8, H2: 0.4, L: 3 } }
     ]
   };
@@ -1286,12 +1330,20 @@
     txt(ctx, `grid ${fmt(st)} ${S.U.L}`, P(x1, y1, z)[0] + 6, P(x1, y1, z)[1] + 4, { size: 10, color: C.muted });
   }
   // glass tank: ring(z) gives plan points; draws back shell, water body and surface; returns a finisher for the front outline
-  function glassTank(ctx, P, ring, zs, level) {
+  function glassTank(ctx, P, ring, zs, level, bands) {
     const proj = (z) => ring(z).map((p) => P(p[0], p[1], z));
     const shell = hull(zs.flatMap(proj));
     fillPoly(ctx, shell, C.wall, 0.07);
     loop(ctx, proj(zs[zs.length - 1]), C.wall, 1, 0.45);
-    if (level > zs[0] + 1e-9) {
+    if (bands && bands.length) {
+      // colour-coded liquid layers, bottom first; each band is its own solid between two planes
+      bands.forEach((b, i) => {
+        const bz = [b.z0].concat(zs.filter((z) => z > b.z0 && z < b.z1), [b.z1]);
+        fillPoly(ctx, hull(bz.flatMap(proj)), b.col, 0.3);
+        const top = proj(b.z1);
+        if (i === bands.length - 1) { fillPoly(ctx, top, b.col, 0.3); loop(ctx, top, b.col, 1.5); } else loop(ctx, top, b.col, 1.3, 0.95, [6, 3]);
+      });
+    } else if (level > zs[0] + 1e-9) {
       const wz = zs.filter((z) => z < level).concat([level]);
       fillPoly(ctx, hull(wz.flatMap(proj)), C.water, 0.3);
       const top = proj(level); fillPoly(ctx, top, C.water, 0.3); loop(ctx, top, C.water_deep, 1.5);
@@ -1322,7 +1374,8 @@
     if (mode === 'twotank') return drawTwoTankIso(ctx, W, H, R, A, T);
     const G = tankGeom(I, mode);
     const h = sm(A, 'h', mode === 'steady' ? I.H : d.hAt(S.simT), T.rdt, 14);
-    const hp = d.hp || 0, v = d.Cv * Math.sqrt(2 * g * Math.max(0, h + hp));
+    const hp = d.hp || 0, heqNow = d.layers ? (d.heqOf ? d.heqOf(Math.max(0, h)) : d.H1 + hp) : h + hp, v = d.Cv * Math.sqrt(2 * g * Math.max(0, heqNow));
+    const jetCol = d.layers ? layCol(d.layerAt ? d.layerAt(Math.max(0, h)) : 0) : C.water;
     const yo = I.y, fl = G.side ? Math.max((I.d / 2) * 1.6, 0.03 * G.Ht) : 0, zb = -fl;
     const xo = G.side ? G.Wt / 2 : 0;
     const zs = (a, b) => { if (G.side) return [a, b]; const o = []; for (let i = 0; i <= 24; i++) o.push(a + ((b - a) * i) / 24); return o; };
@@ -1331,7 +1384,7 @@
     const xL0 = G.side ? 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo) : 0;
     const Rt = Math.max(G.Wt / 2, G.sh === 'rect' && mode !== 'steady' ? I.Bt / 2 : 0, G.sh === 'hcyl' ? I.Lh / 2 : 0);
     const gx0 = -Rt * 1.5, gx1 = xo + xL0 + Math.max(0.4, Rt * 0.6), gy0 = -Rt * 1.5, gy1 = Rt * 1.5;
-    const { P, s } = isoFit(A, 'ib', [[gx0, gy0, 0], [gx1, gy0, 0], [gx1, gy1, 0], [gx0, gy1, 0], [-Rt, Rt, yo + G.Ht], [Rt, -Rt, yo + G.Ht], [-Rt, -Rt, yo + G.Ht]], W, H, 34, T.rdt);
+    const { P, s } = isoFit(A, 'ib', [[gx0, gy0, 0], [gx1, gy0, 0], [gx1, gy1, 0], [gx0, gy1, 0], [-Rt, Rt, yo + G.Ht], [Rt, -Rt, yo + G.Ht], [-Rt, -Rt, yo + G.Ht]].concat(d.layers && !G.side ? [[Rt * 3.2, -Rt * 1.5, yo + G.Ht]] : []), W, H, 34, T.rdt);
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     groundGrid(ctx, P, gx0, gx1, gy0, gy1);
     // shadows
@@ -1339,7 +1392,8 @@
     // legs
     const zl = G.side ? zb : G.sh === 'cone' ? 0.35 * G.Ht : G.sh === 'frustum' ? 0 : 0.25 * G.Ht;
     if (yo + zl > 1e-3) { const rl = ring(zl), idx = rl.length === 4 ? [0, 1, 2, 3] : [5, 15, 25, 35]; idx.forEach((i) => stroke(ctx, [P(rl[i][0] * 0.85, rl[i][1] * 0.85, 0), P(rl[i][0] * 0.85, rl[i][1] * 0.85, yo + zl)], C.wall, 3)); }
-    const finish = glassTank(ctx, P, ringW, zs(yo + zb, yo + G.Ht), yo + Math.max(h, zb + 1e-6));
+    const bands3 = layerBands(d, h, zb);
+    const finish = glassTank(ctx, P, ringW, zs(yo + zb, yo + G.Ht), yo + Math.max(h, zb + 1e-6), bands3 && bands3.map((q) => ({ z0: yo + q.z0, z1: yo + q.z1, col: layCol(q.j) })));
     // target levels
     if (mode !== 'steady' && I.H2 >= 0 && I.H2 <= G.Ht) loop(ctx, ring(I.H2).map((p) => P(p[0], p[1], yo + I.H2)), C.egl, 1.2, 0.9, [5, 4]);
     if (mode === 'inflow' && isFinite(d.heq) && d.heq > 0 && d.heq < G.Ht) loop(ctx, ring(d.heq).map((p) => P(p[0], p[1], yo + d.heq)), C.ok, 1.2, 0.9, [2, 3]);
@@ -1370,7 +1424,7 @@
       if (G.side) { const tL = Math.sqrt((2 * Math.max(yo, 1e-4)) / g); for (let i = 0; i <= 40; i++) { const t = (tL * i) / 40; jet.push(P(xo + v * t, 0, yo - (g * t * t) / 2)); shd.push(P(xo + v * t, 0, 0)); } }
       else { const tL = (-v + Math.sqrt(v * v + 2 * g * Math.max(yo, 1e-4))) / g; for (let i = 0; i <= 20; i++) { const t = (tL * i) / 20; jet.push(P(0, 0, yo - v * t - (g * t * t) / 2)); } }
       if (shd.length) stroke(ctx, shd, C.wall, 2, [4, 4]);
-      ctx.lineCap = 'round'; ctx.globalAlpha = 0.55; poly(ctx, jet); ctx.strokeStyle = C.water; ctx.lineWidth = Math.max(2.5, dj * s); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+      ctx.lineCap = 'round'; ctx.globalAlpha = 0.55; poly(ctx, jet); ctx.strokeStyle = jetCol; ctx.lineWidth = Math.max(2.5, dj * s); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
       const end = jet[jet.length - 1]; ctx.beginPath(); ctx.ellipse(end[0], end[1], 9, 4.5, 0, 0, 2 * PI); ctx.fillStyle = C.egl; ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1;
       if (G.side) { const xl = v * Math.sqrt((2 * Math.max(yo, 1e-4)) / g); dim3(ctx, P(xo, Rt * 0.9, 0), P(xo + xl, Rt * 0.9, 0), `x = ${fmt(xl)} ${L}`); }
     }
@@ -1388,6 +1442,7 @@
     const vt = P(xo, 0, yo); txt(ctx, `v = ${fmt(v)} ${U.v}`, vt[0] + 12, vt[1] - 14, { size: 11, mono: true, bg: C.bg });
     velScale(ctx, W - 210, 40, s, U.v);
     txt(ctx, 'Isometric 3D view', 16, 18, { bold: true, size: 12, color: C.muted });
+    if (d.layers) layerLegend(ctx, d, h, W - 12, 78);
     if (mode !== 'steady' && S.simT >= d.tEnd - 1e-9) txt(ctx, 'H₂ reached — press Reset to run again', W / 2, 18, { align: 'center', bold: true, color: C.egl });
   };
   function drawTwoTankIso(ctx, W, H, R, A, T) {

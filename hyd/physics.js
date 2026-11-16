@@ -124,18 +124,133 @@
     return null;
   };
 
+  /* Tank draining with several immiscible liquid layers (layer 1 at the orifice).
+     The bottom-most remaining layer flows out; the layers above it keep their volume
+     and ride down. The head driving the jet is the pressure at the orifice expressed
+     in metres of the liquid that is flowing out:
+         h_eq = Σ Sg_j·t_j / Sg_k + p_s/(γw·Sg_k),   Q = Cd·A_o·√(2g·h_eq)
+     and t = ∫ A_s(h) dh / Q, integrated phase by phase (one phase per layer). */
+  function drainLayers(o, I, U, lay, sh, K) {
+    const L = U.L, H1 = I.H, H2 = I.H2, n = lay.length, gw = U.gw, ps = I.ps;
+    if (H2 >= H1) return fail(o, 'Final head H₂ must be smaller than the initial head H₁ for draining.');
+    if (H2 < 0) return fail(o, 'Final head H₂ cannot be below the orifice.');
+    // volume below height h: V(h) = ∫ A_s dh (Simpson per cell, then linear inside a cell)
+    const NV = 2000, dv = H1 / NV, hv = [0], vv = [0];
+    for (let i = 1; i <= NV; i++) { const a = (i - 1) * dv, b = i * dv; vv.push(vv[i - 1] + (dv / 6) * (sh.As(a) + 4 * sh.As(a + dv / 2) + sh.As(b))); hv.push(b); }
+    const Vof = (h) => (h <= 0 ? 0 : h >= H1 ? vv[NV] : interp(hv, vv, h));
+    const Vinv = (v) => (v <= 0 ? 0 : v >= vv[NV] ? H1 : interp(vv, hv, v));
+    let z = 0; const zt = lay.map((l) => (z += l.t));
+    const Vl = lay.map((l, j) => Vof(zt[j]) - Vof(j ? zt[j - 1] : 0));
+    const Cab = lay.map((_, j) => Vl.slice(j + 1).reduce((a, b) => a + b, 0)); // volume of the layers above layer j
+    // interface tops of layers k..n−1 when the free surface is at h and layer k is the one draining
+    const topsK = (h, k) => { const Vt = Vof(h), t = []; for (let j = k; j < n; j++) t.push(j === n - 1 ? h : Math.max(0, Vinv(Vt - Cab[j]))); return t; };
+    const heqK = (h, k) => {
+      const t = topsK(h, k); let sum = 0;
+      for (let j = k; j < n; j++) sum += lay[j].sg * Math.max(0, t[j - k] - (j === k ? 0 : t[j - k - 1]));
+      return sum / lay[k].sg + ps / (gw * lay[k].sg);
+    };
+    const layerAt = (h) => { const Vt = Vof(h); for (let j = 0; j < n; j++) if (Vt > Cab[j] + 1e-12 * vv[NV]) return j; return n - 1; };
+    // phase boundaries: layer j is used up when V(h) = volume of the layers above it
+    const hb = lay.map((_, j) => (j === n - 1 ? 0 : Vinv(Cab[j])));
+    const segs = []; let stopped = false;
+    for (let j = 0; j < n; j++) {
+      const ha = j === 0 ? H1 : hb[j - 1], hlo = hb[j];
+      if (ha <= hlo + 1e-12) continue;
+      if (heqK(ha, j) <= 0) { stopped = true; break; }
+      if (heqK(hlo, j) < -1e-12) { const hs = bisect((h) => heqK(h, j), hlo, ha, 1e-12); segs.push({ k: j, ha, hb: hs }); stopped = true; break; }
+      segs.push({ k: j, ha, hb: hlo });
+    }
+    const hEmpty = segs.length ? segs[segs.length - 1].hb : H1;
+    // time from ha down to hb with layer k flowing; h = hb + s² removes the 1/√h_eq singularity at the bottom
+    const segTime = (ha, hbb, k) => {
+      if (ha <= hbb) return 0;
+      const sm = sqrt(ha - hbb), f = (s) => { s = Math.max(s, 1e-7 * sm); const h = hbb + s * s, e = heqK(h, k); return e > 0 ? (2 * s * sh.As(h)) / (K * sqrt(e)) : 0; };
+      return simpson(f, 0, sm, 400);
+    };
+    segs.forEach((g) => { g.t = segTime(g.ha, g.hb, g.k); });
+    const T = (h) => { let t = 0; for (const g of segs) { if (h >= g.ha) break; t += h <= g.hb ? g.t : segTime(g.ha, h, g.k); if (h > g.hb) break; } return t; };
+    const kName = (k) => `layer ${k + 1} (Sg ${fmt(lay[k].sg)})`;
+
+    S(o, 'Surface area as a function of head', 'A_s(h)', sh.expr, sh.constA ? `${fmt(sh.constA)} ${U.A}` : 'varies with h', 'Plan area of the free surface at height h above the orifice.');
+    S(o, 'Volume of each layer', 'V_j = ∫ A_s dh over the layer', 'from the bottom of each layer to its top', `total ${fmt(Vl.reduce((a, b) => a + b, 0))} ${U.Vol}`, 'The upper layers keep these volumes while the layer below them drains.',
+      { head: ['Layer', 'Sg', `t (${L})`, `V (${U.Vol})`, `used up at h (${L})`], rows: lay.map((l, j) => [String(j + 1), fmt(l.sg), fmt(l.t), fmt(Vl[j]), j === n - 1 ? '0' : fmt(hb[j])]).reverse() });
+    let cum = 0;
+    segs.forEach((g, i) => {
+      const ea = heqK(g.ha, g.k), eb = Math.max(0, heqK(g.hb, g.k));
+      const t0 = cum; cum += g.t;
+      const f = sh.constA ? 't = 2A_s(√h_eq,a − √h_eq,b) / (Cd·A_o·√(2g))' : 't = ∫ A_s(h) dh / (Cd·A_o·√(2g·h_eq)), Simpson 400 steps';
+      const sub = sh.constA ? `t = 2(${fmt(sh.constA)})(√${fmt(ea)} − √${fmt(eb)}) / ${fmt(K)}` : `h = ${fmt(g.ha)} → ${fmt(g.hb)} ${L}; h_eq = ${fmt(ea)} → ${fmt(eb)} ${L}`;
+      S(o, `Phase ${i + 1}: ${kName(g.k)} flows out, h = ${fmt(g.ha)} → ${fmt(g.hb)} ${L}`, `h_eq = Σ Sg_j·t_j / Sg_k${ps ? ' + p_s/γ_k' : ''};  ${f}`, sub, `${fmt(g.t)} s (ends at t = ${fmt(cum)} s = ${fmt(cum / 60)} min)`,
+        (sh.constA ? 'With a constant area, h_eq falls one-for-one with h, so the single-liquid formula applies to each phase. ' : '') + `Phase starts at t = ${fmt(t0)} s.`);
+    });
+    if (H2 < hEmpty - 1e-12) return fail(o, `With the vacuum on the surface, outflow stops when the level reaches h = ${fmt(hEmpty)} ${L}; H₂ = ${fmt(H2)} ${L} is never reached.`);
+    const t = T(H2), tEmpty = cum, kq = layerAt(H2), e2 = Math.max(0, heqK(H2, Math.min(kq, n - 1)));
+    S(o, 'Time to drain H₁ → H₂', 't = sum of the phases down to H₂', `h = ${fmt(H1)} → ${fmt(H2)} ${L}`, `${fmt(t)} s = ${fmt(t / 60)} min`, `At H₂ the outflow is ${kName(kq)} with h_eq = ${fmt(e2)} ${L}.`);
+    R(o, 'Time to drain H₁ → H₂', t, 's', true); R(o, 'Time to drain H₁ → H₂', t / 60, 'min');
+    R(o, stopped ? 'Time until outflow stops' : 'Time to empty (to orifice level)', tEmpty, 's');
+    R(o, 'Discharge at H₂', K * sqrt(e2), U.Q);
+    let tc = 0; segs.forEach((g) => { tc += g.t; if (g.k < n - 1 && !(stopped && g === segs[segs.length - 1])) R(o, `Layer ${g.k + 1} (Sg ${fmt(lay[g.k].sg)}) used up at`, tc, 's'); });
+    if (stopped) W(o, `The vacuum on the surface stops the outflow at h = ${fmt(hEmpty)} ${L}.`, 'info');
+    if (I.tq > 0) {
+      if (I.tq >= tEmpty) { S(o, 'Solve for the head after t', 't ≥ time to empty', `t = ${fmt(I.tq)} s`, stopped ? 'outflow stopped' : 'tank empty', 'The level has already reached its lowest point.'); W(o, `After ${fmt(I.tq)} s the outflow has already ended (at ${fmt(tEmpty)} s).`, 'info'); }
+      else {
+        const hq = bisect((h) => T(h) - I.tq, hEmpty, H1, 1e-9);
+        S(o, 'Solve for the head after t', 'find h such that t(H₁ → h) = t', `t = ${fmt(I.tq)} s (bisection over the phases)`, `h = ${fmt(hq)} ${L}`, `Then ${kName(layerAt(hq))} is flowing out.`);
+        R(o, `Head after ${fmt(I.tq)} s`, hq, L);
+      }
+    }
+    // animation table: per phase, uniform in s = √(h − h_b), scaled to the exact phase time
+    const ts = [0], hs = [H1], qs = [K * sqrt(Math.max(0, heqK(H1, 0)))]; let t0 = 0;
+    for (const g of segs) {
+      if (H2 >= g.ha) break;
+      const lo = Math.max(g.hb, H2), base = g.hb, M = 200, sa = sqrt(g.ha - base), sb = sqrt(lo - base);
+      const f = (s) => { s = Math.max(s, 1e-7 * (sa || 1)); const h = base + s * s, e = heqK(h, g.k); return e > 0 ? (2 * s * sh.As(h)) / (K * sqrt(e)) : 0; };
+      const loc = [0], hh = [g.ha], qq = [K * sqrt(Math.max(0, heqK(g.ha, g.k)))]; let acc = 0, fp = f(sa);
+      for (let i = 1; i <= M; i++) { const s = sa + ((sb - sa) * i) / M, fc = f(s); acc += ((fp + fc) / 2) * ((sa - sb) / M); fp = fc; loc.push(acc); const h = base + s * s; hh.push(h); qq.push(K * sqrt(Math.max(0, heqK(h, g.k)))); }
+      const exact = segTime(g.ha, lo, g.k), sc = acc > 0 ? exact / acc : 0;
+      for (let i = 1; i <= M; i++) { ts.push(t0 + loc[i] * sc); hs.push(hh[i]); qs.push(qq[i]); }
+      t0 += exact;
+      if (lo > g.hb) break;
+    }
+    const heqOf = (h) => Math.max(0, heqK(h, layerAt(h)));
+    const layZ = (h) => { const k = layerAt(h), tp = topsK(h, k), out = []; for (let j = 0; j < n; j++) out.push(j < k ? 0 : tp[j - k]); return out; };
+    Object.assign(o.data, { tEnd: t, table: { ts, hs, qs }, hAt: (x) => interp(ts, hs, x), heqOf, layZ, layerAt, hEmpty, tEmpty });
+    return o;
+  }
+
   HP.orifice = function (I, U) {
     const o = Out(), g = U.g, L = U.L, mode = I.mode;
     const gam = I.Sg * U.gw, Ao = (PI * I.d * I.d) / 4, hp = I.ps / gam, s2g = sqrt(2 * g);
     const Cd = I.Cd, Cv = I.Cv, Cc = I.Cc, K = Cd * Ao * s2g;
-    const H1 = I.H, HT = H1 + hp;
+    // liquid layers (steady and draining only): layer 1 is the bottom liquid at the orifice
+    const nL = mode === 'steady' || mode === 'drain' ? Math.max(1, Math.min(4, Math.round(+I.nLay || 1))) : 1;
+    const lay = [{ sg: I.Sg, t: I.H }];
+    for (let j = 2; j <= nL; j++) lay.push({ sg: I['sg' + j], t: I['t' + j] });
+    if (nL > 1) lay[0].t = I.H - lay.slice(1).reduce((a, l) => a + l.t, 0);
+    let H1 = I.H;
     o.data = { mode, Ao, hp, K, Cv, Cd, Cc, d: I.d, y: I.y, g, H1, shape: I.shape };
     if (abs(Cc * Cv - Cd) > 0.005) W(o, `Cd should equal Cc × Cv (${fmt(Cc)} × ${fmt(Cv)} = ${fmt(Cc * Cv)}). Q uses Cd = ${fmt(Cd)}.`);
 
-    S(o, 'Unit weight of the liquid', 'γ = Sg·γw', `γ = ${fmt(I.Sg)} × ${fmt(U.gw)}`, `${fmt(gam)} ${U.gam}`, 'Unit weight used for pressure head and jet power.');
+    S(o, nL > 1 ? 'Unit weight of the bottom liquid (layer 1)' : 'Unit weight of the liquid', nL > 1 ? 'γ₁ = Sg₁·γw' : 'γ = Sg·γw', `γ${nL > 1 ? '₁' : ''} = ${fmt(I.Sg)} × ${fmt(U.gw)}`, `${fmt(gam)} ${U.gam}`, nL > 1 ? 'The orifice discharges the bottom liquid first.' : 'Unit weight used for pressure head and jet power.');
     S(o, 'Orifice area', 'A_o = πd²/4', `A_o = π(${fmt(I.d)})²/4`, `${fmt(Ao)} ${U.A}`, 'Area of the orifice opening.');
+    if (nL > 1) {
+      const up = I.H - lay[0].t;
+      if (lay.some((l) => !(l.sg > 0))) return fail(o, 'Every layer needs a specific gravity greater than zero.');
+      if (lay.slice(1).some((l) => !(l.t > 0))) return fail(o, 'Every upper layer needs a thickness greater than zero.');
+      if (!(lay[0].t > 1e-9)) return fail(o, `The upper layers are ${fmt(up)} ${L} thick in total, which leaves no room for layer 1 in a total depth H${mode === 'drain' ? '₁' : ''} = ${fmt(I.H)} ${L}. Make H larger or the upper layers thinner.`);
+      for (let j = 1; j < nL; j++) if (lay[j].sg > lay[j - 1].sg + 1e-9) W(o, `Layer ${j + 1} (Sg ${fmt(lay[j].sg)}) is heavier than layer ${j} below it (Sg ${fmt(lay[j - 1].sg)}); in a real tank it would sink. It is computed as entered.`);
+      let pz = 0; lay.forEach((l) => { pz += l.sg * U.gw * l.t; });
+      const rows = lay.map((l, j) => [String(j + 1) + (j === 0 ? ' (bottom)' : j === nL - 1 ? ' (top)' : ''), fmt(l.sg), fmt(l.sg * U.gw), fmt(l.t), fmt(l.sg * U.gw * l.t)]).reverse();
+      S(o, 'Liquid layers', 't₁ = H − (t₂ + … + tₙ)', `t₁ = ${fmt(I.H)} − ${fmt(up)}`, `t₁ = ${fmt(lay[0].t)} ${L}`, 'Layers listed from the top down; layer 1 sits at the orifice.', { head: ['Layer', 'Sg', `γ (${U.gam})`, `t (${L})`, `γ·t (${U.p})`], rows });
+      S(o, 'Pressure at the orifice from the layers', 'p = Σ γᵢ·tᵢ', `p = ${lay.map((l) => `${fmt(l.sg * U.gw)}(${fmt(l.t)})`).join(' + ')}`, `${fmt(pz)} ${U.p}`, 'Each layer adds its own γ·t to the pressure below it.');
+      H1 = pz / gam;
+      S(o, 'Equivalent head of the bottom liquid', 'H_eq = p/γ₁ = Σ Sgᵢ·tᵢ / Sg₁', `H_eq = ${fmt(pz)} / ${fmt(gam)}`, `${fmt(H1)} ${L}`, 'The jet is layer-1 liquid, so the head driving it is the pressure in metres of that liquid.');
+      R(o, 'Equivalent head H_eq' + (mode === 'drain' ? ' (at H₁)' : ''), H1, L);
+      o.data.layers = lay; o.data.Heq0 = H1; o.data.H1 = H1;
+    }
+    const HT = H1 + hp;
     if (hp !== 0 && mode !== 'twotank')
-      S(o, 'Total head (closed tank)', 'H_T = H + p_s/γ', `H_T = ${fmt(H1)} + ${P(I.ps)}/${fmt(gam)}`, `${fmt(HT)} ${L}`, 'Gauge pressure on the liquid surface adds a pressure head.');
+      S(o, 'Total head (closed tank)', nL > 1 ? 'H_T = H_eq + p_s/γ₁' : 'H_T = H + p_s/γ', `H_T = ${fmt(H1)} + ${P(I.ps)}/${fmt(gam)}`, `${fmt(HT)} ${L}`, 'Gauge pressure on the liquid surface adds a pressure head.');
     if (mode !== 'twotank' && HT <= 0) return fail(o, 'Total head is zero or negative: the vacuum on the surface is strong enough that no liquid flows out (air is drawn in instead).');
 
     const at = mode === 'steady' ? '' : ' (at H₁)';
@@ -143,7 +258,7 @@
     const vt = sqrt(2 * g * Hh), v = Cv * vt, Q = Cd * Ao * vt, a = Cc * Ao;
     const HL = (1 / (Cv * Cv) - 1) * (v * v) / (2 * g), Pw = (gam * Q * v * v) / (2 * g);
     const x = 2 * Cv * sqrt(Hh * I.y);
-    const Hs = mode === 'twotank' ? 'ΔH' : hp !== 0 ? 'H_T' : 'H';
+    const Hs = mode === 'twotank' ? 'ΔH' : hp !== 0 ? 'H_T' : nL > 1 ? 'H_eq' : 'H';
     S(o, 'Theoretical velocity' + at, `v_t = √(2g${Hs})`, `v_t = √(2 × ${fmt(g)} × ${fmt(Hh)})`, `${fmt(vt)} ${U.v}`, 'Torricelli: ideal velocity from the head.');
     S(o, 'Actual jet velocity' + at, 'v = Cv·√(2gH)', `v = ${fmt(Cv)} × ${fmt(vt)}`, `${fmt(v)} ${U.v}`, 'Friction makes the real jet slower by Cv.');
     S(o, 'Discharge' + at, 'Q = Cd·A_o·√(2gH)', `Q = ${fmt(Cd)} × ${fmt(Ao)} × ${fmt(vt)}`, `${fmt(Q)} ${U.Q}`, 'Cd = Cc·Cv accounts for contraction and friction.');
@@ -198,7 +313,8 @@
       return o;
     }
 
-    if (H1 > sh.Hmax) return fail(o, `Initial head H₁ = ${fmt(H1)} ${L} exceeds the tank height (${fmt(sh.Hmax)} ${L}). Lower H₁ or enlarge the tank.`);
+    if (I.H > sh.Hmax) return fail(o, `Initial head H₁ = ${fmt(I.H)} ${L} exceeds the tank height (${fmt(sh.Hmax)} ${L}). Lower H₁ or enlarge the tank.`);
+    if (nL > 1) return drainLayers(o, I, U, lay, sh, K);
     const Qin = mode === 'inflow' ? I.Qin : 0;
     S(o, 'Surface area as a function of head', 'A_s(h)', sh.expr, sh.constA ? `${fmt(sh.constA)} ${U.A}` : 'varies with h', 'Plan area of the free surface at height h above the orifice.');
     // t = ∫ A_s dh / (Q_in − Cd·A_o·√(2g(h+hp))); substitute u = √(h+hp) ⇒ dh = 2u du (removes the 1/√h singularity)
@@ -748,7 +864,7 @@
   /* =====================================================================
      MODULE 5 — WEIRS
      ===================================================================== */
-  HP.weir = function (I, U) {
+  function weirQ(I, U) {
     const o = Out(), g = U.g, L = U.L, mode = I.mode, s2g = sqrt(2 * g);
     o.data = { mode };
     const H = mode === 'unsteady' ? I.H1 : I.H;
@@ -840,6 +956,62 @@
       R(o, 'Approach velocity v_a', va, U.v);
     }
     Object.assign(o.data, { Q, H, P: I.P, Lw: I.L, b, ht, theta: I.theta, zs: I.zs, n: +I.n, g });
+    return o;
+  }
+
+  /** Weirs: find Q from H (default), or H from a given Q by inverting the same equations. */
+  HP.weir = function (I, U) {
+    if (I.solveFor !== 'H' || I.mode === 'unsteady') return weirQ(I, U);
+    const mode = I.mode, L = U.L, g = U.g, s2g = sqrt(2 * g), Qt = I.Qw;
+    const bad = (t) => { const o = Out(); o.data = { mode }; return fail(o, t); };
+    if (!(Qt > 0)) return bad('Enter a discharge Q greater than zero to solve for the head.');
+    const qAt = (h) => { const r = weirQ(Object.assign({}, I, { H: h }), U); return r.invalid ? NaN : r.data.Q; };
+    const ht = I.ht > 0 ? I.ht : 0, n = mode === 'rect' ? +I.n : 0;
+    const Crect = I.useCd ? (2 / 3) * I.Cd * s2g : U.weir;
+    const tn = Math.tan((I.theta * PI) / 360);
+    const Cv = I.useCd ? (8 / 15) * I.Cd * s2g * tn : U.vn * tn;
+    const cip = mode === 'trap' && abs(I.zs - 0.25) < 1e-9 && !I.useCd;
+    // direct inversion where H appears once; otherwise a starting guess
+    let H0, direct = null;
+    if (mode === 'rect') { H0 = pow(Qt / (Crect * I.L), 2 / 3); if (n === 0 && !I.approach) direct = ['H = [Q / (C·L)]^(2/3)', `H = [${fmt(Qt)} / (${fmt(Crect)} × ${fmt(I.L)})]^(2/3)`]; }
+    else if (mode === 'vnotch') { H0 = pow(Qt / Cv, 2 / 5); direct = ['H = (Q / C)^(2/5),  C = ' + (I.useCd ? '(8/15)Cd√(2g)·tan(θ/2)' : `${U.vn}·tan(θ/2)`), `H = (${fmt(Qt)} / ${fmt(Cv)})^(2/5)`]; }
+    else if (mode === 'trap') { H0 = pow(Qt / ((cip ? U.cip : Crect) * I.L), 2 / 3); if (cip) direct = [`H = [Q / (${U.cip}·L)]^(2/3)`, `H = [${fmt(Qt)} / (${U.cip} × ${fmt(I.L)})]^(2/3)`]; }
+    else { H0 = pow(Qt / (U.broad * I.L), 2 / 3); direct = [`H = [Q / (${U.broad}·L)]^(2/3)`, `H = [${fmt(Qt)} / (${U.broad} × ${fmt(I.L)})]^(2/3)`]; }
+    if (ht > 0) direct = null; // submergence makes Q depend on H twice
+    // bracket the root: Q(H) rises with H (up to H = 6L/n with end contractions)
+    const lo0 = ht > 0 ? ht * (1 + 1e-9) + 1e-12 : 1e-9;
+    const cap = n > 0 ? (6 * I.L) / n : 1e4;
+    let lo = lo0, hi = Math.min(Math.max(H0, lo0) * 1.5 + 1e-6, cap);
+    for (let k = 0; k < 80 && !(qAt(hi) >= Qt) && hi < cap; k++) { lo = hi; hi = Math.min(hi * 2, cap); }
+    if (!(qAt(hi) >= Qt)) return bad(n > 0 ? `This weir cannot pass Q = ${fmt(Qt)} ${U.Q}: with ${n} end contraction${n > 1 ? 's' : ''} the most it carries is ${fmt(qAt(cap))} ${U.Q} (at H = 6L/n = ${fmt(cap)} ${L}). Lengthen the crest.` : `No head up to ${fmt(cap)} ${L} passes Q = ${fmt(Qt)} ${U.Q}.`);
+    let H, rows = [];
+    if (direct) H = mode === 'vnotch' ? pow(Qt / Cv, 2 / 5) : H0;
+    else {
+      // Newton steps on Q(H) = Q_target, kept inside the bracket (bisection if a step leaves it)
+      let h = Math.min(Math.max(H0, lo), hi);
+      for (let k = 0; k < 60; k++) {
+        const q = qAt(h), dh = Math.max(1e-7, 1e-6 * h), dq = (qAt(h + dh) - qAt(Math.max(lo0, h - dh))) / (h + dh - Math.max(lo0, h - dh));
+        rows.push([String(k + 1), fmt(h, 6), fmt(q, 6), fmt(q - Qt, 3)]);
+        if (abs(q - Qt) <= 1e-10 * Qt) break;
+        if (q < Qt) lo = h; else hi = h;
+        let hn = dq > 0 ? h - (q - Qt) / dq : NaN;
+        if (!(hn > lo && hn < hi)) hn = 0.5 * (lo + hi);
+        if (abs(hn - h) <= 1e-12 * h) { h = hn; break; }
+        h = hn;
+      }
+      H = h;
+    }
+    const o = weirQ(Object.assign({}, I, { H }), U);
+    if (o.invalid) return o;
+    const why = mode === 'rect' && n > 0 ? 'L′ = L − 0.1nH depends on H' : mode === 'rect' && I.approach ? 'the velocity of approach depends on H' : ht > 0 ? 'the Villemonte submergence factor depends on H' : 'the trapezoid has a rectangular and a triangular part';
+    const st = direct
+      ? { t: 'Solve for the head H (direct)', f: direct[0], s: direct[1], r: `${fmt(H)} ${L}`, n: 'The discharge equation rearranged for H.' }
+      : { t: 'Solve for the head H (iteration)', f: 'find H such that Q(H) = Q', s: `Q = ${fmt(Qt)} ${U.Q}; start from H = ${fmt(H0)} ${L}; ${why}`, r: `${fmt(H)} ${L}`, n: 'Newton steps on Q(H) − Q = 0 (bisection kept as a fallback); the steps below check the result.', table: { head: ['#', 'H', 'Q(H)', 'Q(H) − Q'], rows: rows.slice(0, 12) } };
+    o.steps.unshift(st);
+    o.results.forEach((r) => { if (r.label === 'Discharge Q' && r.em) r.em = false; });
+    o.results.unshift({ label: 'Head over the crest H', value: H, unit: L, em: true });
+    if (ht > 0 && I.villemonte === false) W(o, 'Submerged weir solved without the Villemonte correction: H is under-estimated.', 'info');
+    o.data.solveFor = 'H'; o.data.Qtarget = Qt;
     return o;
   };
 

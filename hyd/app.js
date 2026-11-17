@@ -1849,7 +1849,7 @@
       if (!R || R.invalid) { [[ctxM, a], [ctxA, b]].forEach(([c, s]) => { c.fillStyle = C.bg; c.fillRect(0, 0, s.W, s.H); }); txt(ctxM, 'Fix the input flagged on the right to see the diagram.', a.W / 2, a.H / 2, { align: 'center', size: 14, color: C.danger, bold: true }); }
       else { (m.drawIso && S.view === '3d' ? m.drawIso : m.draw)(ctxM, a.W, a.H, R, A, T); m.drawAux(ctxA, b.W, b.H, R, A, T); }
     } catch (e) { console.error(e); }
-    const t = S.simT; $('#clock').textContent = `simulated t = ${fmt(t)} s (${fmt(t / 60)} min)  ·  ${S.speed}×`;
+    const t = S.simT; $('#clock').textContent = `simulated t = ${t.toFixed(2).padStart(7)} s (${(t / 60).toFixed(2).padStart(6)} min) · ${(S.speed + '×').padEnd(5)}`; // fixed decimals + padding: the text keeps one width, so nothing around it moves
     requestAnimationFrame(frame);
   }
   function pointer(cv, handler) {

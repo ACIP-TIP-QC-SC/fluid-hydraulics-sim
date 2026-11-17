@@ -366,6 +366,8 @@
     V.circle(0, H, 0, R, '#2c3e50', 2);
     if (g.shape !== 'cone') V.circle(0, 0, 0, R, '#2c3e50', 2);
     V.line([[0, Math.min(0, g.zv) - 0.1 * H, 0], [0, H * 1.25, 0]], '#7f8c8d', 1, [8, 4]);
+    // paraboloid meridian (dashed): shows the imaginary part below the bottom or above the lid, which h is measured on
+    if (g.zv < -1e-9 || g.rim > H + 1e-9) { const pr = []; for (let i = -40; i <= 40; i++) { const r = (R * i) / 40; pr.push([r, g.zv + g.k * r * r, 0]); } V.line(pr, '#0b3d91', 1.2, [5, 4]); }
     void half;
     const u = U.len, gap = 0.3 * Math.max(R, 0.3 * H);
     V.dim([0, H, 0], [R, H, 0], `R = ${f(R)} ${u}`, [0, gap * 0.6, 0]);

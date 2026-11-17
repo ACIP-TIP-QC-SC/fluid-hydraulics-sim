@@ -441,7 +441,7 @@
     V.dim([0, 0, Lz], [g.R * Math.cos(ra), g.R * Math.sin(ra), Lz], `R = ${f(g.R)} ${u}`, [0, 0, 0]);
     const bx = g.type === 'quarter' ? 0 : g.type === 'semi' ? 0 : 0;
     V.dim([bx, -g.R, 0], [bx, -g.R, Lz], `L = ${f(g.W)} ${u}`, [0, -gap, 0]);
-    const xr = Math.max(...xs);
+    const xr = Math.max(...xs, ...cg.solid.map((p) => p[0])); // keep the depth dimension outside the gate and its support
     V.dim([xr, g.yFS, Lz], [xr, g.yTop - g.Hp, Lz], `depth ${f(g.hd + g.Hp)} ${u}`, [gap, 0, 0]);
     if (g.hd > 0) V.dim([xr, g.yFS, Lz], [xr, g.yTop, Lz], `h = ${f(g.hd)} ${u}`, [2.2 * gap, 0, 0]);
     V.autoBounds();

@@ -120,9 +120,10 @@
         const vs = s.solve === 'up' ? -1 : 1, a = P(s0 + s.L / 2, tf + hb + 0.15 * s.L), b = P(s0 + s.L / 2 + vs * 0.5 * s.L, tf + hb + 0.15 * s.L);
         V.line([[a[0], a[1], 0], [b[0], b[1], 0]], '#c0392b', 3); V.label([b[0], b[1], 0], `V = ${f(g.V)} ${u.V}`, '#c0392b');
         V.dim([P(s0, tf + hb)[0], P(s0, tf + hb)[1], s.B / 2], [P(s0 + s.L, tf + hb)[0], P(s0 + s.L, tf + hb)[1], s.B / 2], `L = ${f(s.L)} ${u.len}`, [n[0] * 0.2 * s.L, n[1] * 0.2 * s.L, 0]);
-        const q = P(s0 + s.L, tf); V.dim([q[0], q[1], -s.B / 2], [q[0], q[1], s.B / 2], `B = ${f(s.B)} ${u.len}`, [0.2 * s.L, 0, 0]);
+        const q = P(s0 + s.L, tf); V.dim([q[0], q[1], -s.B / 2], [q[0], q[1], s.B / 2], `B = ${f(s.B)} ${u.len}`, [0.4 * s.L, 0, 0]);
         V.label([Lr * Math.cos(th) * 0.8, 0.02, zb], `θ = ${f(s.theta)}°`, '#34495e');
-        V.label([P(s0, 0)[0], P(s0, 0)[1], s.B / 2], `film t = ${f(g.tIn)} ${u.t}`, OILD);
+        V.line([[P(s0, tf / 2)[0], P(s0, tf / 2)[1], s.B / 2], [P(s0, tf / 2)[0], P(s0, tf / 2)[1], s.B * 1.15]], OILD, 1);
+        V.label([P(s0, tf / 2)[0], P(s0, tf / 2)[1], s.B * 1.15], `film t = ${f(g.tIn)} ${u.t}`, OILD);
       } else if (s.sub === 'gap') {
         const Wd = Math.sqrt(s.A), H = g.hgap, sc = Wd / (H * 6), Hs = H * sc * 3;
         const y = (m) => m * sc * 3;
@@ -168,7 +169,7 @@
       } else {
         const R = s.R, L = s.Lc, c = Math.max(g.t, 0.1 * R), tb = s.bottom ? Math.max(g.tb, 0.1 * R) : 0.15 * R;
         V.lathe([[0, -tb - 0.1 * R], [R + c + 0.15 * R, -tb - 0.1 * R], [R + c + 0.15 * R, 1.15 * L], [R + c, 1.15 * L], [R + c, -tb], [0, -tb]], STEEL, 0.3, null, 40);
-        V.lathe([[0, -tb], [R + c, -tb], [R + c, L], [0, L]], OIL, 0.35, null, 40);
+        V.lathe([[0, -tb], [R + c, -tb], [R + c, L], [R, L], [R, 0], [0, 0]], OIL, 0.35, null, 40);
         V.lathe([[0, 0], [R, 0], [R, 1.3 * L], [0, 1.3 * L]], '#7f8c8d', 0.95, null, 40);
         V.circle(0, 1.4 * L, 0, R * 0.8, '#c0392b', 2.5);
         V.label([R, 1.4 * L, 0], `N = ${f(s.N)} rpm, T = ${f(s.Tq)} ${u.T}`, '#c0392b');

@@ -93,12 +93,22 @@
     lathe(profile, fill, alpha = 1, stroke = null, seg = 40, cx = 0, cz = 0, opts = {}) {
       const n = profile.length;
       const m = opts.open ? n - 1 : n;
+      // A flat cap (horizontal segment touching the axis) is drawn as ONE disc face, not a fan of
+      // thin triangles: fan triangles get sorted out of order and show as spikes over other parts.
+      const isCap = (a, b) => Math.abs(a[1] - b[1]) < 1e-12 && Math.min(Math.abs(a[0]), Math.abs(b[0])) < 1e-9 && Math.max(Math.abs(a[0]), Math.abs(b[0])) > 1e-9;
+      for (let i = 0; i < m; i++) {
+        const a = profile[i], b = profile[(i + 1) % n];
+        if (!isCap(a, b)) continue;
+        const r = Math.max(Math.abs(a[0]), Math.abs(b[0])), disc = [];
+        for (let j = 0; j < seg; j++) { const t = (j / seg) * 2 * Math.PI; disc.push([cx + r * Math.cos(t), a[1], cz + r * Math.sin(t)]); }
+        this.face(disc, fill, alpha, stroke);
+      }
       for (let j = 0; j < seg; j++) {
         const t0 = (j / seg) * 2 * Math.PI, t1 = ((j + 1) / seg) * 2 * Math.PI;
         const c0 = Math.cos(t0), s0 = Math.sin(t0), c1 = Math.cos(t1), s1 = Math.sin(t1);
         for (let i = 0; i < m; i++) {
           const a = profile[i], b = profile[(i + 1) % n];
-          if (Math.abs(a[0]) < 1e-9 && Math.abs(b[0]) < 1e-9) continue;
+          if ((Math.abs(a[0]) < 1e-9 && Math.abs(b[0]) < 1e-9) || isCap(a, b)) continue;
           const q = [[cx + a[0] * c0, a[1], cz + a[0] * s0], [cx + b[0] * c0, b[1], cz + b[0] * s0], [cx + b[0] * c1, b[1], cz + b[0] * s1], [cx + a[0] * c1, a[1], cz + a[0] * s1]];
           this.face(q, fill, alpha, stroke);
         }
@@ -169,6 +179,8 @@
       }
       // dimension lines (drawn in screen space so arrowheads stay crisp)
       ctx.font = '600 11.5px system-ui, sans-serif';
+      const taken = []; // screen boxes already used by text, so labels can step aside instead of overprinting
+      const hits = (r) => taken.some((t) => r[0] < t[0] + t[2] + 2 && t[0] < r[0] + r[2] + 2 && r[1] < t[1] + t[3] + 1 && t[1] < r[1] + r[3] + 1);
       for (const d of this.dims) {
         const A = this.project(d.a), B = this.project(d.b), A2 = this.project(d.a2), B2 = this.project(d.b2);
         const L = Math.hypot(B2[0] - A2[0], B2[1] - A2[1]);
@@ -185,14 +197,18 @@
         });
         const mx = (A2[0] + B2[0]) / 2, my = (A2[1] + B2[1]) / 2;
         const tw = ctx.measureText(d.text).width;
-        ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillRect(mx - tw / 2 - 3, my - 8, tw + 6, 15);
+        ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillRect(mx - tw / 2 - 3, my - 8, tw + 6, 15); taken.push([mx - tw / 2 - 3, my - 8, tw + 6, 15]);
         ctx.fillStyle = d.color; ctx.textAlign = 'center'; ctx.fillText(d.text, mx, my + 4); ctx.textAlign = 'start';
       }
       ctx.font = '600 12px system-ui, sans-serif';
       for (const lb of this.labels) {
-        const q = this.project(lb.p);
-        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.strokeText(lb.text, q[0] + 4, q[1] - 4);
-        ctx.fillStyle = lb.color; ctx.fillText(lb.text, q[0] + 4, q[1] - 4);
+        const q = this.project(lb.p), tw = ctx.measureText(lb.text).width;
+        let dy = 0;
+        for (const t of [0, -15, 15, -30, 30, -45, 45, -60, 60]) { if (!hits([q[0] + 2, q[1] - 17 + t, tw + 4, 16])) { dy = t; break; } }
+        taken.push([q[0] + 2, q[1] - 17 + dy, tw + 4, 16]);
+        if (dy) { ctx.strokeStyle = lb.color; ctx.globalAlpha = 0.5; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0] + 3, q[1] - 9 + dy); ctx.stroke(); ctx.globalAlpha = 1; }
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.strokeText(lb.text, q[0] + 4, q[1] - 4 + dy);
+        ctx.fillStyle = lb.color; ctx.fillText(lb.text, q[0] + 4, q[1] - 4 + dy);
       }
       // axis gizmo
       const gx = 46, gy = h - 40, s = 26;

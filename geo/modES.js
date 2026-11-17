@@ -97,7 +97,7 @@
       if (opts.showP !== false) {
         const sMax = Math.max(...pr.pts.map((p) => Math.max(Math.abs(p.s), Math.abs(p.u))), 1e-9), k = (0.45 * Ht) / sMax;
         [['s', CS, 'σ'], ['u', CU, 'u'], ['e', CE, 'σ′']].forEach(([key, col, nm], j) => {
-          const x0 = W + 0.15 * Ht + j * 0.6 * Ht, zz = Lz;
+          const x0 = W + 0.15 * Ht + j * 0.6 * Ht, zz = 0; // back plane: the diagrams sit beside the column instead of over its right face
           const pts = pr.pts.map((p) => [x0 + p[key] * k, -p.z, zz]);
           V.face([[x0, 0, zz]].concat(pts, [[x0, -Ht, zz]]), col, 0.3, col);
           V.line([[x0, 0, zz], [x0, -Ht, zz]], '#2c3e50', 1.2);

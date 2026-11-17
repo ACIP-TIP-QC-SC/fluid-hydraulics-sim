@@ -638,22 +638,30 @@
     if (shape === 'rect') { A = b * y; Pw = b + 2 * y; T = b; }
     else if (shape === 'trap') { A = (b + z * y) * y; Pw = b + 2 * y * sqrt(1 + z * z); T = b + 2 * z * y; }
     else if (shape === 'tri') { A = z * y * y; Pw = 2 * y * sqrt(1 + z * z); T = 2 * z * y; }
-    else { const yy = Math.min(Math.max(y, 0), D); th = 2 * Math.acos(1 - (2 * yy) / D); A = ((D * D) / 8) * (th - Math.sin(th)); Pw = (D * th) / 2; T = D * Math.sin(th / 2); }
+    else {
+      // circle (closed conduit, y ≤ D) or semicircle (open channel of radius r = D/2, y ≤ r): same segment formulas
+      const yy = Math.min(Math.max(y, 0), shape === 'semi' ? D / 2 : D);
+      th = 2 * Math.acos(1 - (2 * yy) / D); A = ((D * D) / 8) * (th - Math.sin(th)); Pw = (D * th) / 2; T = D * Math.sin(th / 2);
+    }
     return { A, P: Pw, T, R: A / Pw, Dh: A / T, theta: th };
   };
   const secText = {
     rect: 'A = b·y,  P = b + 2y,  T = b',
     trap: 'A = (b + zy)y,  P = b + 2y√(1+z²),  T = b + 2zy',
     tri: 'A = zy²,  P = 2y√(1+z²),  T = 2zy',
-    circ: 'θ = 2cos⁻¹(1 − 2y/D),  A = (D²/8)(θ − sinθ),  P = Dθ/2,  T = D·sin(θ/2)'
+    circ: 'θ = 2cos⁻¹(1 − 2y/D),  A = (D²/8)(θ − sinθ),  P = Dθ/2,  T = D·sin(θ/2)',
+    semi: 'r = D/2,  θ = 2cos⁻¹(1 − y/r),  A = (r²/2)(θ − sinθ),  P = rθ,  T = 2r·sin(θ/2)   (y ≤ r)'
   };
   HP.secText = secText;
-  function yMaxFor(shape, G) { return shape === 'circ' ? G.D * 0.99999 : 1e4; }
+  function yMaxFor(shape, G) { return shape === 'circ' ? G.D * 0.99999 : shape === 'semi' ? G.D / 2 : 1e4; }
+  HP.yMaxFor = yMaxFor;
+  const roundShape = (shape) => shape === 'circ' || shape === 'semi';
   // Critical depth: Q²T/(gA³) = 1
   HP.criticalDepth = function (shape, G, Q, g) {
     const f = (y) => { const s = HP.section(shape, G, y); return (Q * Q * s.T) / (g * pow(s.A, 3)) - 1; };
-    let hi = shape === 'circ' ? G.D * 0.999 : 1;
-    if (shape !== 'circ') while (f(hi) > 0 && hi < 1e5) hi *= 2;
+    // semicircle: y_c must lie below the rim (y = r); NaN means the flow is supercritical even when full
+    let hi = shape === 'circ' ? G.D * 0.999 : shape === 'semi' ? G.D / 2 : 1;
+    if (!roundShape(shape)) while (f(hi) > 0 && hi < 1e5) hi *= 2;
     return bisect(f, 1e-7, hi, 1e-11);
   };
   const Efun = (shape, G, Q, g) => (y) => y + (Q * Q) / (2 * g * pow(HP.section(shape, G, y).A, 2));
@@ -662,7 +670,7 @@
   HP.alternateDepths = function (shape, G, Q, g, E, yc) {
     const Ef = Efun(shape, G, Q, g);
     const sup = bisect((y) => Ef(y) - E, 1e-7, yc, 1e-11);
-    const top = shape === 'circ' ? G.D * 0.99999 : E;
+    const top = shape === 'circ' ? G.D * 0.99999 : shape === 'semi' ? Math.min(G.D / 2, E) : E;
     const sub = bisect((y) => Ef(y) - E, yc, top, 1e-11);
     return [sup, sub];
   };
@@ -689,7 +697,8 @@
     o.data = { mode, shape, G, Q, q, g };
     if (shape === 'rect') S(o, 'Unit discharge', useq ? 'Q = q·b' : 'q = Q/b', useq ? `Q = ${fmt(I.q)} × ${fmt(I.b)}` : `q = ${fmt(Q)}/${fmt(I.b)}`, useq ? `${fmt(Q)} ${U.Q}` : `${fmt(q)} ${U.q}`, 'Flow per unit width of a rectangular channel.');
     const yc = HP.criticalDepth(shape, G, Q, g);
-    if (!isFinite(yc)) return fail(o, 'Critical depth not found: for a circular conduit the discharge is too large to flow part-full.');
+    if (!isFinite(yc)) return fail(o, shape === 'semi' ? `Critical depth not found: Q = ${fmt(Q)} ${U.Q} is too large for this semicircle (the flow is supercritical even when full, so y_c would be above the rim). Use a larger D.` : 'Critical depth not found: for a circular conduit the discharge is too large to flow part-full.');
+    if (shape === 'semi' && mode === 'curve' && I.y > I.Dc / 2 + 1e-12) return fail(o, `Depth y = ${fmt(I.y)} ${L} exceeds the radius r = ${fmt(I.Dc / 2)} ${L}: a semicircular channel is full at y = r.`);
     const sc = HP.section(shape, G, yc), Emin = yc + (Q * Q) / (2 * g * sc.A * sc.A), vc = Q / sc.A;
     if (shape === 'rect') S(o, 'Critical depth', 'y_c = (q²/g)^(1/3)', `y_c = (${fmt(q)}²/${fmt(g)})^(1/3)`, `${fmt(yc)} ${L}`, 'Depth at which specific energy is minimum.');
     else if (shape === 'tri') S(o, 'Critical depth (triangular)', 'y_c = (2Q²/(g z²))^(1/5)', `y_c = (2·${fmt(Q)}²/(${fmt(g)}·${fmt(I.z)}²))^(1/5)`, `${fmt(yc)} ${L}`, 'Closed form for a V-shaped channel.');
@@ -700,12 +709,13 @@
 
     if (mode === 'curve') {
       const y = I.y, s = HP.section(shape, G, y), v = Q / s.A, E = y + (v * v) / (2 * g), Fr = v / sqrt(g * s.Dh);
-      S(o, 'Section properties', secText[shape], `y = ${fmt(y)} ${L}`, `A = ${fmt(s.A)} ${U.A}, T = ${fmt(s.T)} ${L}, D_h = A/T = ${fmt(s.Dh)} ${L}`, 'Flow area, top width and hydraulic depth.');
+      S(o, 'Section properties', secText[shape], (shape === 'semi' ? `r = ${fmt(G.D / 2)} ${L}, ` : '') + `y = ${fmt(y)} ${L}` + (shape === 'semi' || shape === 'circ' ? `, θ = ${fmt(s.theta)} rad` : ''), `A = ${fmt(s.A)} ${U.A}, T = ${fmt(s.T)} ${L}, D_h = A/T = ${fmt(s.Dh)} ${L}`, 'Flow area, top width and hydraulic depth.');
       S(o, 'Specific energy', shape === 'rect' ? 'E = y + q²/(2gy²)' : 'E = y + Q²/(2gA²)', shape === 'rect' ? `E = ${fmt(y)} + ${fmt(q)}²/(2·${fmt(g)}·${fmt(y)}²)` : `E = ${fmt(y)} + ${fmt(Q)}²/(2·${fmt(g)}·${fmt(s.A)}²)`, `${fmt(E)} ${L}`, 'Energy measured from the channel bottom.');
       const reg = abs(Fr - 1) < 0.01 ? 'critical' : Fr < 1 ? 'subcritical' : 'supercritical';
       S(o, 'Froude number', 'F = v/√(g·D_h)', `F = ${fmt(v)}/√(${fmt(g)} × ${fmt(s.Dh)})`, `${fmt(Fr)} → ${reg}`, 'F < 1 subcritical, F > 1 supercritical.');
       const alt = HP.alternateDepths(shape, G, Q, g, E, yc);
       const other = y > yc ? alt[0] : alt[1];
+      if (shape === 'semi' && !isFinite(alt[1])) W(o, `The subcritical alternate depth would be above the rim (r = ${fmt(G.D / 2)} ${L}): it does not exist in this semicircle.`, 'info');
       if (shape === 'rect') S(o, 'Alternate depths (solve the cubic)', 'y³ − E·y² + q²/(2g) = 0', `y³ − ${fmt(E)}y² + ${fmt((q * q) / (2 * g))} = 0`, `y = ${fmt(alt[0])} and ${fmt(alt[1])} ${L}`, 'Two positive roots with the same E; the third root is negative.');
       else S(o, 'Alternate depths', 'E(y) = E, solved on each side of y_c', `E = ${fmt(E)} ${L}`, `y = ${fmt(alt[0])} and ${fmt(alt[1])} ${L}`, 'Supercritical and subcritical depths with the same E.');
       R(o, 'Velocity v', v, U.v); R(o, 'Specific energy E', E, L, true); R(o, 'Froude number F', Fr, '', true); R(o, 'Flow regime', reg, ''); R(o, 'Alternate depth', other, L, true);
@@ -1023,6 +1033,7 @@
     const shape = mode === 'circular' ? 'circ' : I.section;
     const G = { b: shape === 'tri' ? 0 : I.b, z: shape === 'rect' ? 0 : I.z, D: I.D };
     if (shape === 'tri' && !(I.z > 0)) return fail(o, 'A triangular channel needs a side slope z > 0.');
+    const semi = shape === 'semi', r0 = I.D / 2;
     const k = U.man;
     const Qof = (y, n, S0, GG) => { const s = HP.section(shape, GG || G, y); return (k / n) * s.A * pow(s.R, 2 / 3) * sqrt(S0); };
     const manTxt = `Q = (${U.manT})·A·R^(2/3)·S^(1/2)`;
@@ -1036,25 +1047,31 @@
       if (shape === 'rect') { const yo = pow(c / (2 * pow(0.5, 2 / 3)), 3 / 8); opt = { b: 2 * yo, z: 0, y: yo }; S(o, 'Best rectangle', 'b = 2y,  A = 2y²,  R = y/2', `${manTxt} → 2y²(y/2)^(2/3) = nQ/(${U.man === 1 ? '' : '1.486'}√S) = ${fmt(c)}`, `y = ${fmt(yo)} ${L}, b = ${fmt(2 * yo)} ${L}`, 'Half of a square: depth is half the width.'); }
       else if (shape === 'trap') { const yo = pow(c / (sqrt(3) * pow(0.5, 2 / 3)), 3 / 8); opt = { b: (2 / sqrt(3)) * yo, z: 1 / sqrt(3), y: yo }; S(o, 'Best trapezoid (half hexagon)', 'z = 1/√3 (60°),  b = (2/√3)y,  A = √3·y²,  R = y/2', `√3·y²(y/2)^(2/3) = ${fmt(c)}`, `y = ${fmt(yo)} ${L}, b = ${fmt(opt.b)} ${L}`, 'Sides at 60° to the horizontal.'); }
       else if (shape === 'tri') { const yo = pow(c / pow(1 / (2 * sqrt(2)), 2 / 3), 3 / 8); opt = { b: 0, z: 1, y: yo }; S(o, 'Best triangle (90° vertex)', 'z = 1,  A = y²,  R = y/(2√2)', `y²(y/2√2)^(2/3) = ${fmt(c)}`, `y = ${fmt(yo)} ${L}`, 'Each side at 45°.'); }
+      else if (semi) {
+        // semicircle flowing full: A = πr²/2, P = πr, R = r/2 (the best hydraulic section of all)
+        const fac = (Math.PI / 2) * pow(0.5, 2 / 3), r = pow(c / fac, 3 / 8); opt = { D: 2 * r, y: r };
+        S(o, 'Best section: semicircle flowing full', 'A = πr²/2,  P = πr,  R = r/2;  A·R^(2/3) = (π/2)(1/2)^(2/3)·r^(8/3)', `${fmt(fac)}·r^(8/3) = nQ/(${U.man === 1 ? '' : '1.486'}√S) = ${fmt(c)}`, `r = ${fmt(r)} ${L}, D = 2r = ${fmt(2 * r)} ${L}, y = r`, 'Of all sections with the same area, the half circle has the least wetted perimeter.');
+      }
       else {
         // circle flowing at y = 0.938D carries max Q
         const sUnit = HP.section('circ', { D: 1 }, 0.938), fac = sUnit.A * pow(sUnit.R, 2 / 3);
         const D = pow(c / fac, 3 / 8); opt = { D, y: 0.938 * D };
         S(o, 'Best circular conduit', 'Q is maximum at y = 0.938D (v is maximum at y = 0.81D)', `A·R^(2/3) = ${fmt(fac)}·D^(8/3) = ${fmt(c)}`, `D = ${fmt(D)} ${L}, y = ${fmt(0.938 * D)} ${L}`, 'Smallest pipe that carries Q part-full.');
       }
-      const Go = shape === 'circ' ? { D: opt.D } : { b: opt.b, z: opt.z };
+      const Go = shape === 'circ' || semi ? { D: opt.D } : { b: opt.b, z: opt.z };
       const so = HP.section(shape, Go, opt.y);
       // current section carrying the same Q
-      const ycur = shape === 'circ' ? NaN : bisect((yy) => Qof(yy, n, S0) - Q, 1e-6, 1e3);
+      const ycur = shape === 'circ' ? NaN : bisect((yy) => Qof(yy, n, S0) - Q, 1e-6, semi ? r0 : 1e3);
       const scur = isFinite(ycur) ? HP.section(shape, G, ycur) : null;
       R(o, 'Optimum depth y', opt.y, L, true);
-      if (shape === 'circ') R(o, 'Optimum diameter D', opt.D, L, true); else if (shape !== 'tri') R(o, 'Optimum bottom width b', opt.b, L, true);
+      if (semi) { R(o, 'Optimum radius r', opt.D / 2, L, true); R(o, 'Optimum diameter D', opt.D, L); }
+      else if (shape === 'circ') R(o, 'Optimum diameter D', opt.D, L, true); else if (shape !== 'tri') R(o, 'Optimum bottom width b', opt.b, L, true);
       if (shape === 'trap' || shape === 'tri') R(o, 'Optimum side slope z', opt.z, 'H:V');
       R(o, 'Optimum area A', so.A, U.A); R(o, 'Optimum wetted perimeter P', so.P, L); R(o, 'Optimum R', so.R, L);
       if (scur) {
-        S(o, 'Your section carrying the same Q', 'normal depth of the entered b, z', `y_n = ${fmt(ycur)} ${L}`, `A = ${fmt(scur.A)} ${U.A}, P = ${fmt(scur.P)} ${L}, R = ${fmt(scur.R)} ${L}`, `The optimum uses ${fmt((100 * so.P) / scur.P)}% of the wetted perimeter.`);
+        S(o, 'Your section carrying the same Q', semi ? `normal depth in the entered semicircle (D = ${fmt(I.D)} ${L})` : 'normal depth of the entered b, z', `y_n = ${fmt(ycur)} ${L}`, `A = ${fmt(scur.A)} ${U.A}, P = ${fmt(scur.P)} ${L}, R = ${fmt(scur.R)} ${L}`, `The optimum uses ${fmt((100 * so.P) / scur.P)}% of the wetted perimeter.`);
         R(o, 'Entered section: y_n', ycur, L); R(o, 'Entered section: P', scur.P, L); R(o, 'Entered section: R', scur.R, L);
-      }
+      } else if (semi) W(o, `The entered semicircle (D = ${fmt(I.D)} ${L}) cannot carry Q = ${fmt(Q)} ${U.Q} even when full.`, 'info');
       Object.assign(o.data, { Q, opt, Go, ycur, so, scur, v: Q / so.A, y: opt.y, morphTo: { G: Go, y: opt.y }, morphFrom: { G, y: ycur } });
       return o;
     }
@@ -1065,6 +1082,10 @@
       if (shape === 'circ') {
         const Qmax = Qof(0.938 * I.D, n, S0);
         if (Q > Qmax) return fail(o, `Q = ${fmt(Q)} ${U.Q} exceeds the largest part-full capacity (${fmt(Qmax)} ${U.Q} at y = 0.938D). Use a bigger pipe.`);
+      } else if (semi) {
+        hi = r0;
+        const Qfull = Qof(r0, n, S0);
+        if (Q > Qfull) return fail(o, `Q = ${fmt(Q)} ${U.Q} exceeds the capacity of the semicircle flowing full (${fmt(Qfull)} ${U.Q} at y = r = ${fmt(r0)} ${L}). Use a larger D or a steeper slope.`);
       } else while (Qof(hi, n, S0) < Q && hi < 1e4) hi *= 2;
       const hist = [];
       y = bisect((yy) => Qof(yy, n, S0) - Q, 1e-6, hi, 1e-10, 200, hist);
@@ -1077,7 +1098,8 @@
     }
     const s = HP.section(shape, G, y);
     if (shape === 'circ' && y > I.D) return fail(o, 'Depth exceeds the pipe diameter.');
-    S(o, 'Section properties', secText[shape], `y = ${fmt(y)} ${L}` + (shape === 'circ' ? `, θ = ${fmt(s.theta)} rad` : ''), `A = ${fmt(s.A)} ${U.A}, P = ${fmt(s.P)} ${L}, T = ${fmt(s.T)} ${L}`, 'Area, wetted perimeter and top width.');
+    if (semi && y > r0 + 1e-12) return fail(o, `Depth y = ${fmt(y)} ${L} exceeds the radius r = ${fmt(r0)} ${L}: a semicircular channel is full at y = r.`);
+    S(o, 'Section properties', secText[shape], (semi ? `r = ${fmt(r0)} ${L}, ` : '') + `y = ${fmt(y)} ${L}` + (shape === 'circ' || semi ? `, θ = ${fmt(s.theta)} rad` : ''), `A = ${fmt(s.A)} ${U.A}, P = ${fmt(s.P)} ${L}, T = ${fmt(s.T)} ${L}`, 'Area, wetted perimeter and top width.');
     S(o, 'Hydraulic radius', 'R = A/P', `R = ${fmt(s.A)}/${fmt(s.P)}`, `${fmt(s.R)} ${L}`, 'Area per unit of wetted boundary.');
     const v = (k / n) * pow(s.R, 2 / 3) * sqrt(S0);
     Q = v * s.A;
@@ -1088,13 +1110,20 @@
     const Fr = v / sqrt(g * s.Dh);
     const yc = HP.criticalDepth(shape, G, Q, g);
     const scc = HP.section(shape, G, yc), Sc = pow((Q * n) / (k * scc.A * pow(scc.R, 2 / 3)), 2);
-    const cls = abs(y - yc) / yc < 0.01 ? 'critical slope' : y > yc ? 'mild slope (y_n > y_c)' : 'steep slope (y_n < y_c)';
-    S(o, 'Froude number and critical depth', 'F = v/√(gD_h);  Q²T/(gA³) = 1', `F = ${fmt(v)}/√(${fmt(g)}·${fmt(s.Dh)});  y_c by iteration`, `F = ${fmt(Fr)}, y_c = ${fmt(yc)} ${L}`, `Critical slope S_c = ${fmt(Sc)} → ${cls}.`);
+    const cls = !isFinite(yc) ? 'steep slope (y_c above the rim)' : abs(y - yc) / yc < 0.01 ? 'critical slope' : y > yc ? 'mild slope (y_n > y_c)' : 'steep slope (y_n < y_c)';
+    if (isFinite(yc)) S(o, 'Froude number and critical depth', 'F = v/√(gD_h);  Q²T/(gA³) = 1', `F = ${fmt(v)}/√(${fmt(g)}·${fmt(s.Dh)});  y_c by iteration`, `F = ${fmt(Fr)}, y_c = ${fmt(yc)} ${L}`, `Critical slope S_c = ${fmt(Sc)} → ${cls}.`);
+    else S(o, 'Froude number and critical depth', 'F = v/√(gD_h);  Q²T/(gA³) = 1', `F = ${fmt(v)}/√(${fmt(g)}·${fmt(s.Dh)});  Q²T/(gA³) > 1 even at y = r`, `F = ${fmt(Fr)}, no y_c below the rim`, 'At this Q the flow would be supercritical at every depth up to the rim.');
     R(o, 'Area A', s.A, U.A); R(o, 'Wetted perimeter P', s.P, L); R(o, 'Hydraulic radius R', s.R, L, true); R(o, 'Top width T', s.T, L);
     if (mode === 'solveY') R(o, 'Normal depth y_n', y, L, true);
     if (mode === 'solveSn') { if (I.solveFor === 'S') R(o, 'Required slope S', S0, '', true); else R(o, 'Required Manning n', n, '', true); }
-    R(o, 'Velocity v', v, U.v, true); R(o, 'Discharge Q', Q, U.Q, true); R(o, 'Chezy C', C, ''); R(o, 'Froude number F', Fr, ''); R(o, 'Critical depth y_c', yc, L); R(o, 'Critical slope S_c', Sc, ''); R(o, 'Slope class', cls, '');
+    R(o, 'Velocity v', v, U.v, true); R(o, 'Discharge Q', Q, U.Q, true); R(o, 'Chezy C', C, ''); R(o, 'Froude number F', Fr, ''); R(o, 'Critical depth y_c', isFinite(yc) ? yc : 'above the rim', isFinite(yc) ? L : ''); if (isFinite(yc)) R(o, 'Critical slope S_c', Sc, ''); R(o, 'Slope class', cls, '');
     if (Fr > 1) W(o, `Uniform flow here is supercritical (F = ${fmt(Fr)}).`, 'info');
+    if (semi) {
+      const sf = HP.section('semi', G, r0), Qf = (k / n) * sf.A * pow(sf.R, 2 / 3) * sqrt(S0);
+      S(o, 'Semicircle flowing full (y = r)', 'A_f = πr²/2,  P_f = πr,  R_f = r/2', `Q_f = (${U.manT})(${fmt(sf.A)})(${fmt(sf.R)})^(2/3)(${fmt(S0)})^(1/2)`, `Q_f = ${fmt(Qf)} ${U.Q}`, `Depth ratio y/r = ${fmt(y / r0)}; Q/Q_f = ${fmt(Q / Qf)}.`);
+      R(o, 'Radius r', r0, L); R(o, 'Q full (y = r)', Qf, U.Q); R(o, 'Q/Q_full', Q / Qf, '');
+      Object.assign(o.data, { Qf });
+    }
     if (mode === 'circular') {
       const sf = HP.section('circ', G, I.D), Qf = (k / n) * sf.A * pow(sf.R, 2 / 3) * sqrt(S0), vf = Qf / sf.A;
       S(o, 'Pipe flowing full', 'A_f = πD²/4,  R_f = D/4', `Q_f = (${U.manT})(${fmt(sf.A)})(${fmt(sf.R)})^(2/3)(${fmt(S0)})^(1/2)`, `Q_f = ${fmt(Qf)} ${U.Q}, v_f = ${fmt(vf)} ${U.v}`, `Q/Q_f = ${fmt(Q / Qf)}, v/v_f = ${fmt(v / vf)}.`);

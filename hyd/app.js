@@ -643,10 +643,10 @@
     id: 'jump', tab: 'Specific Energy & Jump', title: 'Specific Energy and Hydraulic Jump', fn: 'specific',
     modes: [['curve', 'Specific energy curve'], ['jump', 'Hydraulic jump'], ['gate', 'Sluice gate + jump']], speed: {},
     params: [
-      { k: 'shape', type: 'select', label: 'Channel shape', def: 'rect', options: [['rect', 'Rectangular'], ['trap', 'Trapezoidal'], ['tri', 'Triangular'], ['circ', 'Circular']], modes: ['curve'], onSet: (P) => { if ((P.shape === 'tri' || P.shape === 'trap') && !(P.z > 0)) P.z = 1; } },
+      { k: 'shape', type: 'select', label: 'Channel shape', def: 'rect', options: [['rect', 'Rectangular'], ['trap', 'Trapezoidal'], ['tri', 'Triangular'], ['circ', 'Circular'], ['semi', 'Semicircular']], modes: ['curve'], onSet: (P) => { if ((P.shape === 'tri' || P.shape === 'trap') && !(P.z > 0)) P.z = 1; if (P.shape === 'semi' && P.y > P.Dc / 2) P.y = +(0.3 * P.Dc).toFixed(3); } },
       { k: 'b', label: 'Width b (bottom width)', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, show: (P, m) => m !== 'curve' || P.shape === 'rect' || P.shape === 'trap' },
       { k: 'z', label: 'Side slope z (H:V)', dim: 'hv', min: 0, max: 4, step: 0.01, def: 0, show: (P, m) => m === 'curve' && (P.shape === 'trap' || P.shape === 'tri') },
-      { k: 'Dc', label: 'Conduit diameter D', dim: 'len', min: 0.1, max: 10, step: 0.01, def: 2, show: (P, m) => m === 'curve' && P.shape === 'circ' },
+      { k: 'Dc', label: 'Conduit diameter D', labelFn: (P) => (P.shape === 'semi' ? 'Diameter D (= 2r, top width when full)' : 'Conduit diameter D'), dim: 'len', min: 0.1, max: 10, step: 0.01, def: 2, show: (P, m) => m === 'curve' && (P.shape === 'circ' || P.shape === 'semi') },
       { k: 'qmode', type: 'select', label: 'Flow given as', def: 'q', options: [['q', 'Unit discharge q'], ['Q', 'Discharge Q']], show: (P, m) => m !== 'curve' || P.shape === 'rect' },
       { k: 'q', label: 'Unit discharge q', dim: 'q', min: 0.01, max: 200, step: 0.01, def: 3, log: true, show: (P, m) => (m !== 'curve' || P.shape === 'rect') && P.qmode === 'q' },
       { k: 'Q', label: 'Discharge Q', dim: 'Q', min: 0.01, max: 200, step: 0.01, def: 9, log: true, show: (P, m) => !((m !== 'curve' || P.shape === 'rect') && P.qmode === 'q') },
@@ -662,7 +662,8 @@
       { name: 'Subcritical flow over a 0.2 m step (q = 3, y = 2)', mode: 'curve', set: { shape: 'rect', q: 3, y: 2, dz: 0.2 } },
       { name: 'Step of 0.6 m, just under choking (q = 3, y = 2, Δz_max = 0.657 m)', mode: 'curve', set: { shape: 'rect', q: 3, y: 2, dz: 0.6 } },
       { name: 'Choking at a 0.8 m step (q = 3, y = 2): critical depth over the step', mode: 'curve', set: { shape: 'rect', q: 3, y: 2, dz: 0.8 } },
-      { name: 'Trapezoidal channel, Q = 9 m³/s, z = 1', mode: 'curve', set: { shape: 'trap', qmode: 'Q', Q: 9, z: 1, y: 1 } }
+      { name: 'Trapezoidal channel, Q = 9 m³/s, z = 1', mode: 'curve', set: { shape: 'trap', qmode: 'Q', Q: 9, z: 1, y: 1 } },
+      { name: 'Semicircular channel D = 3 m (r = 1.5 m), Q = 4 m³/s, y = 1.2 m', mode: 'curve', set: { shape: 'semi', qmode: 'Q', Q: 4, Dc: 3, y: 1.2 } }
     ]
   };
   MODS.push(M3);
@@ -1083,11 +1084,11 @@
     modes: [['solveQ', 'Solve for Q (given depth)'], ['solveY', 'Solve for normal depth y_n'], ['solveSn', 'Solve for slope S or roughness n'], ['efficient', 'Most efficient section'], ['circular', 'Circular conduit, partly full']], speed: {},
     modeDefaults: { circular: { y: 0.6, D: 1 } },
     params: [
-      { k: 'section', type: 'select', label: 'Section', def: 'rect', options: [['rect', 'Rectangular'], ['trap', 'Trapezoidal'], ['tri', 'Triangular'], ['circ', 'Circular']], show: (P, m) => m !== 'circular', onSet: (P) => { if ((P.section === 'tri' || P.section === 'trap') && !(P.z > 0)) P.z = 1; if (P.section === 'circ' && P.y > P.D) P.y = +(0.6 * P.D).toFixed(3); } },
+      { k: 'section', type: 'select', label: 'Section', def: 'rect', options: [['rect', 'Rectangular'], ['trap', 'Trapezoidal'], ['tri', 'Triangular'], ['circ', 'Circular'], ['semi', 'Semicircular']], show: (P, m) => m !== 'circular', onSet: (P) => { if ((P.section === 'tri' || P.section === 'trap') && !(P.z > 0)) P.z = 1; if (P.section === 'circ' && P.y > P.D) P.y = +(0.6 * P.D).toFixed(3); if (P.section === 'semi' && P.y > P.D / 2) P.y = +(0.35 * P.D).toFixed(3); } },
       { k: 'b', label: 'Bottom width b', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, show: (P, m) => m !== 'circular' && (P.section === 'rect' || P.section === 'trap') },
       { k: 'z', label: 'Side slope z (H:V)', dim: 'hv', min: 0, max: 4, step: 0.01, def: 0, show: (P, m) => m !== 'circular' && (P.section === 'trap' || P.section === 'tri') },
-      { k: 'D', label: 'Diameter D', dim: 'len', min: 0.1, max: 5, step: 0.01, def: 1, show: (P, m) => m === 'circular' || P.section === 'circ' },
-      { k: 'y', label: 'Depth y', dim: 'len', min: 0.01, max: 10, step: 0.001, def: 1.5, modes: ['solveQ', 'solveSn', 'circular'], maxFn: (P, m) => (m === 'circular' || P.section === 'circ' ? P.D : 10) },
+      { k: 'D', label: 'Diameter D', labelFn: (P, m) => (m !== 'circular' && P.section === 'semi' ? 'Diameter D (= 2r, top width when full)' : 'Diameter D'), dim: 'len', min: 0.1, max: 10, step: 0.01, def: 1, show: (P, m) => m === 'circular' || P.section === 'circ' || P.section === 'semi' },
+      { k: 'y', label: 'Depth y', dim: 'len', min: 0.01, max: 10, step: 0.001, def: 1.5, modes: ['solveQ', 'solveSn', 'circular'], maxFn: (P, m) => (m === 'circular' || P.section === 'circ' ? P.D : P.section === 'semi' ? P.D / 2 : 10) },
       { k: 'n', label: 'Manning n', min: 0.009, max: 0.06, step: 0.0001, def: 0.013, chips: N_CHIPS, show: (P, m) => !(m === 'solveSn' && P.solveFor === 'n') },
       { k: 'S', label: 'Bed slope S', min: 0.00001, max: 0.1, step: 0.00001, def: 0.001, log: true, show: (P, m) => !(m === 'solveSn' && P.solveFor === 'S') },
       { k: 'Q', label: 'Discharge Q', dim: 'Q', min: 0.01, max: 500, step: 0.01, def: 10, log: true, modes: ['solveY', 'solveSn', 'efficient'] },
@@ -1100,7 +1101,12 @@
       { name: 'Best trapezoid for Q = 10 m³/s', mode: 'efficient', set: { section: 'trap', b: 3, z: 1, Q: 10 } },
       { name: 'Best rectangle for Q = 10 m³/s', mode: 'efficient', set: { section: 'rect', b: 3, Q: 10 } },
       { name: 'Sewer D = 1 m flowing 60% full', mode: 'circular', set: { D: 1, y: 0.6, n: 0.013, S: 0.001 } },
-      { name: 'Steep concrete chute, S = 0.02', mode: 'solveQ', set: { section: 'rect', b: 3, y: 0.5, S: 0.02 } }
+      { name: 'Steep concrete chute, S = 0.02', mode: 'solveQ', set: { section: 'rect', b: 3, y: 0.5, S: 0.02 } },
+      { name: 'Test — semicircle r = 1 m flowing full: R = r/2 = 0.5 m, Q = 2.407 m³/s', mode: 'solveQ', set: { section: 'semi', D: 2, y: 1, n: 0.013, S: 0.001 } },
+      { name: 'Semicircular channel D = 2 m, depth 0.6 m', mode: 'solveQ', set: { section: 'semi', D: 2, y: 0.6, n: 0.013, S: 0.001 } },
+      { name: 'Normal depth in a semicircular flume D = 1.5 m, Q = 1 m³/s', mode: 'solveY', set: { section: 'semi', D: 1.5, Q: 1, n: 0.012, S: 0.002 } },
+      { name: 'Slope for a semicircular channel D = 3 m, y = 1.2 m, Q = 5 m³/s', mode: 'solveSn', set: { section: 'semi', D: 3, y: 1.2, Q: 5, n: 0.013, solveFor: 'S' } },
+      { name: 'Best section: semicircle flowing full for Q = 10 m³/s (vs D = 4 m)', mode: 'efficient', set: { section: 'semi', D: 4, Q: 10 } }
     ]
   };
   MODS.push(M6);
@@ -1138,13 +1144,13 @@
     velScale(ctx, W - 210, 50, K, U.v);
   };
   // section geometry exactly as the formulas use it: a triangle has no bottom width, a rectangle has vertical sides
-  function chanG(shape, I) { return shape === 'circ' ? { D: I.D } : shape === 'tri' ? { b: 0, z: I.z, D: 1 } : shape === 'rect' ? { b: I.b, z: 0, D: 1 } : { b: I.b, z: I.z, D: 1 }; }
+  function chanG(shape, I) { return shape === 'circ' || shape === 'semi' ? { D: I.D } : shape === 'tri' ? { b: 0, z: I.z, D: 1 } : shape === 'rect' ? { b: I.b, z: 0, D: 1 } : { b: I.b, z: I.z, D: 1 }; }
   function drawSection(ctx, r, shape, G, y, o) {
     o = o || {};
     const D = G.D, b = G.b || 0, z = G.z || 0;
-    const yTop = shape === 'circ' ? D : Math.max(y * 1.35, y + 0.2 * y);
-    const Ttop = shape === 'circ' ? D : b + 2 * z * yTop;
-    const V = view({ x0: -Ttop / 2 - 0.08 * Ttop - 0.1, x1: Ttop / 2 + 0.08 * Ttop + 0.1, y0: -0.12 * yTop, y1: yTop * 1.12 }, r.w, r.h, { l: 34 + r.x, r: 40 + (o.rpad || 0), t: 34 + r.y, b: 26 }, true);
+    const yTop = shape === 'circ' ? D : shape === 'semi' ? D / 2 : Math.max(y * 1.35, y + 0.2 * y);
+    const Ttop = shape === 'circ' || shape === 'semi' ? D : b + 2 * z * yTop;
+    const V = view({ x0: -Ttop / 2 - 0.08 * Ttop - 0.1, x1: Ttop / 2 + 0.08 * Ttop + 0.1, y0: -0.12 * yTop, y1: yTop * (shape === 'semi' ? 1.3 : 1.12) }, r.w, r.h, { l: 34 + r.x, r: 40 + (o.rpad || 0), t: 34 + r.y, b: 26 }, true);
     const X = (x) => V.X(x) + 0, Y = V.Y;
     // channel outline
     let wall, water, wet;
@@ -1155,6 +1161,18 @@
       ctx.beginPath(); ctx.arc(X(0), Y(cy), R * V.sx, PI / 2 - th / 2, PI / 2 + th / 2); ctx.strokeStyle = C.egl; ctx.lineWidth = 4; ctx.stroke();
       const T = D * Math.sin(th / 2); if (y > 0) { stroke(ctx, [[X(-T / 2), Y(y)], [X(T / 2), Y(y)]], C.water_deep, 1.5); dimH(ctx, X(-T / 2), X(T / 2), Y(y) - 14, `T = ${fmt(T)}`); }
       dimV(ctx, X(R) + 14, Y(0), Y(y), `y = ${fmt(y)}`); dimV(ctx, X(-R) - 14, Y(0), Y(D), `D = ${fmt(D)}`, null, 'left');
+    } else if (shape === 'semi') {
+      // open semicircular channel: centre on the rim line (y = r), wetted arc below the surface
+      const R = D / 2, yw = Math.min(Math.max(y, 0), R), cx = X(0), cy = Y(R), rp = R * V.sx, yb = Y(-0.12 * yTop);
+      ctx.beginPath(); ctx.moveTo(X(-R) - 30, cy); ctx.lineTo(X(-R), cy); ctx.arc(cx, cy, rp, PI, 0, true); ctx.lineTo(X(R) + 30, cy); ctx.lineTo(X(R) + 30, yb); ctx.lineTo(X(-R) - 30, yb); ctx.closePath();
+      ctx.fillStyle = C.soil; ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rp, 0, PI); ctx.closePath(); ctx.clip(); ctx.fillStyle = C.water; ctx.globalAlpha = 0.4; ctx.fillRect(X(-R), Y(yw), D * V.sx, Y(0) - Y(yw) + 2); ctx.globalAlpha = 1; ctx.restore();
+      ctx.beginPath(); ctx.arc(cx, cy, rp, 0, PI); ctx.strokeStyle = C.wall; ctx.lineWidth = 2.5; ctx.stroke();
+      const th = 2 * Math.acos(1 - (2 * yw) / D), T = D * Math.sin(th / 2);
+      ctx.beginPath(); ctx.arc(cx, cy, rp, PI / 2 - th / 2, PI / 2 + th / 2); ctx.strokeStyle = C.egl; ctx.lineWidth = 4; ctx.stroke();
+      if (yw > 0) { stroke(ctx, [[X(-T / 2), Y(yw)], [X(T / 2), Y(yw)]], C.water_deep, 1.5); surfSym(ctx, X(-T / 4), Y(yw)); dimH(ctx, X(-T / 2), X(T / 2), Y(yw) - 14, `T = ${fmt(T)}`); }
+      { const a = 0.8 * PI, ex = cx + rp * Math.cos(a), ey = cy + rp * Math.sin(a); stroke(ctx, [[cx, cy], [ex, ey]], C.muted, 1, [3, 3]); txt(ctx, 'r', (cx + ex) / 2 - 4, (cy + ey) / 2 - 6, { size: 11, color: C.muted, bold: true }); }
+      dimV(ctx, X(R) + 14, Y(0), Y(yw), `y = ${fmt(yw)}`); dimH(ctx, X(-R), X(R), Y(0) + 18, `D = 2r = ${fmt(D)}  (r = ${fmt(R)})`);
     } else {
       const xb = b / 2, xt = b / 2 + z * yTop;
       wall = [[-xt, yTop], [-xb, 0], [xb, 0], [xt, yTop]];
@@ -1179,6 +1197,7 @@
       const from = d.morphFrom, to = d.morphTo;
       let G, y, lab;
       if (d.shape === 'circ' || !isFinite(from.y)) { G = to.G; y = to.y; lab = 'Optimum'; }
+      else if (d.shape === 'semi') { G = { D: lerp(from.G.D, to.G.D, f) }; y = lerp(from.y, to.y, f); lab = f < 0.02 ? 'Your section (same Q)' : f > 0.98 ? 'Optimum section (full semicircle)' : 'Morphing…'; }
       else { G = { b: lerp(from.G.b, to.G.b, f), z: lerp(from.G.z, to.G.z, f), D: 1 }; y = lerp(from.y, to.y, f); lab = f < 0.02 ? 'Your section (same Q)' : f > 0.98 ? 'Optimum section' : 'Morphing…'; }
       const s = HP.section(d.shape, G, y);
       drawSection(ctx, { x: 0, y: 0, w: W, h: H }, d.shape, G, y, { title: `${lab}`, sub: `A = ${fmt(s.A)}  P = ${fmt(s.P)}  R = ${fmt(s.R)} ${U.L}`, rpad: 170 });
@@ -1606,6 +1625,7 @@
       const ph = (A.mt || 0) % 7, f = ph < 1.5 ? 0 : ph < 3.5 ? sstep((ph - 1.5) / 2) : ph < 5 ? 1 : 1 - sstep((ph - 5) / 2);
       const from = d.morphFrom, to = d.morphTo;
       if (d.shape === 'circ' || !isFinite(from.y)) return { shape: d.shape, G: to.G, y: to.y };
+      if (d.shape === 'semi') return { shape: d.shape, G: { D: lerp(from.G.D, to.G.D, f) }, y: lerp(from.y, to.y, f) };
       return { shape: d.shape, G: { b: lerp(from.G.b, to.G.b, f), z: lerp(from.G.z, to.G.z, f), D: 1 }, y: lerp(from.y, to.y, f) };
     }
     return { shape: d.shape, G: chanG(d.shape, I), y: d.y };
@@ -1615,13 +1635,13 @@
     const st = m6State(R, A), shape = st.shape, y = sm(A, 'iy', st.y, T.rdt, 6), v = sm(A, 'v', d.v, T.rdt, 4);
     const Sbed = d.S || I.S, ang = ((2 + (10 * (Math.log10(Math.max(Sbed, 1e-5)) + 5)) / 4) * PI) / 180, Sv = Math.tan(ang) * 0.8;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
-    const circ = shape === 'circ', D = st.G.D, b = circ ? 0 : sm(A, 'ib', st.G.b, T.rdt, 6), z = circ ? 0 : sm(A, 'iz', st.G.z, T.rdt, 6);
-    const yTop = circ ? D : Math.max(1.35 * y, 0.05), Tt = circ ? D : b + 2 * z * yTop;
-    const Tw = circ ? D * Math.sin(Math.acos(1 - (2 * Math.min(y, D)) / D)) : b + 2 * z * y;
+    const circ = shape === 'circ', semi = shape === 'semi', round = circ || semi, D = st.G.D, b = round ? 0 : sm(A, 'ib', st.G.b, T.rdt, 6), z = round ? 0 : sm(A, 'iz', st.G.z, T.rdt, 6);
+    const yTop = circ ? D : semi ? D / 2 : Math.max(1.35 * y, 0.05), Tt = round ? D : b + 2 * z * yTop;
+    const Tw = round ? D * Math.sin(Math.acos(1 - (2 * Math.min(y, yTop)) / D)) : b + 2 * z * y;
     const Yo = Tt / 2 + 0.3 * Math.max(Tt, y), zB = circ ? -0.15 * D : -0.35 * yTop, Lx = Math.max(2.2 * Tt, 5 * y);
     const { P: P0, s } = isoFit(A, 'cb', [[0, -Yo, zB], [Lx, -Yo, zB - Sv * Lx], [Lx, Yo, zB - Sv * Lx], [0, Yo, zB], [0, -Yo, yTop], [0, Yo, yTop], [Lx, Yo, yTop - Sv * Lx]], W, H, 30, T.rdt);
     const P = (x, yy, zz) => P0(x, yy, zz - Sv * x);
-    const halfW = (zz) => (circ ? Math.sqrt(Math.max(0, zz * (D - zz))) : b / 2 + z * zz);
+    const halfW = (zz) => (round ? Math.sqrt(Math.max(0, zz * (D - zz))) : b / 2 + z * zz);
     // particles (positions in channel coordinates)
     A.cp = A.cp || []; const dt = T.pdt, vis = 45 / s;
     while (A.cp.length < 360) A.cp.push({ x: rnd() * Lx, s: rnd(), w: rnd() * 2 - 1 });
@@ -1635,12 +1655,18 @@
       }
       ctx.globalAlpha = 1; ctx.lineCap = 'butt';
     };
-    const egl = () => { if (!S.egl) return; const hv = (v * v) / (2 * U.g); stroke(ctx, [P(0, 0, y + hv), P(Lx, 0, y + hv)], C.egl, 1.6, [8, 5]); const q = P(0, 0, y + hv); txt(ctx, `EGL  v²/2g = ${fmt(hv)} ${L}`, q[0] + 8, q[1] - 10, { color: C.egl, size: 11, bold: true, bg: C.bg }); };
+    const egl = () => { if (!S.egl) return; const hv = (v * v) / (2 * U.g); stroke(ctx, [P(0, 0, y + hv), P(Lx, 0, y + hv)], C.egl, 1.6, [8, 5]); let fq = 0; while (fq < 0.6 && P(fq * Lx, 0, y + hv)[1] < 74) fq += 0.05; const q = P(fq * Lx, 0, y + hv); txt(ctx, `EGL  v²/2g = ${fmt(hv)} ${L}`, q[0] + 8, q[1] - 10, { color: C.egl, size: 11, bold: true, bg: C.bg }); };
     if (circ) {
       const R2 = D / 2, ring = (x) => circleRing(0, R2, R2, 48).map((q) => P(x, q[0], q[1]));
       const seg = (x) => { const o = []; circleRing(0, R2, R2, 96).forEach((q) => { if (q[1] <= y) o.push(P(x, q[0], q[1])); }); o.push(P(x, -Tw / 2, y), P(x, Tw / 2, y)); return o; };
       groundGrid(ctx, P0, -0.1 * Lx, Lx * 1.05, -Yo, Yo, zB);
-      [0.18, 0.82].forEach((f) => { const x = f * Lx; fillPoly(ctx, [P(x - 0.05 * Lx, -R2 * 0.6, zB), P(x + 0.05 * Lx, -R2 * 0.6, zB), P(x + 0.05 * Lx, -R2 * 0.6, R2 * 0.3), P(x - 0.05 * Lx, -R2 * 0.6, R2 * 0.3)], C.wall, 0.5); });
+      // saddle supports: a block from the ground up to the pipe, its top shaped to the pipe
+      [0.18, 0.82].forEach((f) => {
+        const x0 = f * Lx - 0.035 * Lx, x1 = f * Lx + 0.035 * Lx, ys = 0.75 * R2, cradle = [];
+        for (let i = 0; i <= 12; i++) { const yy = -ys + (2 * ys * i) / 12; cradle.push([yy, R2 - Math.sqrt(Math.max(0, R2 * R2 - yy * yy))]); }
+        fillPoly(ctx, [P(x0, ys, zB), P(x1, ys, zB), P(x1, ys, cradle[12][1]), P(x0, ys, cradle[12][1])], shade(C.wall, 1.25), 0.85, C.wall, 0.8);
+        fillPoly(ctx, [[-ys, zB], ...cradle, [ys, zB]].map((q) => P(x1, q[0], q[1])), shade(C.wall, 1.05), 0.85, C.wall, 0.8);
+      });
       const shell = hull(ring(0).concat(ring(Lx))); fillPoly(ctx, shell, C.pipe, 0.16);
       if (y > 1e-4) { fillPoly(ctx, hull(seg(0).concat(seg(Lx))), C.water, 0.32); fillPoly(ctx, [P(0, -Tw / 2, y), P(Lx, -Tw / 2, y), P(Lx, Tw / 2, y), P(0, Tw / 2, y)], C.water, 0.35, C.water_deep, 1); }
       drawParticles();
@@ -1648,16 +1674,17 @@
       if (y > 1e-4) { fillPoly(ctx, hull(seg(Lx)), C.water, 0.5); const th = 2 * Math.acos(1 - (2 * Math.min(y, D)) / D), arc = []; for (let i = 0; i <= 40; i++) { const t = -PI / 2 - th / 2 + (th * i) / 40; arc.push(P(Lx, R2 * Math.cos(t), R2 + R2 * Math.sin(t))); } stroke(ctx, arc, C.egl, 3.5); }
       egl();
       dimV(ctx, P(Lx, -R2 * 1.25, 0)[0], P(Lx, -R2 * 1.25, 0)[1], P(Lx, -R2 * 1.25, y)[1], `y = ${fmt(y)} ${L}`, null, 'left');
-      dim3(ctx, P(Lx, R2, -0.12 * D), P(Lx, R2, D * 1.08), `D = ${fmt(D)} ${L}`);
+      dim3(ctx, P(Lx, R2 * 1.4, 0), P(Lx, R2 * 1.4, D), `D = ${fmt(D)} ${L}`);
     } else {
-      const prof = b > 1e-6 ? [[-Tt / 2, yTop], [-b / 2, 0], [b / 2, 0], [Tt / 2, yTop]] : [[-Tt / 2, yTop], [0, 0], [Tt / 2, yTop]];
+      const R2 = D / 2, arcPts = (zMax) => { const o = []; for (let i = 0; i <= 48; i++) { const t = PI + (PI * i) / 48, q = [R2 * Math.cos(t), R2 + R2 * Math.sin(t)]; if (q[1] <= zMax + 1e-9) o.push(q); } return o; };
+      const prof = semi ? arcPts(R2) : b > 1e-6 ? [[-Tt / 2, yTop], [-b / 2, 0], [b / 2, 0], [Tt / 2, yTop]] : [[-Tt / 2, yTop], [0, 0], [Tt / 2, yTop]];
       const quad = (y0, z0, y1, z1) => [P(0, y0, z0), P(Lx, y0, z0), P(Lx, y1, z1), P(0, y1, z1)];
       fillPoly(ctx, quad(-Yo, yTop, -Tt / 2, yTop), shade(C.soil, 1.12), 1, C.wall, 0.8);
       const lined = (d.n || I.n) < 0.0165, base = lined ? C.pipe : C.soil;
       for (let i = 0; i < prof.length - 1; i++) {
         const a = prof[i], c = prof[i + 1], dy = c[0] - a[0], dz = c[1] - a[1], ln = Math.hypot(dy, dz) || 1, ny = -dz / ln, nz = dy / ln;
         if (ny + nz <= 0.001) continue;
-        fillPoly(ctx, quad(a[0], a[1], c[0], c[1]), shade(base, 0.75 + 0.35 * nz), 1, C.wall, 0.8);
+        fillPoly(ctx, quad(a[0], a[1], c[0], c[1]), shade(base, 0.75 + 0.35 * nz), 1, semi ? null : C.wall, 0.8); // a curved bed has no facet edges
       }
       if (y > 1e-4) fillPoly(ctx, [P(0, -Tw / 2, y), P(Lx, -Tw / 2, y), P(Lx, Tw / 2, y), P(0, Tw / 2, y)], C.water, 0.42, C.water_deep, 1);
       drawParticles();
@@ -1668,7 +1695,7 @@
       fillPoly(ctx, face, shade(C.soil, 0.7), 1, C.wall, 1.2);
       stroke(ctx, prof.map((q) => P(Lx, q[0], q[1])), lined ? C.pipe : C.wall, lined ? 4 : 1.5);
       if (y > 1e-4) {
-        const ws = b > 1e-6 ? [[-Tw / 2, y], [-b / 2, 0], [b / 2, 0], [Tw / 2, y]] : [[-Tw / 2, y], [0, 0], [Tw / 2, y]];
+        const ws = semi ? [[-Tw / 2, y], ...arcPts(y), [Tw / 2, y]] : b > 1e-6 ? [[-Tw / 2, y], [-b / 2, 0], [b / 2, 0], [Tw / 2, y]] : [[-Tw / 2, y], [0, 0], [Tw / 2, y]];
         fillPoly(ctx, ws.map((q) => P(Lx, q[0], q[1])), C.water, 0.55);
         stroke(ctx, ws.map((q) => P(Lx, q[0], q[1])), C.egl, 3.5);
         stroke(ctx, [P(Lx, -Tw / 2, y), P(Lx, Tw / 2, y)], C.water_deep, 1.5);
@@ -1677,6 +1704,7 @@
       const dy = Tt / 2 + 0.55 * (Yo - Tt / 2); dimV(ctx, P(Lx, dy, 0)[0], P(Lx, dy, 0)[1], P(Lx, dy, y)[1], `y = ${fmt(y)} ${L}`, null, 'left');
       dim3(ctx, P(Lx, -Tw / 2, y + 0.12 * yTop), P(Lx, Tw / 2, y + 0.12 * yTop), `T = ${fmt(Tw)} ${L}`);
       if (b > 1e-6) dim3(ctx, P(Lx, -b / 2, zB * 0.55), P(Lx, b / 2, zB * 0.55), `b = ${fmt(b)} ${L}`);
+      if (semi) dim3(ctx, P(Lx, -R2, zB * 0.55), P(Lx, R2, zB * 0.55), `D = 2r = ${fmt(D)} ${L}`);
       const sf = P(Lx * 0.3, 0, y); surfSym(ctx, sf[0], sf[1]);
     }
     const dlab = d.mode === 'efficient' ? `Optimum vs your section (morphing), Q = ${fmt(d.Q)} ${U.Q}` : `v = ${fmt(d.v)} ${U.v}   Q = ${fmt(d.Q)} ${U.Q}   S = ${fmt(Sbed)}   n = ${fmt(d.n || I.n)}` + (isFinite(d.Fr) ? `   F = ${fmt(d.Fr)}` : '');

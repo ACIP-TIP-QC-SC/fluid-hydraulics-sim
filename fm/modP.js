@@ -150,6 +150,7 @@
     draw3D(V, res, U) {
       if (!res.ok) return;
       const s = this.state, g = res.geo;
+      if (s.sub === 'press') { press3D(V, s, g, U); return; }
       const sch = scene(s, g, U);
       const w = sch.tw || 0.08, dep = sch.depth || 0.6;
       sch.items.forEach((it) => {
@@ -165,6 +166,38 @@
       V.autoBounds();
     },
   };
+
+  /* Hydraulic press in 3D: real round cylinders and pistons (the generic scene would turn both
+     cylinders into boxes of the same depth, hiding the small one behind the large one). */
+  function press3D(V, s, g, U) {
+    const r1 = g.d1 / 2, r2 = g.d2 / 2, dz = g.dz, gap = Math.max(4 * r1, 0.5 * r2), x1 = 0, x2 = 2 * r1 + gap + r2;
+    const base = Math.min(0, dz) - 0.5 * r2 - 0.15, col = fluidCol(s.sgP), tp = 0.06, tp2 = 0.08, GREY = '#5d6d7e';
+    const wall = Math.max(0.15 * r1, 0.004);
+    // transparent cylinder walls a little above each piston
+    V.lathe([[r1, base], [r1 + wall, base], [r1 + wall, tp + 0.08], [r1, tp + 0.08]], '#c8d0d8', 0.25, null, 32, x1, 0);
+    V.lathe([[r2, base], [r2 + wall, base], [r2 + wall, dz + tp2 + 0.08], [r2, dz + tp2 + 0.08]], '#c8d0d8', 0.25, null, 40, x2, 0);
+    // liquid columns and the connecting pipe under them
+    V.lathe([[0, base], [r1, base], [r1, 0], [0, 0]], col, 0.6, null, 32, x1, 0);
+    V.lathe([[0, base], [r2, base], [r2, dz], [0, dz]], col, 0.6, null, 40, x2, 0);
+    const pz = Math.max(0.8 * r1, 0.02);
+    V.box(x1 + r1, base, -pz, x2 - r2, base + Math.max(2 * pz, 0.06), pz, col, 0.6, null);
+    // pistons
+    V.lathe([[0, 0], [r1, 0], [r1, tp], [0, tp]], GREY, 1, null, 32, x1, 0);
+    V.lathe([[0, dz], [r2, dz], [r2, dz + tp2], [0, dz + tp2]], GREY, 1, null, 40, x2, 0);
+    // force arrows with cone heads: F1 pushes down on the small piston, F2 is the load lifted by the large one
+    const al = Math.max(0.25, 1.2 * r2), hh = 0.18 * al, hr = 0.06 * al;
+    const a1 = Math.max(al, dz + tp2 + 0.25 - tp); // keep the F1 label clear of the large cylinder
+    V.line([[x1, tp + a1, 0], [x1, tp + hh, 0]], '#c0392b', 3);
+    V.lathe([[0, tp], [hr, tp + hh], [0, tp + hh]], '#c0392b', 1, null, 16, x1, 0);
+    V.label([x1, tp + a1, 0], `F₁ = ${f(g.F1)} ${U.force}`, '#c0392b');
+    V.line([[x2, dz + tp2, 0], [x2, dz + tp2 + al - hh, 0]], '#1e8449', 3);
+    V.lathe([[0, dz + tp2 + al], [hr, dz + tp2 + al - hh], [0, dz + tp2 + al - hh]], '#1e8449', 1, null, 16, x2, 0);
+    V.label([x2, dz + tp2 + al, 0], `F₂ = ${f(g.F2)} ${U.force}`, '#1e8449');
+    V.dim([x1 - r1, base, 0], [x1 + r1, base, 0], `d₁ = ${f(g.d1)} ${U.len}`, [0, -0.12, 0]);
+    V.dim([x2 - r2, base, 0], [x2 + r2, base, 0], `d₂ = ${f(g.d2)} ${U.len}`, [0, -0.12, 0]);
+    if (Math.abs(dz) > 1e-6) V.dim([x2 + r2, 0, 0], [x2 + r2, dz, 0], `Δz = ${f(dz)} ${U.len}`, [0.25, 0, 0]);
+    V.autoBounds();
+  }
 
   /* ---------- scene builder shared by 2D and 3D ---------- */
   function scene(s, g, U) {

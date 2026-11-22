@@ -301,12 +301,12 @@
       S.forEach((q, i) => {
         const y = top + rh * (i + 1);
         if (i % 2) s('rect', { x: r.x + 6, y: y - rh + 3, width: r.w - 12, height: rh, fill: '#f7f9fa' });
-        cols.forEach(([, fn], j) => { const v = fn(q); s('text', { x: r.x + 8 + cw * (j + 1) - 4, y, 'font-size': fs, 'text-anchor': 'end', fill: j === 0 ? '#6b4a1f' : '#1d2733', 'font-family': 'JetBrains Mono, ui-monospace, monospace' }, v === undefined ? '' : j === 0 ? String(v) : f(v, 4)); });
+        cols.forEach(([, fn], j) => { const v = fn(q); s('text', { x: r.x + 8 + cw * (j + 1) - 4, y, 'font-size': fs, 'text-anchor': 'end', fill: j === 0 ? '#6b4a1f' : '#1d2733', 'font-family': 'IBM Plex Mono, ui-monospace, monospace' }, v === undefined ? '' : j === 0 ? String(v) : f(v, 4)); });
       });
       const y = top + rh * (S.length + 1);
       s('line', { x1: r.x + 6, y1: y - rh + 2, x2: r.x + r.w - 6, y2: y - rh + 2, stroke: '#95a5a6' });
       const sum = (fn) => S.reduce((a, q) => a + (fn(q) || 0), 0);
-      [[3, sum((q) => q.W)], [5, sum((q) => q.Wsin)], [8, sum((q) => q.res)], [10, sum((q) => q.bnum)]].forEach(([j, v]) => s('text', { x: r.x + 8 + cw * (j + 1) - 4, y, 'font-size': fs, 'font-weight': 700, 'text-anchor': 'end', fill: '#c0392b', 'font-family': 'JetBrains Mono, ui-monospace, monospace' }, f(v, 5)));
+      [[3, sum((q) => q.W)], [5, sum((q) => q.Wsin)], [8, sum((q) => q.res)], [10, sum((q) => q.bnum)]].forEach(([j, v]) => s('text', { x: r.x + 8 + cw * (j + 1) - 4, y, 'font-size': fs, 'font-weight': 700, 'text-anchor': 'end', fill: '#c0392b', 'font-family': 'IBM Plex Mono, ui-monospace, monospace' }, f(v, 5)));
       s('text', { x: r.x + 10, y, 'font-size': fs, 'font-weight': 700, fill: '#c0392b' }, 'Σ');
     },
   };

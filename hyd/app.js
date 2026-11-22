@@ -39,8 +39,8 @@
   }
 
   /* ------------------------------------------------------------------ drawing helpers */
-  const FONT = '"Source Sans 3", "Segoe UI", system-ui, sans-serif';
-  const MONO = '"JetBrains Mono", ui-monospace, Menlo, monospace';
+  const FONT = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
   function txt(ctx, s, x, y, o) {
     o = o || {};
     ctx.font = (o.bold ? '600 ' : '') + (o.size || 12) + 'px ' + (o.mono ? MONO : FONT);

@@ -5,14 +5,12 @@
 <script>
 /* Theme from the main page (light by default); when opened on its own, from the saved choice. */
 (function () { var de = document.documentElement, m = 'light';
-  try { if (window.parent !== window) { var p = window.parent.document.documentElement; m = p.hasAttribute('data-theme') ? p.getAttribute('data-theme') : 'system'; } else { m = localStorage.getItem('fmh.theme') || 'light'; } } catch (e) {}
+  try { if (window.parent !== window) { var p = window.parent.document.documentElement; de.classList.add('embedded'); m = p.hasAttribute('data-theme') ? p.getAttribute('data-theme') : 'system'; } else { m = localStorage.getItem('fmh.theme') || 'light'; } } catch (e) {}
   if (m === 'system') de.removeAttribute('data-theme'); else de.setAttribute('data-theme', m === 'dark' ? 'dark' : 'light'); })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hydraulics Engineering</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../fonts.css">
 <style>
 /* Layout: lab console — controls | live diagram | worked solution, under a centered title block */
 :root {
@@ -33,9 +31,9 @@
   --c-water: #3a90cc; --c-water-deep: #1c6aa3; --c-part: #0d3b5e; --c-foam: #ffffff;
   --c-egl: #d4612a; --c-hgl: #6b4fc8; --c-danger: #d23b3b; --c-ok: #2e8b57;
   --c-soil: #c8b79c; --c-wall: #33444f; --c-air: #fff4dc; --c-pipe: #8796a0;
-  --f-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
-  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
-  --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --f-display: "IBM Plex Sans", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -151,12 +149,13 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding-block
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 </style>
 <style>body{margin:0} .stephead .btns{display:flex;gap:6px} .stephead{flex-wrap:wrap;gap:8px} nav.tabs{padding-top:4px} [hidden]{display:none!important}</style>
+<link rel="stylesheet" href="../skin.css">
 </head>
 <body>
 <div class="wrap">
   <nav class="tabs" id="tabs" role="tablist" aria-label="Modules"></nav>
   <div class="bar">
-    <h2 id="modTitle">Module</h2>
+    <div class="ttl"><div class="crumb">Hydraulics Engineering</div><h2 id="modTitle">Module</h2></div>
     <div class="seg" role="group" aria-label="Units">
       <button id="uSI" aria-pressed="true">SI</button><button id="uEN" aria-pressed="false">English</button>
     </div>

@@ -153,7 +153,7 @@
     const X = (x) => L + ((lx(x) - lx(xmin)) / (lx(xmax) - lx(xmin))) * (R - L);
     const Y = (y) => (o.ydown ? T + ((y - ymin) / (ymax - ymin)) * (B - T) : B - ((y - ymin) / (ymax - ymin)) * (B - T));
     s('rect', { x: L, y: T, width: R - L, height: B - T, fill: '#ffffff', stroke: '#c4ced9' }, g);
-    const txt = (x, y, t, a) => { const e = s('text', Object.assign({ x, y, 'font-size': 11, fill: '#5d6b7a', 'font-family': 'Source Sans 3, system-ui, sans-serif' }, a || {}), g); e.textContent = t; return e; };
+    const txt = (x, y, t, a) => { const e = s('text', Object.assign({ x, y, 'font-size': 11, fill: '#5d6b7a', 'font-family': 'IBM Plex Sans, system-ui, sans-serif' }, a || {}), g); e.textContent = t; return e; };
     // grid & ticks
     if (o.xlog) {
       for (let d = Math.floor(Math.log10(xmin)); d <= Math.ceil(Math.log10(xmax)); d++) for (let m = 1; m <= 9; m++) {

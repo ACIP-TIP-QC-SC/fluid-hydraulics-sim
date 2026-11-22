@@ -14,7 +14,9 @@ American Concrete Institute Philippines T.I.P. QC Student Chapter · by CEM Juma
 
 ## Layout
 
-- `index.html`: the shared header and the three discipline tabs
+- `index.html`: the shared header, the sidebar listing every module, the "All calculators" home page of cards, and the footer. Each discipline loads in its own frame; `#fm`, `#hyd/2` and so on open a discipline or a module directly
+- `skin.css`: the shared look of the three solvers (IBM Plex type, blue accent), styled after the Structural Analysis and Design Calculator
+- `fonts.css` and `vendor/fonts/`: IBM Plex Sans and IBM Plex Mono (SIL Open Font License), hosted here
 - `fm/`: Fluid Mechanics solver
 - `hyd/`: Hydraulics Engineering solver
 - `geo/`: Geotechnical Engineering solver (reuses `fm/ui.js`, `fm/iso3d.js` and `fm/styles.css`)

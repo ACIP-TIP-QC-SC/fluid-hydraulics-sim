@@ -1,0 +1,92 @@
+/* Shared look for the three solvers (fm/, hyd/, geo/), loaded after each solver's own styles.
+   Matches the Structural Analysis and Design Calculator: IBM Plex type, blue accent, quiet panels.
+   Diagram colours (--c-* and the SVG/canvas palettes) are left to each solver. */
+:root {
+  --paper: #F3F5F7; --panel: #FFFFFF; --ink: #16202B; --muted: #52606D; --rule: #D5DBE1;
+  --accent: #1F5FA8; --accent-ink: #FFFFFF; --tint: #E8F0FA; --chip: #EEF2F5; --field: #FFFFFF;
+  --brand: #9A5B00;
+  --f-display: "IBM Plex Sans", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0F151C; --panel: #18212B; --ink: #E6EDF3; --muted: #9AA7B4; --rule: #2B3744;
+    --accent: #74ACEC; --accent-ink: #0F151C; --tint: #1D2C3D; --chip: #1F2A36; --field: #121A22;
+    --brand: #E9B44C;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0F151C; --panel: #18212B; --ink: #E6EDF3; --muted: #9AA7B4; --rule: #2B3744;
+  --accent: #74ACEC; --accent-ink: #0F151C; --tint: #1D2C3D; --chip: #1F2A36; --field: #121A22;
+  --brand: #E9B44C;
+}
+body { font-family: var(--f-body); }
+
+/* Module tabs: underlined text tabs. Inside the main page the sidebar lists the modules instead. */
+nav.tabs { justify-content: flex-start; gap: 4px; padding-top: 8px; border-bottom: 1px solid var(--rule); }
+nav.tabs button { font: 500 14px var(--f-body); letter-spacing: 0; color: var(--muted); border-bottom: 2px solid transparent; padding: 8px 12px; margin-bottom: -1px; min-height: 40px; }
+nav.tabs button .n { font: 500 11px var(--f-mono); margin-right: 6px; }
+nav.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+nav.tabs button:hover { color: var(--accent); }
+html.embedded nav.tabs { display: none; }
+
+/* Title bar: discipline label over the module name, controls on the right. */
+.bar { padding-block: 20px 16px; gap: 10px 14px; }
+.bar .ttl { margin: 0 auto 0 0; min-width: 0; }
+.bar .crumb { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.bar h2, .bar .ttl h2 { font: 600 22px/1.25 var(--f-body); letter-spacing: 0; margin: 0; }
+.bar select { height: 36px; }
+
+/* Segmented buttons: the chosen option fills with the accent. */
+.seg { border-radius: 6px; background: var(--panel); }
+.seg button { font: 500 13px var(--f-body); padding: 7px 12px; min-width: 44px; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"], .seg button.on { background: var(--accent); color: var(--accent-ink); }
+.seg button + button { border-left-color: var(--rule); }
+
+/* Inputs */
+select, input[type="number"] { border-radius: 6px; font-family: var(--f-body); }
+input[type="number"] { font-family: var(--f-mono); }
+
+/* Plain buttons: white with a thin border; hover in the accent. */
+.btn, .copy, .anim button.b { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; color: var(--ink); font: 500 13px var(--f-body); padding: 6px 12px; }
+.btn.small { font-size: 12px; padding: 4px 10px; }
+.btn:hover, .copy:hover, .anim button.b:hover { border-color: var(--accent); color: var(--accent); }
+.anim button.b.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.anim button.b.primary:hover { color: var(--accent-ink); }
+
+/* Panel headings and control groups */
+.panel { border-radius: 8px; }
+.ph { font: 600 12px var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.ctl-section { border-top: 1px solid var(--rule); padding-top: 10px; margin-top: 14px; }
+.ctl-title, .grp { font: 600 14px var(--f-body); letter-spacing: 0; color: var(--ink); }
+.grp { border-top: 1px solid var(--rule); padding-top: 12px; margin-top: 14px; }
+.ctl-label, .prm-h label, .toggle label, .prm.check label { font-weight: 500; }
+
+/* Preset chips and mode lists */
+.presets button, .chips button { background: var(--panel); border: 1px solid var(--rule); border-radius: 999px; font: 500 12px var(--f-body); padding: 3px 10px; }
+.presets button:hover, .chips button:hover { border-color: var(--accent); color: var(--accent); }
+.presets button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.modes button { border-radius: 6px; font: 500 13px var(--f-body); }
+.modes button:hover { border-color: var(--accent); }
+.modes button[aria-pressed="true"] { border-color: var(--accent); background: var(--tint); color: var(--ink); }
+
+/* Results and worked solution */
+.pill { font-weight: 600; }
+table.results tr.hl td, table.res tr.em td { font-weight: 600; }
+.st-t { font-weight: 600; }
+ol.steps li::before { background: var(--tint); color: var(--accent); font-weight: 500; }
+svg .lbl { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+footer { font-family: var(--f-body); }
+
+/* Space for the in-page diagram columns once the sidebar takes its share of the width. */
+@media (min-width: 1060px) and (max-width: 1180px) {
+  .layout { grid-template-columns: 270px minmax(0, 1fr) 330px; }
+  #right { grid-column: auto; }
+}
+@media (max-width: 760px) {
+  .bar { padding-block: 14px 12px; }
+  .bar .ttl { flex: 1 1 100%; }
+  .seg button { padding: 9px 12px; }
+}

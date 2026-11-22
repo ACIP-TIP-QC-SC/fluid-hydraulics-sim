@@ -7,261 +7,290 @@
 /* Theme: light by default; the viewer can pick Dark or System (follows the device). */
 (function () { var m = 'light'; try { m = localStorage.getItem('fmh.theme') || 'light'; } catch (e) {}
   if (m === 'system') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', m === 'dark' ? 'dark' : 'light'); })();
+  else document.documentElement.setAttribute('data-theme', m === 'dark' ? 'dark' : 'light');
+  try { if (localStorage.getItem('fmh.rail') === '1') document.documentElement.classList.add('rail'); } catch (e) {} })();
 </script>
 <title>Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<meta name="description" content="Fluid mechanics, hydraulics and geotechnical engineering calculators with live diagrams and numbered worked solutions. American Concrete Institute Philippines T.I.P. QC Student Chapter.">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="stylesheet" href="fonts.css">
 <style>
 :root {
-  --paper: #f2f5f6; --panel: #ffffff; --ink: #15242d; --muted: #5a6b75; --rule: #d3dce0;
-  --accent: #d4612a; --accent-ink: #ffffff; --tab-bg: #e8eef1;
-  --f-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
-  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --bg: #F3F5F7; --panel: #FFFFFF; --ink: #16202B; --muted: #52606D; --rule: #D5DBE1;
+  --accent: #1F5FA8; --accent-ink: #FFFFFF; --tint: #E8F0FA; --brand: #9A5B00;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0e161b; --panel: #142029; --ink: #e1eaee; --muted: #93a5af; --rule: #263642;
-    --accent: #f08a50; --accent-ink: #1a0d05; --tab-bg: #1c2b36; color-scheme: dark;
+    --bg: #0F151C; --panel: #18212B; --ink: #E6EDF3; --muted: #9AA7B4; --rule: #2B3744;
+    --accent: #74ACEC; --accent-ink: #0F151C; --tint: #1D2C3D; --brand: #E9B44C; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #0e161b; --panel: #142029; --ink: #e1eaee; --muted: #93a5af; --rule: #263642;
-  --accent: #f08a50; --accent-ink: #1a0d05; --tab-bg: #1c2b36; color-scheme: dark;
+  --bg: #0F151C; --panel: #18212B; --ink: #E6EDF3; --muted: #9AA7B4; --rule: #2B3744;
+  --accent: #74ACEC; --accent-ink: #0F151C; --tint: #1D2C3D; --brand: #E9B44C; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; }
-body { background: var(--paper); color: var(--ink); font-family: var(--f-body); }
-/* The header and solver fill the first screen; the footer sits below it. */
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* The header, sidebar and calculator fill the first screen; the footer sits below it. */
 .shell { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-header.app {
-  display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
-  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
-  padding-top: max(12px, env(safe-area-inset-top, 0px));
-  background: var(--panel); border-bottom: 1px solid var(--rule);
+
+/* Header: logo and titles on the left, labelled controls on the right. */
+header.top {
+  position: relative; z-index: 20; background: var(--panel); border-bottom: 1px solid var(--rule);
+  box-shadow: 0 1px 4px rgba(22, 32, 43, .08);
+  display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between;
+  padding: 10px max(20px, env(safe-area-inset-right, 0px)) 10px max(20px, env(safe-area-inset-left, 0px));
+  padding-top: max(10px, env(safe-area-inset-top, 0px));
 }
-.brand { display: flex; align-items: center; gap: 14px; min-width: 0; padding-bottom: 12px; margin-right: auto; }
-.brand img { flex: none; width: 64px; height: 64px; display: block; object-fit: contain; }
-.brand h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(22px, 3vw, 34px); line-height: 1.02; letter-spacing: 0.01em; text-wrap: balance; }
-.brand p.by { margin-top: 1px; color: var(--accent); font-weight: 600; }
-.brand p { margin: 4px 0 0; font-family: var(--f-display); font-weight: 500; font-size: clamp(13px, 1.4vw, 16px); letter-spacing: 0.04em; color: var(--muted); }
-.side { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; align-self: stretch; }
-.theme { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; padding: 2px; background: var(--tab-bg); }
-.theme button {
-  display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 6px; background: transparent;
-  color: var(--muted); font: 600 13px/1 var(--f-body); padding: 5px 9px; cursor: pointer;
-}
-.theme button svg { width: 15px; height: 15px; flex: none; }
-.theme button:hover { color: var(--ink); }
-.theme button[aria-checked="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
-.theme button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-nav.disc { display: flex; gap: 6px; align-self: flex-end; }
-nav.disc button {
-  font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: 0.02em;
-  border: 1px solid var(--rule); border-bottom: 0; border-radius: 10px 10px 0 0;
-  background: var(--tab-bg); color: var(--muted); padding: 10px 20px 9px; cursor: pointer;
-  display: flex; align-items: center; gap: 8px; position: relative; top: 1px;
-}
-nav.disc button svg { width: 20px; height: 20px; flex: none; }
-nav.disc button:hover { color: var(--ink); }
-nav.disc button[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: inset 0 3px 0 var(--accent); }
-nav.disc button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-nav.disc .short { display: none; }
-/* Wide screens: the theme switch sits in the top-right corner, so the discipline tabs can wrap onto their own row. */
-@media (min-width: 721px) {
-  header.app { position: relative; }
-  .theme { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); }
-  .brand { max-width: calc(100% - 290px); }
-  .side { justify-content: flex-end; min-height: 40px; }
-}
-@media (max-width: 1240px) { nav.disc button { font-size: 16px; padding: 9px 13px 8px; } }
-main { flex: 1; position: relative; min-height: 0; }
-main iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: var(--paper); }
-main iframe[hidden] { display: none; }
-footer.site { background: var(--panel); border-top: 1px solid var(--rule); color: var(--ink); }
-footer.site .inner {
-  max-width: 1200px; margin: 0 auto; display: grid; gap: 28px 36px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  padding: 36px max(16px, env(safe-area-inset-right, 0px)) 28px max(16px, env(safe-area-inset-left, 0px));
-}
-footer.site section { min-width: 0; }
-footer.site h2 {
-  margin: 0 0 8px; font-family: var(--f-display); font-weight: 700; font-size: 15px;
-  letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
-  padding-bottom: 6px; border-bottom: 2px solid var(--rule);
-}
-footer.site p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink); }
-footer.site .dev { display: flex; align-items: center; gap: 12px; }
-footer.site .dev img { flex: none; width: 52px; height: 52px; object-fit: contain; }
-footer.site .dev .name { font-family: var(--f-display); font-weight: 700; font-size: 22px; line-height: 1.1; }
-footer.site .dev .role { color: var(--muted); font-weight: 600; font-size: 14px; margin-top: 2px; }
-footer.site .base {
-  border-top: 1px solid var(--rule); color: var(--muted); font-size: 13px; text-align: center;
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
-}
-@media (max-width: 720px) {
-  .brand img { width: 52px; height: 52px; }
-  .side { width: 100%; }
-  nav.disc { width: 100%; }
-  nav.disc button { flex: 1; justify-content: center; font-size: 16px; padding: 9px 8px 8px; white-space: nowrap; }
-  nav.disc button svg { display: none; }
-  nav.disc .full { display: none; } nav.disc .short { display: inline; }
+.brand { display: flex; gap: 12px; align-items: center; min-width: 0; text-decoration: none; color: inherit; }
+.brand img { height: 56px; width: 56px; flex: none; object-fit: contain; display: block; }
+.brand h1 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.2; }
+.brand p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.brand .by { color: var(--brand); font-weight: 500; }
+.ctrls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.ctrl { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); font-weight: 500; letter-spacing: .02em; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; height: 36px; }
+.seg button { font: 500 13px var(--sans); color: var(--muted); background: var(--panel); border: 0; padding: 0 12px; cursor: pointer; min-width: 44px; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
+.btn { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; height: 36px; padding: 0 12px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Sidebar: every module, grouped by discipline. */
+.body { flex: 1; display: flex; min-height: 0; }
+.side { flex: 0 0 260px; background: var(--panel); border-right: 1px solid var(--rule); padding: 12px 10px 20px; overflow-y: auto; }
+.sidetop { display: flex; gap: 8px; }
+.homeb { flex: 1; justify-content: flex-start; border-color: transparent; font-size: 14px; }
+.homeb.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.homeb.on:hover { color: var(--accent-ink); }
+.railbtn { flex: 0 0 36px; padding: 0; }
+.navbtn { display: none; }
+.navhead { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 16px 10px 6px; }
+.navitem { width: 100%; font: 400 14px/1.3 var(--sans); text-align: left; color: var(--ink); background: transparent; border: 0; border-radius: 6px; padding: 6px 10px; min-height: 32px; cursor: pointer; display: flex; align-items: center; }
+.navitem:hover { background: var(--tint); }
+.navitem.on { background: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.railonly { display: none; flex-direction: column; gap: 6px; margin-top: 10px; }
+.railic { width: 36px; height: 36px; border-radius: 6px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); font: 600 11px var(--sans); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.railic:hover { border-color: var(--accent); color: var(--accent); }
+.railic.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+html.rail .side { flex-basis: 57px; padding-inline: 10px; }
+html.rail .side .navlist, html.rail .side .homeb { display: none; }
+html.rail .side .railonly { display: flex; }
+
+/* Main area: the home page of cards, or one calculator. */
+main.main { flex: 1; position: relative; min-width: 0; }
+main iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: var(--bg); }
+.home { position: absolute; inset: 0; overflow-y: auto; padding: 24px; }
+.home .h2 { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.25; }
+.home .lead { margin: 6px 0 0; max-width: 760px; color: var(--muted); }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.pillbtn { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 18px; height: 36px; padding: 0 14px; cursor: pointer; }
+.pillbtn:hover { border-color: var(--accent); }
+.pillbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.mcard { display: flex; flex-direction: column; gap: 8px; text-align: left; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; cursor: pointer; min-height: 150px; }
+.mcard:hover { border-color: var(--accent); }
+.mc-ic { width: 32px; height: 32px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.mc-t { font-weight: 600; font-size: 15px; }
+.mc-d { font-size: 13px; color: var(--muted); }
+.mc-f { font-size: 12px; color: var(--accent); font-weight: 500; margin-top: auto; }
+
+/* Footer */
+footer.foot { border-top: 1px solid var(--rule); background: var(--panel); color: var(--muted); font-size: 13px;
+  padding: 20px max(24px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px)); }
+.footgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+.foot h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.foot p { margin: 0; }
+.foot .dev { display: flex; gap: 10px; align-items: center; }
+.foot .dev img { height: 52px; width: 52px; object-fit: contain; }
+.foot .dev strong { color: var(--ink); font-weight: 600; }
+.footbase { border-top: 1px solid var(--rule); margin-top: 16px; padding-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between; }
+
+/* Phones and narrow tablets: the page scrolls as one; the module list opens from a button. */
+@media (max-width: 820px) {
   .shell { height: auto; min-height: 100dvh; }
-  /* On phones the solver frame is sized to its whole content (see fitFrames below), so the page
-     scrolls as one and the footer follows the solver. A swipe inside a frame never scrolls the
-     page on iOS or Android, so a fixed-height frame hid the footer. */
-  main { flex: none; height: auto; }
+  header.top { padding: 10px max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px)); padding-top: max(10px, env(safe-area-inset-top, 0px)); }
+  .brand img { height: 44px; width: 44px; }
+  .brand h1 { font-size: 16px; }
+  .body { flex-direction: column; flex: none; }
+  .side, html.rail .side { flex: none; border-right: 0; border-bottom: 1px solid var(--rule); padding: 10px max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px)); overflow: visible; }
+  html.rail .side .homeb { display: inline-flex; }
+  html.rail .side .railonly, .railbtn { display: none; }
+  .navbtn { display: inline-flex; }
+  .navlist, html.rail .side .navlist { display: none; }
+  .side.navopen .navlist { display: block; }
+  .btn, .seg, .pillbtn { height: 44px; }
+  .seg button { min-width: 48px; }
+  .navitem { min-height: 44px; }
+  .homeb { border-color: var(--rule); }
+  main.main { flex: none; }
+  .home { position: static; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+  /* The solver frame is sized to its whole content (see fit below), so the page scrolls as one and
+     the footer follows the solver. A swipe inside a frame never scrolls the page on iOS or Android. */
   main iframe { position: static; height: 80vh; height: 80dvh; }
-  footer.site .inner { padding-top: 28px; gap: 24px; }
+  footer.foot { padding-inline: max(16px, env(safe-area-inset-left, 0px)); }
 }
 </style>
 </head>
 <body>
 <div class="shell">
-<header class="app">
-  <div class="brand">
-    <img src="logo.png" width="64" height="64" alt="ACI Philippines T.I.P. Quezon City Student Chapter logo">
+<header class="top">
+  <a class="brand" href="#" id="brandLink">
+    <img src="logo.png" width="56" height="56" alt="ACI Philippines T.I.P. Quezon City Student Chapter logo">
     <div>
       <h1>Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator</h1>
       <p>American Concrete Institute Philippines T.I.P. QC Student Chapter</p>
       <p class="by">by CEM Jumawan</p>
     </div>
-  </div>
-  <div class="side">
-  <div class="theme" role="radiogroup" aria-label="Colour theme">
-    <button type="button" role="radio" data-mode="light" aria-checked="false" title="Light theme">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Light</button>
-    <button type="button" role="radio" data-mode="dark" aria-checked="false" title="Dark theme">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Dark</button>
-    <button type="button" role="radio" data-mode="system" aria-checked="false" title="Follow the device setting">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
-  </div>
-  <nav class="disc" role="tablist" aria-label="Discipline">
-    <button role="tab" id="tab-fm" aria-controls="pane-fm" data-pane="fm">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v16H3z"/><path d="M3 10c3 0 3 1.5 6 1.5S12 10 15 10s3 1.5 6 1.5"/><path d="M12 13v5m-2.5-2.5L12 18l2.5-2.5"/></svg>
-      <span class="full">Fluid Mechanics</span><span class="short">Fluid Mech.</span>
-    </button>
-    <button role="tab" id="tab-hyd" aria-controls="pane-hyd" data-pane="hyd">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8h8v8H2z"/><path d="M10 12h12"/><path d="M14 9.5l2.5 2.5-2.5 2.5"/><path d="M2 11c2 0 2 1 4 1s2-1 4-1"/></svg>
-      <span class="full">Hydraulics Engineering</span><span class="short">Hydraulics</span>
-    </button>
-    <button role="tab" id="tab-geo" aria-controls="pane-geo" data-pane="geo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18M3 14h18M3 19h18"/><path d="M6 4v5M17 9v5"/><circle cx="10" cy="16.5" r=".6"/><circle cx="15" cy="16.5" r=".6"/><path d="M12 4l3 3-3 3"/></svg>
-      <span class="full">Geotechnical Engineering</span><span class="short">Geotechnical</span>
-    </button>
-  </nav>
+  </a>
+  <div class="ctrls">
+    <div class="ctrl"><span id="themeLbl">Theme</span>
+      <div class="seg theme" role="radiogroup" aria-labelledby="themeLbl">
+        <button type="button" role="radio" data-mode="light" aria-checked="false" title="Light theme">Light</button><button type="button" role="radio" data-mode="dark" aria-checked="false" title="Dark theme">Dark</button><button type="button" role="radio" data-mode="system" aria-checked="false" title="Follow the device setting">System</button>
+      </div>
+    </div>
   </div>
 </header>
-<main>
-  <iframe id="pane-fm" role="tabpanel" aria-labelledby="tab-fm" title="Fluid Mechanics solver" data-src="fm/index.html" hidden></iframe>
-  <iframe id="pane-hyd" role="tabpanel" aria-labelledby="tab-hyd" title="Hydraulics Engineering solver" data-src="hyd/index.html" hidden></iframe>
-  <iframe id="pane-geo" role="tabpanel" aria-labelledby="tab-geo" title="Geotechnical Engineering solver" data-src="geo/index.html" hidden></iframe>
-</main>
+<div class="body">
+  <nav class="side" id="side" aria-label="Calculators">
+    <div class="sidetop">
+      <button type="button" class="btn homeb" id="homeBtn">All calculators</button>
+      <button type="button" class="btn navbtn" id="navBtn" aria-expanded="false" aria-controls="navlist">Modules</button>
+      <button type="button" class="btn railbtn" id="railBtn" title="Collapse the sidebar" aria-label="Collapse the sidebar">«</button>
+    </div>
+    <div class="navlist" id="navlist"></div>
+    <div class="railonly" id="railonly"></div>
+  </nav>
+  <main class="main" id="main">
+    <section class="home" id="home" aria-labelledby="homeTitle" hidden>
+      <h2 class="h2" id="homeTitle">Fluid mechanics, hydraulics and geotechnical engineering</h2>
+      <p class="lead">Pick a calculator. Each one sets its inputs beside a live 2D and 3D diagram, loads worked examples and test cases, and ends with a numbered step-by-step solution you can copy or print as a PDF.</p>
+      <div class="pills" id="pills" role="group" aria-label="Filter by discipline"></div>
+      <div class="grid" id="cards"></div>
+    </section>
+    <iframe id="pane-fm" title="Fluid Mechanics solver" data-src="fm/index.html" hidden></iframe>
+    <iframe id="pane-hyd" title="Hydraulics Engineering solver" data-src="hyd/index.html" hidden></iframe>
+    <iframe id="pane-geo" title="Geotechnical Engineering solver" data-src="geo/index.html" hidden></iframe>
+  </main>
 </div>
-<footer class="site">
-  <div class="inner">
-    <section aria-labelledby="ft-about">
-      <h2 id="ft-about">About Us</h2>
-      <p>The American Concrete Institute Philippines Technological Institute of the Philippines Quezon City Student Chapter (ACIP T.I.P. QC SC) is the Premier Civil Engineering Student Organization at T.I.P. QC.</p>
-    </section>
-    <section aria-labelledby="ft-mission">
-      <h2 id="ft-mission">Mission</h2>
-      <p>To help our members grow into competent, ethical, and future-ready civil engineers by providing academic and professional services, technical seminars, and hands-on workshops guided by ACI standards and best practices in concrete design and construction.</p>
-    </section>
-    <section aria-labelledby="ft-vision">
-      <h2 id="ft-vision">Vision</h2>
-      <p>To be the leading student chapter of ACI Philippines, known for producing civil engineers who build safe, durable, and sustainable concrete structures for the nation.</p>
-    </section>
-    <section aria-labelledby="ft-dev">
-      <h2 id="ft-dev">Developer</h2>
-      <div class="dev">
-        <img src="logo.png" width="52" height="52" alt="">
-        <div>
-          <div class="name">Engr. CEM Jumawan</div>
-          <div class="role">President 2026-2027</div>
-        </div>
-      </div>
-    </section>
+</div>
+<footer class="foot">
+  <div class="footgrid">
+    <section><h2>About Us</h2><p>The American Concrete Institute Philippines Technological Institute of the Philippines Quezon City Student Chapter (ACIP T.I.P. QC SC) is the Premier Civil Engineering Student Organization at T.I.P. QC.</p></section>
+    <section><h2>Mission</h2><p>To help our members grow into competent, ethical, and future-ready civil engineers by providing academic and professional services, technical seminars, and hands-on workshops guided by ACI standards and best practices in concrete design and construction.</p></section>
+    <section><h2>Vision</h2><p>To be the leading student chapter of ACI Philippines, known for producing civil engineers who build safe, durable, and sustainable concrete structures for the nation.</p></section>
+    <section><h2>Developer</h2><div class="dev"><img src="logo.png" width="52" height="52" alt=""><p><strong>Engr. CEM Jumawan</strong><br>President 2026-2027</p></div></section>
   </div>
-  <div class="base">ACIP T.I.P. QC SC · Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator</div>
+  <div class="footbase">
+    <span>ACIP T.I.P. QC SC · Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator</span>
+    <span>For study and checking hand solutions. Values are rounded to 4 significant figures.</span>
+  </div>
 </footer>
+<noscript><p style="padding:16px">This calculator needs JavaScript to run.</p></noscript>
 <script>
 (function () {
   'use strict';
-  var KEY = 'fmh.tab';
-  var tabs = Array.prototype.slice.call(document.querySelectorAll('nav.disc button'));
-  function store(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
-  function stored() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  // Every module, in the order of each solver's own module list (the sidebar clicks the solver's
+  // n-th module tab, so this order must match fm/app.js, hyd/app.js and geo/app.js).
+  var DISC = [
+    { id: 'fm', name: 'Fluid Mechanics', ic: 'FM', mods: [
+      ['Viscosity', 'Shear in thin oil films: blocks on inclines, plates in gaps, shafts, disks, cones and viscometers.', 'Block on incline · Shaft and sleeve · Viscometer'],
+      ['Pressure', 'Pressure at a depth through layered liquids, piezometers, manometers and the hydraulic press.', 'Liquid layers · Manometers · Hydraulic press'],
+      ['Hydrostatic Forces', 'Resultant force and centre of pressure on plane and curved surfaces, including hinged gates.', 'Plane surfaces · Curved surfaces · Gates'],
+      ['Analysis of Dams', 'Gravity dam stability: overturning, sliding, the middle third and foundation pressure.', 'Overturning · Sliding · Foundation pressure'],
+      ['Buoyancy & Flotation', 'Draft in up to three liquids, metacentric stability and ballast problems.', 'Draft · Stability · Ballast'],
+      ['Relative Equilibrium', 'Liquids in accelerating and rotating containers: surface slope, spilling and pressures.', 'Linear acceleration · Rotating vessels']
+    ] },
+    { id: 'hyd', name: 'Hydraulics Engineering', ic: 'HY', mods: [
+      ['Orifices & Tanks', 'Flow through orifices and tubes, tank draining times, and two connected tanks.', 'Steady flow · Draining · Two tanks'],
+      ['Pipe Systems', 'Head losses and flows in single, series and parallel pipes, three reservoirs and equivalent pipes.', 'Darcy · Hazen-Williams · Manning · Three reservoirs'],
+      ['Specific Energy & Jump', 'Critical and alternate depths, choking over steps, hydraulic jumps and sluice gates.', 'Specific energy · Hydraulic jump · Sluice gate'],
+      ['Pumps & Siphons', 'The energy equation with pumps and turbines, siphon summit pressure and nozzle jet power.', 'Pump · Turbine · Siphon · Nozzle'],
+      ['Weirs', 'Discharge over rectangular, V-notch, Cipolletti and broad-crested weirs, or the head for a given flow.', 'Rectangular · V-notch · Broad-crested · Reservoir lowering'],
+      ['Open Channels', 'Manning uniform flow: discharge, normal depth, slope and the most efficient section.', 'Normal depth · Best section · Circular conduits'],
+      ['Water Hammer', 'Pressure rise from valve closure, wave celerity and pipe hoop stress, with an animated surge.', 'Rapid closure · Slow closure · Hoop stress']
+    ] },
+    { id: 'geo', name: 'Geotechnical Engineering', ic: 'GE', mods: [
+      ['Permeability & Seepage', 'Constant and falling head tests, layered soil and computed flow nets under sheet piles and dams.', 'Lab tests · Layered soil · Flow nets'],
+      ['Effective Stress', 'Total stress, pore pressure and effective stress through a layered profile, with capillarity and seepage.', 'Soil profile · Capillary rise · Seepage'],
+      ['Stresses in Soil', 'Boussinesq stress increase under point, line, strip, circular and rectangular loads, and the 2:1 method.', 'Point and line loads · Footings · Pressure bulbs'],
+      ['Consolidation', 'Primary settlement of normally and over-consolidated clays, time rate and secondary compression.', 'Settlement · Time rate · Secondary compression'],
+      ['Shear Strength', 'Mohr circles, Mohr–Coulomb failure, direct shear, triaxial and unconfined compression tests.', 'Mohr circle · Direct shear · Triaxial'],
+      ['Lateral Earth Pressure & Retaining Walls', 'Rankine and Coulomb earth pressures, and the stability of cantilever and gravity retaining walls.', 'Rankine · Coulomb · Wall stability'],
+      ['Slope Stability', 'Infinite slopes, Culmann plane failure and the method of slices (Fellenius and Bishop).', 'Infinite slope · Culmann · Method of slices']
+    ] }
+  ];
+  var byId = {}; DISC.forEach(function (d) { byId[d.id] = d; });
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function frame(id) { return document.getElementById('pane-' + id); }
+  function frames() { return DISC.map(function (d) { return frame(d.id); }); }
 
-  // Pass the page theme (light/dark override) to the embedded solvers.
-  function syncTheme(fr) {
-    try {
-      var d = fr.contentDocument && fr.contentDocument.documentElement; if (!d) return;
-      var t = document.documentElement.getAttribute('data-theme');
-      if (t) d.setAttribute('data-theme', t); else d.removeAttribute('data-theme');
-    } catch (e) {}
-  }
-  function frames() { return Array.prototype.slice.call(document.querySelectorAll('main iframe')); }
+  var S = { view: 'home', disc: null, pending: {}, filter: 'all' };
+  var side = document.getElementById('side'), navBtn = document.getElementById('navBtn');
 
-  // Phones: grow the visible solver frame to the height of its content, so the solver scrolls with
-  // the page and About Us / Mission / Vision / Developer are reached by scrolling down.
-  var phone = window.matchMedia('(max-width: 720px)');
-  function fit(fr) {
-    try {
-      var d = fr.contentDocument; if (!d || !d.documentElement || !d.body) return;
-      // The solvers size some panels with vh; inside a content-sized frame that would track the
-      // frame, so hand them the phone's own viewport height instead.
-      d.documentElement.style.setProperty('--vh', (window.innerHeight / 100) + 'px');
-      if (!phone.matches) { fr.style.height = ''; return; }
-      if (fr.hidden) return;
-      var h = Math.ceil(d.documentElement.getBoundingClientRect().height);
-      if (h > 0 && Math.abs(h - fr.offsetHeight) > 1) fr.style.height = h + 'px';
-    } catch (e) {}
-  }
-  function fitFrames() { frames().forEach(fit); }
-  function watch(fr) {
-    try {
-      var w = fr.contentWindow, d = fr.contentDocument;
-      if (!w || !d || fr._watched === d) return;
-      fr._watched = d;
-      if (w.ResizeObserver) new w.ResizeObserver(function () { fit(fr); }).observe(d.body);
-      fit(fr);
-    } catch (e) {}
-  }
-  window.addEventListener('resize', fitFrames);
-  if (phone.addEventListener) phone.addEventListener('change', fitFrames); else if (phone.addListener) phone.addListener(fitFrames);
-
-  function select(id) {
-    if (id !== 'fm' && id !== 'hyd' && id !== 'geo') id = 'fm';
-    tabs.forEach(function (b) {
-      var on = b.dataset.pane === id;
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
-      b.tabIndex = on ? 0 : -1;
+  // ---- Sidebar, rail and home cards ----
+  var navlist = document.getElementById('navlist'), railonly = document.getElementById('railonly');
+  var items = {};
+  DISC.forEach(function (d) {
+    navlist.append(el('div', 'navhead', d.name));
+    items[d.id] = d.mods.map(function (m, i) {
+      var b = el('button', 'navitem', m[0]); b.type = 'button';
+      b.addEventListener('click', function () { open(d.id, i); });
+      navlist.append(b); return b;
     });
-    frames().forEach(function (fr) {
-      var on = fr.id === 'pane-' + id;
-      if (on && !fr.getAttribute('src')) {
-        fr.addEventListener('load', function () { syncTheme(fr); watch(fr); });
-        fr.setAttribute('src', fr.dataset.src);
-      }
-      fr.hidden = !on;
-      if (on) { try { fr.contentWindow && fr.contentWindow.dispatchEvent(new Event('resize')); } catch (e) {} fit(fr); }
-    });
-    store(id);
-    if (location.hash !== '#' + id) { try { history.replaceState(null, '', '#' + id); } catch (e) {} }
-  }
-
-  tabs.forEach(function (b, i) {
-    b.addEventListener('click', function () { select(b.dataset.pane); });
-    b.addEventListener('keydown', function (e) {
-      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-      var n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
-      n.focus(); select(n.dataset.pane);
-    });
+    var r = el('button', 'railic', d.ic); r.type = 'button'; r.dataset.disc = d.id; r.title = d.name; r.setAttribute('aria-label', d.name);
+    r.addEventListener('click', function () { open(d.id, null); });
+    railonly.append(r);
   });
-  // Theme switcher: Light (default), Dark, or System (follows the device).
+  var railHome = el('button', 'railic', '⌂'); railHome.type = 'button'; railHome.title = 'All calculators'; railHome.setAttribute('aria-label', 'All calculators');
+  railHome.addEventListener('click', function () { showHome(); });
+  railonly.prepend(railHome);
+
+  var pills = document.getElementById('pills'), cards = document.getElementById('cards');
+  [['all', 'All']].concat(DISC.map(function (d) { return [d.id, d.name]; })).forEach(function (p) {
+    var b = el('button', 'pillbtn', p[1]); b.type = 'button'; b.dataset.f = p[0];
+    b.addEventListener('click', function () { S.filter = p[0]; drawCards(); });
+    pills.append(b);
+  });
+  function drawCards() {
+    Array.prototype.forEach.call(pills.children, function (b) { b.setAttribute('aria-pressed', b.dataset.f === S.filter ? 'true' : 'false'); });
+    cards.innerHTML = '';
+    DISC.forEach(function (d) {
+      if (S.filter !== 'all' && S.filter !== d.id) return;
+      d.mods.forEach(function (m, i) {
+        var c = el('button', 'mcard'); c.type = 'button';
+        var ic = el('span', 'mc-ic', d.ic); ic.title = d.name;
+        c.append(ic, el('span', 'mc-t', m[0]), el('span', 'mc-d', m[1]), el('span', 'mc-f', m[2]));
+        c.addEventListener('click', function () { open(d.id, i); });
+        cards.append(c);
+      });
+    });
+  }
+  drawCards();
+
+  document.getElementById('homeBtn').addEventListener('click', function () { showHome(); });
+  document.getElementById('brandLink').addEventListener('click', function (e) { e.preventDefault(); showHome(); });
+  navBtn.addEventListener('click', function () { setNav(!side.classList.contains('navopen')); });
+  function setNav(on) { side.classList.toggle('navopen', on); navBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); navBtn.textContent = on ? 'Hide modules' : 'Modules'; }
+  var railBtn = document.getElementById('railBtn');
+  function setRail(on, save) {
+    document.documentElement.classList.toggle('rail', on);
+    railBtn.textContent = on ? '»' : '«';
+    railBtn.title = on ? 'Expand the sidebar' : 'Collapse the sidebar'; railBtn.setAttribute('aria-label', railBtn.title);
+    if (save) { try { localStorage.setItem('fmh.rail', on ? '1' : '0'); } catch (e) {} }
+    frames().forEach(function (fr) { try { if (!fr.hidden && fr.contentWindow) fr.contentWindow.dispatchEvent(new Event('resize')); } catch (e) {} });
+  }
+  railBtn.addEventListener('click', function () { setRail(!document.documentElement.classList.contains('rail'), true); });
+  setRail(document.documentElement.classList.contains('rail'), false);
+
+  // ---- Theme: Light (default), Dark, or System (follows the device) ----
   var THEME_KEY = 'fmh.theme';
   var modeBtns = Array.prototype.slice.call(document.querySelectorAll('.theme button'));
   function themeMode() { var m = null; try { m = localStorage.getItem(THEME_KEY); } catch (e) {} return (m === 'dark' || m === 'system') ? m : 'light'; }
@@ -282,8 +311,91 @@ footer.site .base {
   });
   setTheme(themeMode(), false);
 
+  // Pass the page theme (light/dark override) to the embedded solvers.
+  function syncTheme(fr) {
+    try {
+      var d = fr.contentDocument && fr.contentDocument.documentElement; if (!d) return;
+      var t = document.documentElement.getAttribute('data-theme');
+      if (t) d.setAttribute('data-theme', t); else d.removeAttribute('data-theme');
+    } catch (e) {}
+  }
   new MutationObserver(function () { frames().forEach(syncTheme); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ---- Phones: grow the visible solver frame to its content, so the page scrolls as one ----
+  var phone = window.matchMedia('(max-width: 820px)');
+  function fit(fr) {
+    try {
+      var d = fr.contentDocument; if (!d || !d.documentElement || !d.body) return;
+      // The solvers size some panels with vh; inside a content-sized frame that would track the
+      // frame, so hand them the phone's own viewport height instead.
+      d.documentElement.style.setProperty('--vh', (window.innerHeight / 100) + 'px');
+      if (!phone.matches) { fr.style.height = ''; return; }
+      if (fr.hidden) return;
+      var h = Math.ceil(d.documentElement.getBoundingClientRect().height);
+      if (h > 0 && Math.abs(h - fr.offsetHeight) > 1) fr.style.height = h + 'px';
+    } catch (e) {}
+  }
+  function fitFrames() { frames().forEach(fit); }
+  window.addEventListener('resize', fitFrames);
+  if (phone.addEventListener) phone.addEventListener('change', fitFrames); else if (phone.addListener) phone.addListener(fitFrames);
+
+  // ---- The solver's own module tabs (hidden inside this page) drive which module shows ----
+  function tabsOf(id) { try { var d = frame(id).contentDocument; return d ? d.querySelectorAll('#tabs button') : []; } catch (e) { return []; } }
+  function activeOf(id) { var t = tabsOf(id); for (var i = 0; i < t.length; i++) if (t[i].getAttribute('aria-selected') === 'true') return i; return -1; }
+  function pick(id, i) { var t = tabsOf(id); if (t[i] && t[i].getAttribute('aria-selected') !== 'true') t[i].click(); }
+  function watch(fr, id) {
+    try {
+      var w = fr.contentWindow, d = fr.contentDocument;
+      if (!w || !d || fr._watched === d) return;
+      fr._watched = d;
+      if (w.ResizeObserver) new w.ResizeObserver(function () { fit(fr); }).observe(d.body);
+      var tabs = d.getElementById('tabs');
+      if (tabs) new w.MutationObserver(refresh).observe(tabs, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-selected'] });
+      fit(fr);
+    } catch (e) {}
+  }
+
+  function refresh() {
+    var mod = S.view === 'calc' ? activeOf(S.disc) : -1;
+    DISC.forEach(function (d) { items[d.id].forEach(function (b, i) { b.classList.toggle('on', d.id === S.disc && i === mod && S.view === 'calc'); }); });
+    Array.prototype.forEach.call(railonly.children, function (b) { b.classList.toggle('on', S.view === 'calc' ? b.dataset.disc === S.disc : b === railHome); });
+    document.getElementById('homeBtn').classList.toggle('on', S.view === 'home');
+    var hash = S.view === 'calc' ? '#' + S.disc + (mod >= 0 ? '/' + (mod + 1) : '') : '';
+    if (location.hash !== hash) { try { history.replaceState(null, '', hash || location.pathname + location.search); } catch (e) {} }
+    var m = mod >= 0 && byId[S.disc] ? byId[S.disc].mods[mod] : null;
+    document.title = (m ? m[0] + ' · ' : '') + 'Hydraulics and Principles of Geotechnical Engineering (HPGE) Calculator';
+  }
+
+  function showHome() {
+    S.view = 'home'; S.disc = null;
+    document.getElementById('home').hidden = false;
+    frames().forEach(function (fr) { fr.hidden = true; });
+    setNav(false); refresh();
+  }
+
+  // Open a discipline at module i (0-based), or at whichever module it last showed (i = null).
+  function open(id, i) {
+    if (!byId[id]) id = 'fm';
+    S.view = 'calc'; S.disc = id;
+    document.getElementById('home').hidden = true;
+    frames().forEach(function (fr) {
+      var on = fr.id === 'pane-' + id;
+      if (on && !fr.getAttribute('src')) {
+        fr.addEventListener('load', function () {
+          syncTheme(fr); watch(fr, id);
+          if (S.pending[id] != null) { pick(id, S.pending[id]); S.pending[id] = null; }
+          refresh();
+        });
+        fr.setAttribute('src', fr.dataset.src);
+      }
+      fr.hidden = !on;
+      if (on) { try { fr.contentWindow && fr.contentWindow.dispatchEvent(new Event('resize')); } catch (e) {} fit(fr); }
+    });
+    if (i != null) { if (tabsOf(id).length) pick(id, i); else S.pending[id] = i; }
+    setNav(false); refresh();
+    if (phone.matches) { var mtop = document.getElementById('main').getBoundingClientRect().top; if (mtop < 0) window.scrollBy(0, mtop); }
+  }
 
   // The solvers hand generated PDFs to this page, which owns the viewer's download permission.
   // The PDF arrives as a Blob made inside the solver's frame; copy it into a Blob of this page
@@ -320,8 +432,14 @@ footer.site .base {
     } catch (e) { return false; }
   };
 
-  var start = (location.hash || '').slice(1) || stored() || 'fm';
-  select(start);
+  // Start: #fm, #hyd or #geo open that discipline, #hyd/3 opens its third module; otherwise the home page.
+  function route() {
+    var m = /^#(fm|hyd|geo)(?:\/(\d+))?$/.exec(location.hash || '');
+    if (m) open(m[1], m[2] ? Math.max(0, Math.min(byId[m[1]].mods.length, +m[2]) - 1) : null);
+    else showHome();
+  }
+  window.addEventListener('hashchange', route);
+  route();
 })();
 </script>
 </body>

@@ -7,33 +7,33 @@
 (function (root) {
   'use strict';
   const CSS = `
-    .sp-rep{position:fixed;left:-10000px;top:0;width:800px;background:#fff;color:#15242d;font:14px/1.45 "Source Sans 3","Segoe UI",system-ui,sans-serif;padding:0}
+    .sp-rep{position:fixed;left:-10000px;top:0;width:800px;background:#fff;color:#15242d;font:14px/1.45 "IBM Plex Sans",system-ui,sans-serif;padding:0}
     .sp-rep *{box-sizing:border-box}
     .sp-blk{padding:6px 34px}
-    .sp-hd{display:flex;align-items:center;gap:16px;padding-top:30px;border-bottom:3px solid #d4612a;padding-bottom:12px}
+    .sp-hd{display:flex;align-items:center;gap:16px;padding-top:30px;border-bottom:3px solid #1F5FA8;padding-bottom:12px}
     .sp-hd img{width:70px;height:70px;object-fit:contain}
-    .sp-hd h1{margin:0;font:700 28px/1.05 "Barlow Condensed","Arial Narrow",Arial,sans-serif}
-    .sp-hd p.by{margin-top:1px;color:#d4612a;font-weight:600}
-    .sp-hd p{margin:4px 0 0;font:500 15px "Barlow Condensed","Arial Narrow",Arial,sans-serif;color:#5a6b75;letter-spacing:.03em}
+    .sp-hd h1{margin:0;font:600 22px/1.2 "IBM Plex Sans",system-ui,sans-serif}
+    .sp-hd p.by{margin-top:1px;color:#9A5B00;font-weight:600}
+    .sp-hd p{margin:3px 0 0;font:400 13px "IBM Plex Sans",system-ui,sans-serif;color:#52606D}
     .sp-meta{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#5a6b75;padding-top:10px}
-    .sp-meta b{color:#15242d;font:600 20px "Barlow Condensed","Arial Narrow",Arial,sans-serif}
+    .sp-meta b{color:#15242d;font:600 20px "IBM Plex Sans",system-ui,sans-serif}
     .sp-ph{margin:0 auto;border:1px solid #d3dce0;background:#fbfcfd}
-    .sp-cap{font:600 13px "Barlow Condensed","Arial Narrow",Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:#5a6b75;margin:8px 0 4px}
-    .sp-h2{font:600 13px "Barlow Condensed","Arial Narrow",Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:#5a6b75;margin:10px 0 4px}
+    .sp-cap{font:600 12px "IBM Plex Sans",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#5a6b75;margin:8px 0 4px}
+    .sp-h2{font:600 12px "IBM Plex Sans",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#5a6b75;margin:10px 0 4px}
     .sp-w{border-left:4px solid;border-radius:5px;padding:6px 10px;font-size:13px;margin:3px 0}
     .sp-w.err{background:#fde8e6;color:#a3281f}.sp-w.warn{background:#fff3d9;color:#8a5a00}.sp-w.info{background:#e6f1f9;color:#1f5f8f}
     .sp-res{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
     .sp-res td{padding:3px 0;border-bottom:1px solid #e1e7ea}
-    .sp-res td.v{text-align:right;font:13px "JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;padding-left:8px;white-space:nowrap}
-    .sp-res td.u{font:11px "JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;color:#5a6b75;padding-left:6px;white-space:nowrap;width:70px}
-    .sp-res tr.em td{font-weight:700}.sp-res tr.em td.v{color:#d4612a}
+    .sp-res td.v{text-align:right;font:13px "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;padding-left:8px;white-space:nowrap}
+    .sp-res td.u{font:11px "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;color:#5a6b75;padding-left:6px;white-space:nowrap;width:70px}
+    .sp-res tr.em td{font-weight:700}.sp-res tr.em td.v{color:#1F5FA8}
     .sp-st{display:grid;grid-template-columns:28px 1fr;gap:0 6px;border-top:1px solid #e1e7ea;padding:7px 0}
-    .sp-st .n{width:22px;height:22px;border-radius:50%;background:#e8eef1;font:600 11px/22px "JetBrains Mono",monospace;text-align:center}
+    .sp-st .n{width:22px;height:22px;border-radius:50%;background:#e8eef1;font:600 11px/22px "IBM Plex Mono",monospace;text-align:center}
     .sp-st .t{font-weight:700}
-    .sp-st .f,.sp-st .s{font:12px "JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
-    .sp-st .s{color:#5a6b75}.sp-st .r{font:600 12.5px "JetBrains Mono",monospace;color:#d4612a}
+    .sp-st .f,.sp-st .s{font:12px "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+    .sp-st .s{color:#5a6b75}.sp-st .r{font:600 12.5px "IBM Plex Mono",monospace;color:#1F5FA8}
     .sp-st .no{font-size:12px;color:#5a6b75;font-style:italic}
-    .sp-st table{border-collapse:collapse;font:11px "JetBrains Mono",monospace;margin-top:4px}
+    .sp-st table{border-collapse:collapse;font:11px "IBM Plex Mono",monospace;margin-top:4px}
     .sp-st th,.sp-st td{padding:1px 6px;border-bottom:1px solid #e1e7ea;text-align:right}
     .sp-ft{font-size:11px;color:#5a6b75;text-align:center;padding:14px 34px 26px}`;
 
@@ -176,7 +176,7 @@
         const clone = svg.cloneNode(true);
         clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg'); clone.setAttribute('width', w); clone.setAttribute('height', h);
         const st = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-        st.textContent = '.lbl{paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;font-family:"Source Sans 3",system-ui,sans-serif}';
+        st.textContent = '.lbl{paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;font-family:"IBM Plex Sans",system-ui,sans-serif}';
         clone.insertBefore(st, clone.firstChild);
         const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); bg.setAttribute('width', '100%'); bg.setAttribute('height', '100%'); bg.setAttribute('fill', '#fbfcfd');
         clone.insertBefore(bg, st.nextSibling);

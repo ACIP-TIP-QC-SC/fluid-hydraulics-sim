@@ -267,6 +267,12 @@
       R(o, 'Equivalent head H_eq' + (mode === 'drain' ? ' (at H₁)' : ''), H1, L);
       o.data.layers = lay; o.data.Heq0 = H1; o.data.H1 = H1;
     }
+    if (mode === 'steady' && +I.ay) {
+      const ka = 1 + I.ay / g;
+      if (!(ka > 0)) return fail(o, 'A downward acceleration of g or more leaves the liquid weightless: nothing flows out.');
+      S(o, 'Tank accelerating vertically', 'p = ρ(g + a)h  →  H_eff = H (1 + a/g)', `H_eff = ${fmt(H1)} × (1 + ${P(I.ay)}/${fmt(g)})`, `${fmt(H1 * ka)} ${L}`, `a = ${P(I.ay)} ${U.acc || (L + '/s²')} (+ upward, − downward). The jet speed is √(2(g + a)h) = √(2g·H_eff).`);
+      H1 *= ka; o.data.H1 = H1;
+    }
     let HT = H1 + hp;
     if (hp !== 0 && mode !== 'twotank' && !(mode === 'steady' && I.jfind === 'H'))
       S(o, 'Total head (closed tank)', nL > 1 ? 'H_T = H_eq + p_s/γ₁' : 'H_T = H + p_s/γ', `H_T = ${fmt(H1)} + ${P(I.ps)}/${fmt(gam)}`, `${fmt(HT)} ${L}`, 'Gauge pressure on the liquid surface adds a pressure head.');
@@ -1409,6 +1415,17 @@
     if (mode === 'design' && Math.max(1, Math.round(+I.nPar || 1)) > 1) R(o, 'Total discharge (all conduits)', Q * Math.max(1, Math.round(+I.nPar || 1)), U.Q);
     R(o, 'Velocity v', v, U.v, true); R(o, 'Discharge Q', Q, U.Q, true); R(o, 'Chezy C', C, ''); R(o, 'Froude number F', Fr, ''); R(o, 'Critical depth y_c', isFinite(yc) ? yc : 'above the rim', isFinite(yc) ? L : ''); if (isFinite(yc)) R(o, 'Critical slope S_c', Sc, ''); R(o, 'Slope class', cls, '');
     if (Fr > 1) W(o, `Uniform flow here is supercritical (F = ${fmt(Fr)}).`, 'info');
+    {
+      const SI = U.sys === 'SI', gamN = U.gw * (SI ? 1000 : 1), tau = gamN * s.R * S0;
+      S(o, 'Average boundary shear stress', 'τ₀ = γ R S', `τ₀ = ${fmt(gamN)} × ${fmt(s.R)} × ${fmt(S0)}`, `${fmt(tau)} ${SI ? 'Pa' : 'psf'}`, `Shear velocity u* = √(τ₀/ρ) = ${fmt(sqrt(g * s.R * S0))} ${U.v}.`);
+      R(o, 'Boundary shear stress τ₀ = γRS', tau, SI ? 'Pa' : 'psf');
+      if (I.duty && I.dutyV > 0) {
+        const per = SI ? I.dutyV / 1000 : I.dutyV; // L/s per ha → m³/s per ha;  ft³/s per acre
+        const area = Q * Math.max(1, Math.round(+I.nPar || 1)) / per;
+        S(o, 'Irrigated area served (duty of water)', 'Area = Q / duty', `Area = ${fmt(Q)} ${U.Q} / ${fmt(I.dutyV)} ${SI ? 'L/s per ha' : 'ft³/s per acre'}`, `${fmt(area)} ${SI ? 'ha' : 'acres'}`, SI ? `= ${fmt(area / 100)} km²` : '');
+        R(o, 'Area served at the duty', area, SI ? 'ha' : 'acres', true);
+      }
+    }
     if (semi) {
       const sf = HP.section('semi', G, r0), Qf = (k / n) * sf.A * pow(sf.R, 2 / 3) * sqrt(S0);
       S(o, 'Semicircle flowing full (y = r)', 'A_f = πr²/2,  P_f = πr,  R_f = r/2', `Q_f = (${U.manT})(${fmt(sf.A)})(${fmt(sf.R)})^(2/3)(${fmt(S0)})^(1/2)`, `Q_f = ${fmt(Qf)} ${U.Q}`, `Depth ratio y/r = ${fmt(y / r0)}; Q/Q_f = ${fmt(Q / Qf)}.`);

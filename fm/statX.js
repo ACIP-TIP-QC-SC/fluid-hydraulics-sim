@@ -693,6 +693,7 @@
     },
   };
   root.StatX = StatX;
+  StatX.X = X;
 
   /* ---------------- hook into the host modules ------------------------ */
   function hook(M) {

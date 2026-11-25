@@ -34,6 +34,17 @@
     if (!(rho > 0)) return fail(['Density must be positive.']);
     const sn = Math.sin(th);
     if (!(sn > 1e-6)) return fail(['The plate must make an angle with the jet (θ > 0).']);
+    if (p.solve === 'h') {
+      if (!(p.Fg > 0) || !(V > 0)) return fail(['Enter the jet velocity and the weight held up.']);
+      Q = A * V;
+      st.add('Jet area and discharge', 'A = πD²/4,  Q = A V', `A = π(${f(p.D * u.dF)})²/4 = ${f(A)},  Q = ${f(A)} × ${f(V)}`, `Q = ${f(Q)} ${u.Q}`, '');
+      const Vh = p.Fg / (rho * Q);
+      st.add('Jet speed needed at the plate', 'W = ρ Q V_h  ⇒  V_h = W / (ρ Q)', `V_h = ${f(p.Fg)} / (${f(rho)} × ${f(Q)})`, `V_h = ${f(Vh)} ${u.v}`, 'The water leaves the plate sideways, so all its upward momentum is destroyed.');
+      if (Vh >= V) return fail([`The jet cannot hold that weight: even at the nozzle it gives only ρQV = ${f(rho * Q * V)} ${u.F}.`], [], st.list);
+      const h = (V * V - Vh * Vh) / (2 * u.g);
+      st.add('Height of the plate above the nozzle', 'h = (V² − V_h²) / (2g)', `h = (${f(V)}² − ${f(Vh)}²) / (2 × ${f(u.g)})`, `h = ${f(h)} ${u.L}`, 'Bernoulli along the free jet (no losses).');
+      return { ok: true, err: [], warn, steps: st.list, status: { cls: 'ok', text: `h = ${f(h)} ${u.L}` }, out: [{ k: 'Height of the load above the nozzle h', v: h, u: u.L, hl: true }, { k: 'Jet speed at the load V_h', v: Vh, u: u.v }, { k: 'Discharge Q', v: Q, u: u.Q }, { k: 'Max height of the free jet V²/2g', v: (V * V) / (2 * u.g), u: u.L }], geo: { kind: 'plate', V, Vh, Vr: Vh, u: 0, Q, D: sqrt((4 * A) / PI), Fn: p.Fg, Fx: p.Fg, Fy: 0, theta: 90, motion: 'fixed', vert: true, h } };
+    }
     if (p.solve === 'Q' || p.solve === 'D') {
       if (p.motion !== 'fixed' || p.vert) return fail(['Solving for the flow or the jet size works for a fixed plate with a horizontal jet.']);
       if (!(p.Fg > 0)) return fail(['Enter the force on the plate.']);

@@ -84,13 +84,14 @@
       }
       if (T === 'plate' || T === 'vane' || T === 'split') {
         const g = C.section(el, 'Jet');
-        if (T === 'plate') C.select(g, { label: 'Solve for', options: [['F', 'Force on the plate'], ['Q', 'Discharge from the force (jet size known)'], ['D', 'Jet size from the force (discharge known)']], get: () => s.solve, set: (v) => (s.solve = v) });
+        if (T === 'plate') C.select(g, { label: 'Solve for', options: [['F', 'Force on the plate'], ['Q', 'Discharge from the force (jet size known)'], ['D', 'Jet size from the force (discharge known)'], ['h', 'Height at which a vertical jet holds a load']], get: () => s.solve, set: (v) => (s.solve = v) });
         const sv = T === 'plate' ? s.solve : 'F';
         if (sv !== 'D') sl(g, 'D', 'Jet diameter D', 1, SI ? 2000 : 80, SI ? 1 : 0.01, u.du);
-        if (sv === 'F') sl(g, 'V', 'Jet velocity V', 0.1, SI ? 300 : 1000, 0.01, u.v);
+        if (sv === 'F' || sv === 'h') sl(g, 'V', 'Jet velocity V', 0.1, SI ? 300 : 1000, 0.01, u.v);
         if (sv === 'D') sl(g, 'Q', 'Discharge Q', 0.00001, SI ? 20 : 500, 0.00001, u.Q);
-        if (sv !== 'F') sl(g, 'Fg', 'Force on the plate F', 0.01, SI ? 1e7 : 1e6, 0.01, u.F);
-        if (T !== 'split') {
+        if (sv !== 'F') sl(g, 'Fg', sv === 'h' ? 'Weight held up by the jet W' : 'Force on the plate F', 0.01, SI ? 1e7 : 1e6, 0.01, u.F);
+        if (sv === 'h') C.note(g, 'A vertical jet strikes a flat plate (or the bottom of a load) square on; the plate rides at the height where ρ Q V_h equals the weight.');
+        if (T !== 'split' && sv !== 'h') {
           const m = C.section(el, T === 'plate' ? 'Plate' : 'Vane');
           sl(m, 'theta', T === 'plate' ? 'Angle between plate and jet θ' : 'Deflection angle θ', T === 'plate' ? 5 : 0, T === 'plate' ? 90 : 180, 0.1, '°');
           if (sv === 'F') {

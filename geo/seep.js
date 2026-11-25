@@ -133,13 +133,16 @@
     st.add('Anisotropy ratio', 'k_H / k_V', `${f(kH)} / ${f(kV)}`, `k_H / k_V = ${f(kH / kV)}`, 'For layered soil k_H is always at least k_V.');
     out.push({ k: 'Total thickness H', v: H, u: U.len }, { k: 'Equivalent k_H', v: kH, u: ku, hl: true }, { k: 'Equivalent k_V', v: kV, u: ku, hl: true }, { k: 'k_H / k_V', v: kH / kV, u: '' });
     // vertical flow with total head loss dh
-    const dh = p.dh, kb = U.kToBase;
+    const kb = U.kToBase;
+    const dh = p.vBy === 'i' ? p.iv * H : p.dh;
+    if (p.vBy === 'i') st.add('Head loss across the deposit from the vertical gradient', 'Δh = i H', `Δh = ${f(p.iv)} × ${f(H)}`, `Δh = ${f(dh)} ${U.len}`);
     const v = kV * kb * (dh / H);
     const per = L.map((l) => { const hl = (v * l.H) / (kv(l) * kb); return { hl, i: hl / l.H }; });
     if (dh > 0) {
       st.add('Vertical flow: discharge velocity', 'v = k_V (Δh / H)', `v = ${f(kV * kb)} × (${f(dh)} / ${f(H)})`, `v = ${f(v)} ${U.len}/s`, `k in base units: ${f(kV)} ${ku} = ${f(kV * kb)} ${U.len}/s. The same v passes through every layer.`);
       st.add('Head loss in each layer', 'Δhᵢ = v Hᵢ / kᵢ  (gradient iᵢ = Δhᵢ / Hᵢ)', L.map((l, j) => `Δh${j + 1} = ${f(v)} × ${f(l.H)} / ${f(kv(l) * kb)} = ${f(per[j].hl)}`).join(';  '), `Σ Δhᵢ = ${f(per.reduce((s, q) => s + q.hl, 0))} ${U.len} = Δh ✓`);
-      out.push({ k: 'Vertical discharge velocity v', v, u: `${U.len}/s` }, { k: 'Vertical flow per unit area', v: v * U.perDay, u: `${U.len}³/day per ${U.len}²` });
+      out.push({ k: 'Vertical discharge velocity v', v, u: `${U.len}/s` }, { k: 'Vertical flow per unit area', v: v * U.perDay, u: `${U.len}³/day per ${U.len}²` }, { k: '   per hour', v: v * 3600, u: `${U.len}³/hr per ${U.len}²` });
+      if (U.id === 'SI') out.push({ k: '   in cm³/s per m²', v: v * 1e6, u: 'cm³/s' });
       per.forEach((q, j) => out.push({ k: `Layer ${j + 1}: head loss (gradient)`, v: q.hl, u: `${U.len}  (i = ${f(q.i)})` }));
     }
     const ih = p.ih;
@@ -149,6 +152,7 @@
       const shares = L.map((l) => (kh(l) * l.H) / sumKH);
       st.add('Share of the horizontal flow carried by each layer', 'qᵢ / q = kᵢ Hᵢ / Σ(k H)', shares.map((s, j) => `layer ${j + 1}: ${f(100 * s, 3)} %`).join(',  '), '');
       out.push({ k: 'Horizontal flow q', v: qh, u: U.qpl }, { k: 'Horizontal flow q', v: qh * U.perDay, u: U.qplDay });
+      if (U.id === 'SI') out.push({ k: '   in cm³/s per m width', v: qh * 1e6, u: 'cm³/s' });
     }
     const kmax = Math.max(...L.map(kh)), kmin = Math.min(...L.map(kv));
     if (kmax / kmin > 1e4) warn.push('Layer permeabilities differ by more than 10⁴: vertical flow is controlled by the least permeable layer.');
@@ -450,12 +454,136 @@
     return { ok: true, err: [], warn, status: { cls, text }, out, steps: st.list, geo: { kind: 'net', net, g, isPile, T, h1, h2, dH, Nd, Nf, ratio, q, iExit, lExit, heave, uplift, faces, P: { x: xp, y: yp, u: uP, H: Ht }, icr, B: isPile ? 0 : net.nB * net.h, D: isPile ? p.D : 0, du: g.du, dd: g.dd, given: p.counts === 'given' } };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Field permeability with a choice of units                         */
+  /* ------------------------------------------------------------------ */
+  const KU = {
+    SI: { cms: ['cm/s', 0.01], ms: ['m/s', 1], mday: ['m/day', 1 / 86400], mhr: ['m/hr', 1 / 3600], cmhr: ['cm/hr', 1 / 360000], cmday: ['cm/day', 1 / 8.64e6] },
+    EN: { fts: ['ft/s', 1], ftmin: ['ft/min', 1 / 60], ftday: ['ft/day', 1 / 86400], ins: ['in/s', 1 / 12] },
+  };
+  const kUnits = (U) => KU[U.id] || KU.SI;
+  /** k in base units (m/s or ft/s) and the label of the entered unit. */
+  function kBase(k, ku, U) { const t = kUnits(U)[ku] || Object.values(kUnits(U))[0]; return { k: k * t[1], lab: t[0] }; }
+  function kOut(out, kb, U, label) {
+    const L = U.len;
+    out.push({ k: label || 'Coefficient of permeability k', v: kb, u: `${L}/s`, hl: true }, { k: '   per day', v: kb * 86400, u: `${L}/day` });
+    if (U.id === 'SI') out.push({ k: '   in cm/s', v: kb * 100, u: 'cm/s' }); else out.push({ k: '   in ft/min', v: kb * 60, u: 'ft/min' });
+  }
+  /** Discharge entered in a chosen unit → base (m³/s or ft³/s). */
+  const QU = { SI: { ls: ['L/s', 1e-3], m3s: ['m³/s', 1], m3day: ['m³/day', 1 / 86400], m3hr: ['m³/hr', 1 / 3600], lmin: ['L/min', 1 / 60000] }, EN: { cfs: ['ft³/s', 1], gpm: ['gal/min', 0.133681 / 60], cfd: ['ft³/day', 1 / 86400] } };
+  const qUnits = (U) => QU[U.id] || QU.SI;
+
+  /** Pumping test: confined (Thiem) or unconfined (Dupuit) aquifer, two observation wells. */
+  function well(p, U) {
+    const st = Steps(), out = [], warn = [], L = U.len;
+    const conf = p.type === 'confined';
+    const r1 = p.r1, r2 = p.r2;
+    if (!(r1 > 0) || !(r2 > r1)) return fail(['Need 0 < r₁ < r₂ (r₁ is the nearer observation well).']);
+    let h1, h2;
+    if (p.hBy === 'draw') {
+      h1 = p.H0 - p.s1; h2 = p.H0 - p.s2;
+      st.add('Heads in the observation wells from the drawdowns', 'h = H₀ − s  (H₀ = static saturated thickness / head above the base)', `h₁ = ${f(p.H0)} − ${f(p.s1)};  h₂ = ${f(p.H0)} − ${f(p.s2)}`, `h₁ = ${f(h1)} ${L},  h₂ = ${f(h2)} ${L}`);
+    } else { h1 = p.h1; h2 = p.h2; }
+    if (!(h2 > h1) || !(h1 > 0)) return fail(['The head must rise away from the well: h₂ > h₁ > 0.']);
+    const ln = Math.log(r2 / r1);
+    const Qt = qUnits(U)[p.qu] || Object.values(qUnits(U))[0];
+    let Q, k;
+    if (p.solve === 'k') {
+      Q = p.Q * Qt[1];
+      k = conf ? (Q * ln) / (2 * Math.PI * p.b * (h2 - h1)) : (Q * ln) / (Math.PI * (h2 * h2 - h1 * h1));
+      st.add('Pumping rate', 'Q in base units', `Q = ${f(p.Q)} ${Qt[0]}`, `Q = ${f(Q)} ${L}³/s = ${f(Q * 86400)} ${L}³/day`);
+      st.add(conf ? 'Permeability, confined aquifer (Thiem)' : 'Permeability, unconfined aquifer (Dupuit)', conf ? 'k = Q ln(r₂/r₁) / [2π b (h₂ − h₁)]' : 'k = Q ln(r₂/r₁) / [π (h₂² − h₁²)]', conf ? `k = ${f(Q)} × ln(${f(r2)}/${f(r1)}) / [2π × ${f(p.b)} × (${f(h2)} − ${f(h1)})]` : `k = ${f(Q)} × ln(${f(r2)}/${f(r1)}) / [π (${f(h2)}² − ${f(h1)}²)]`, `k = ${f(k)} ${L}/s = ${f(k * 86400)} ${L}/day`);
+    } else {
+      const kk = kBase(p.k, p.ku, U); k = kk.k;
+      Q = conf ? (2 * Math.PI * k * p.b * (h2 - h1)) / ln : (Math.PI * k * (h2 * h2 - h1 * h1)) / ln;
+      st.add(conf ? 'Discharge, confined aquifer (Thiem)' : 'Discharge, unconfined aquifer (Dupuit)', conf ? 'Q = 2π k b (h₂ − h₁) / ln(r₂/r₁)' : 'Q = π k (h₂² − h₁²) / ln(r₂/r₁)', conf ? `Q = 2π × ${f(k)} × ${f(p.b)} × (${f(h2)} − ${f(h1)}) / ln(${f(r2)}/${f(r1)})` : `Q = π × ${f(k)} × (${f(h2)}² − ${f(h1)}²) / ln(${f(r2)}/${f(r1)})`, `Q = ${f(Q)} ${L}³/s`, `k = ${f(p.k)} ${kk.lab} = ${f(k)} ${L}/s.`);
+    }
+    out.push({ k: 'Pumping rate Q', v: Q, u: `${L}³/s` }, { k: '   per day', v: Q * 86400, u: `${L}³/day`, hl: p.solve !== 'k' }, { k: '   per hour', v: Q * 3600, u: `${L}³/hr` });
+    if (U.id === 'SI') out.push({ k: '   in L/s', v: Q * 1000, u: 'L/s' });
+    kOut(out, k, U);
+    const hbar = (h1 + h2) / 2;
+    const T = conf ? k * p.b : k * hbar;
+    st.add('Transmissivity', conf ? 'T = k b' : 'T = k h̄,  h̄ = (h₁ + h₂)/2  (equals Q ln(r₂/r₁) / [2π (h₂ − h₁)])', conf ? `T = ${f(k * 86400)} × ${f(p.b)}` : `T = ${f(k * 86400)} × ${f(hbar)}`, `T = ${f(T * 86400)} ${L}²/day`);
+    out.push({ k: 'Transmissivity T', v: T * 86400, u: `${L}²/day`, hl: true }, { k: '   per second', v: T, u: `${L}²/s` });
+    if (!conf && p.hBy === 'draw') out.push({ k: 'k × H₀ (full saturated thickness)', v: k * p.H0 * 86400, u: `${L}²/day` });
+    return { ok: true, err: [], warn, status: { cls: 'ok', text: `k = ${f(k * 86400)} ${L}/day · Q = ${f(Q * 86400)} ${L}³/day` }, out, steps: st.list, geo: { kind: 'well', conf, r1, r2, h1, h2, b: p.b, H0: p.hBy === 'draw' ? p.H0 : h2 * 1.05, Q, k } };
+  }
+
+  /** Flow through a confined aquifer or a sloping permeable layer: q = k i A, seepage velocity and travel time. */
+  function aquifer(p, U) {
+    const st = Steps(), out = [], warn = [], L = U.len;
+    const kk = kBase(p.k, p.ku, U), k = kk.k;
+    const a = (p.alpha || 0) * P.DEG;
+    let i, iTxt;
+    if (p.iBy === 'slope') { i = p.iFn === 'tan' ? Math.tan(a) : Math.sin(a); iTxt = [p.iFn === 'tan' ? 'i = tan α' : 'i = sin α  (water table parallel to the layer)', `i = ${p.iFn === 'tan' ? 'tan' : 'sin'} ${f(p.alpha)}°`]; }
+    else {
+      const Ls = p.Lalong ? p.L : p.L / Math.cos(a);
+      i = p.dh / Ls;
+      iTxt = [p.Lalong || !(a > 0) ? 'i = Δh / L' : 'i = Δh / (L / cos α)  (L measured horizontally)', p.Lalong || !(a > 0) ? `i = ${f(p.dh)} / ${f(p.L)}` : `i = ${f(p.dh)} / (${f(p.L)} / cos ${f(p.alpha)}°)`];
+    }
+    st.add('Hydraulic gradient', iTxt[0], iTxt[1], `i = ${f(i)}`);
+    const t = p.tBy === 'vert' ? p.t * Math.cos(a) : p.t;
+    const A = t * p.W;
+    st.add('Flow area', p.tBy === 'vert' ? 'A = (H cos α) × width  (thickness H measured vertically)' : 'A = thickness × width', p.tBy === 'vert' ? `A = ${f(p.t)} cos ${f(p.alpha)}° × ${f(p.W)}` : `A = ${f(p.t)} × ${f(p.W)}`, `A = ${f(A)} ${L}²`);
+    const q = k * i * A;
+    st.add('Discharge (Darcy)', 'q = k i A', `q = ${f(k)} × ${f(i)} × ${f(A)}`, `q = ${f(q)} ${L}³/s = ${f(q * 86400)} ${L}³/day`, `k = ${f(p.k)} ${kk.lab} = ${f(k)} ${L}/s.`);
+    out.push({ k: 'Hydraulic gradient i', v: i, u: '' }, { k: 'Discharge q', v: q * 86400, u: `${L}³/day`, hl: true }, { k: '   per hour', v: q * 3600, u: `${L}³/hr` }, { k: '   per second', v: q, u: `${L}³/s` });
+    if (U.id === 'SI') out.push({ k: '   in L/hr', v: q * 3.6e6, u: 'L/hr' }, { k: '   in L/min', v: q * 6e4, u: 'L/min' });
+    const v = k * i;
+    out.push({ k: 'Discharge velocity v = k i', v: v * 86400, u: `${L}/day` });
+    let vs = null, time = null;
+    if (p.n > 0) {
+      vs = v / (p.n / 100);
+      st.add('Seepage velocity', 'v_s = k i / n', `v_s = ${f(v)} / ${f(p.n / 100)}`, `v_s = ${f(vs)} ${L}/s = ${f(vs * 86400)} ${L}/day`);
+      out.push({ k: 'Seepage velocity v_s', v: vs * 86400, u: `${L}/day`, hl: true }, { k: '   per second', v: vs, u: `${L}/s` });
+      if (p.d > 0) {
+        time = p.d / vs;
+        st.add('Travel time', 't = distance / v_s', `t = ${f(p.d)} / ${f(vs * 86400)}`, `t = ${f(time / 86400)} days`);
+        out.push({ k: `Travel time over ${f(p.d)} ${L}`, v: time / 86400, u: 'days', hl: true }, { k: '   in years', v: time / (86400 * 365), u: 'yr' });
+      }
+    }
+    return { ok: true, err: [], warn, status: { cls: 'ok', text: `q = ${f(q * 86400)} ${L}³/day` }, out, steps: st.list, geo: { kind: 'aquifer', i, A, q, vs, time, a, t: p.t, L: p.L || 10, dh: p.dh, slope: p.iBy === 'slope' } };
+  }
+
+  /** Flow net from given counts (hand-drawn): seepage and uplift by equipotential drops. */
+  function netCounts(p, U) {
+    const st = Steps(), out = [], warn = [], L = U.len, gw = U.gw;
+    const kk = kBase(p.k, p.ku, U), k = kk.k;
+    if (!(p.Nf > 0) || !(p.Nd > 0) || !(p.H > 0)) return fail(['Enter H, N_f and N_d.']);
+    const q = (k * p.H * p.Nf) / p.Nd;
+    st.add('Seepage per unit length (flow net)', 'q = k H N_f / N_d', `q = ${f(k)} × ${f(p.H)} × ${f(p.Nf)} / ${f(p.Nd)}`, `q = ${f(q)} ${L}³/s per ${L} = ${f(q * 86400)} ${L}³/day per ${L}`, `k = ${f(p.k)} ${kk.lab}.`);
+    out.push({ k: 'Seepage q per unit length', v: q * 86400, u: `${L}³/day per ${L}`, hl: true }, { k: '   per second', v: q, u: `${L}³/s per ${L}` });
+    if (U.id === 'SI') out.push({ k: '   in L/min per m', v: q * 6e4, u: 'L/min' }, { k: '   in L/s per m', v: q * 1000, u: 'L/s' });
+    if (p.Lw > 0) out.push({ k: `Total seepage for ${f(p.Lw)} ${L}`, v: q * p.Lw * 86400, u: `${L}³/day` });
+    const dH = p.H / p.Nd;
+    st.add('Head lost per equipotential drop', 'ΔH = H / N_d', `ΔH = ${f(p.H)} / ${f(p.Nd)}`, `ΔH = ${f(dH)} ${L}`);
+    let uh = null, ut = null, U_ = null;
+    if (p.uplift) {
+      const nt = p.toeBy === 'between' ? p.nH + p.nB : p.nT;
+      const ph = (n) => p.H - n * dH + p.dB;
+      uh = gw * ph(p.nH); ut = gw * ph(nt);
+      st.add('Uplift pressure at the heel', 'u = γw (H − n ΔH + d)  (d = depth of the base below the tailwater level)', `u_heel = ${f(gw)} × (${f(p.H)} − ${f(p.nH)} × ${f(dH)} + ${f(p.dB)})`, `u_heel = ${f(uh)} ${U.press}`, `n = number of drops before the heel; datum at the tailwater surface.`);
+      st.add('Uplift pressure at the toe', 'u = γw (H − n ΔH + d)', `u_toe = ${f(gw)} × (${f(p.H)} − ${f(nt)} × ${f(dH)} + ${f(p.dB)})`, `u_toe = ${f(ut)} ${U.press}`, p.toeBy === 'between' ? `${f(p.nB)} drops between the heel and the toe.` : '');
+      out.push({ k: 'Uplift pressure at the heel', v: uh, u: U.press, hl: true }, { k: 'Uplift pressure at the toe', v: ut, u: U.press, hl: true });
+      if (p.B > 0) {
+        U_ = ((uh + ut) / 2) * p.B;
+        const xb = (p.B * (2 * ut + uh)) / (3 * (uh + ut)); // from the heel
+        st.add('Uplift force (linear between heel and toe)', 'U = (u_heel + u_toe)/2 × B', `U = (${f(uh)} + ${f(ut)})/2 × ${f(p.B)}`, `U = ${f(U_)} ${U.fpl}, acting ${f(xb)} ${L} from the heel`);
+        out.push({ k: 'Uplift force U per unit length', v: U_, u: U.fpl, hl: true }, { k: '   acting from the heel at', v: xb, u: L });
+      }
+    }
+    return { ok: true, err: [], warn, status: { cls: 'ok', text: `q = ${f(q * 86400)} ${L}³/day per ${L}` }, out, steps: st.list, geo: { kind: 'netc', p, q, dH, uh, ut, U: U_ } };
+  }
+
   function seepage(p, U) {
+    if (p.sub === 'well') return well(p.well, U);
+    if (p.sub === 'aquifer') return aquifer(p.aq, U);
+    if (p.sub === 'netc') return netCounts(p.nc, U);
     if (p.sub === 'const') return constHead(p.const, U);
     if (p.sub === 'fall') return fallingHead(p.fall, U);
     if (p.sub === 'layers') return layered(p.layers, U);
     return flowNet(Object.assign({}, p.net, { type: p.sub === 'dam' ? 'dam' : 'pile' }), U);
   }
 
-  Object.assign(P, { seepage, constHead, fallingHead, layered, flowNet, solveNet, contour, phiLattice, psiLattice, phiAt });
+  Object.assign(P, { seepKUnits: kUnits, seepQUnits: qUnits, seepage, constHead, fallingHead, layered, flowNet, solveNet, contour, phiLattice, psiLattice, phiAt });
 })(typeof window !== 'undefined' ? window : globalThis);

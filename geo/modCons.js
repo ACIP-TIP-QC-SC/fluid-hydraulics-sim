@@ -10,12 +10,46 @@
   const LEN = 1 / 0.3048, STR = 20.885434;
 
   const profC = (over) => Object.assign({ by: 'gamma', wt: 2, layers: [{ soil: 'sand', H: 5, g: 16.5, gsat: 18.8 }, { soil: 'clay', H: 4, g: 18, gsat: 19.2 }] }, over || {});
-  const base = { layer: 1, n: 1, e0: 0.9, ccBy: 'given', Cc: 0.28, Cs: 0.05, LL: 50, hist: 'NC', pc: 100, OCR: 2, load: 'uniform', q: 60, B: 3, L: 3, cv: 2, drain: 'double', solve: 't', U: 90, t: 1, sec: false, Ca: 0.02, t1By: 'auto', t1: 2, t2: 20 };
+  const base = { method: 'cc', src: 'profile', Hg: 4, s0g: 100, deBy: 'ef', ef: 0.6, frac: 50, dE: 0.2, layer: 1, n: 1, e0: 0.9, ccBy: 'given', Cc: 0.28, Cs: 0.05, LL: 50, hist: 'NC', pc: 100, OCR: 2, load: 'uniform', q: 60, B: 3, L: 3, cv: 2, drain: 'double', solve: 't', U: 90, t: 1, sec: false, Ca: 0.02, t1By: 'auto', t1: 2, t2: 20 };
+
+  /** Layer before and after: solids keep their height H/(1+e₀); voids shrink from e₀ to e_f. */
+  function de2D(svg, res, U) {
+    const g = res.geo, H = g.H, Hs = H / (1 + g.e0), Hf = H - g.dH;
+    const D = root.UI.Draw2D(svg, { xmin: -0.9 * H, xmax: 2.6 * H, ymin: -0.15 * H, ymax: 1.25 * H }, { pad: 30 });
+    G.soilDefs(svg);
+    const col = (x0, top, label) => {
+      G.soilRect(D, x0, 0, x0 + 0.6 * H, top, 'clay');
+      D.text([x0 + 0.3 * H, top], label, { anchor: 'middle', dy: -8, size: 12.5, weight: 700, color: '#1d2733' });
+    };
+    col(0, H, `before: e₀ = ${f(g.e0)}`);
+    col(1.4 * H, Hf, `after: e_f = ${f(g.ef)}`);
+    D.dim([0, 0], [0, H], `H = ${f(H)} ${U.len}`, 14, { anchor: 'end', ldx: -6 });
+    D.dim([2 * H, 0], [2 * H, Hf], `${f(Hf)} ${U.len}`, -14, { anchor: 'start', ldx: 6 });
+    D.line([0.6 * H, H], [1.4 * H, H], { stroke: '#7f8c8d', sw: 1, dash: '4 4' });
+    D.dim([1.4 * H, Hf], [1.4 * H, H], `ΔH = ${f(g.dH)} ${U.len}`, 14, { anchor: 'end', ldx: -6, color: '#c0392b' });
+    // solids bars
+    [[0, '#b9875a'], [1.4 * H, '#b9875a']].forEach(([x0]) => D.poly([[x0 + 0.62 * H, 0], [x0 + 0.7 * H, 0], [x0 + 0.7 * H, Hs], [x0 + 0.62 * H, Hs]], { fill: '#b9875a', fop: 0.8, stroke: '#5b4a35', sw: 1 }));
+    D.text([0.66 * H, Hs], `solids ${f(Hs)}`, { dx: 4, dy: -4, size: 10.5, color: '#5b4a35' });
+  }
+  function de3D(V, res, U) {
+    const g = res.geo, H = g.H, Hf = H - g.dH, W = 0.7 * H;
+    G.soilBlock3D(V, 0, W, 0, W, [{ y0: 0, y1: H, soil: 'clay', sat: true }]);
+    G.soilBlock3D(V, 1.4 * H, 1.4 * H + W, 0, W, [{ y0: 0, y1: Hf, soil: 'clay', sat: true }]);
+    V.dim([0, 0, W], [0, H, W], `H = ${f(H)}`, [-0.12 * H, 0, 0]);
+    V.dim([1.4 * H + W, 0, W], [1.4 * H + W, Hf, W], `${f(Hf)}`, [0.12 * H, 0, 0]);
+    V.label([1.4 * H + W / 2, Hf, W / 2], `ΔH = ${f(g.dH)} ${U.len}`, '#c0392b');
+    V.autoBounds();
+  }
 
   const GCons = {
     id: 'cons', title: 'Consolidation',
     state: Object.assign({}, base),
     presets: [
+      { name: 'CE Ref 4 May 2015 #27 — soft clay 10 m, e₀ 1.8, void ratio halved → thickness left 6.786 m', apply: (s) => { Object.assign(s, base, { method: 'de', Hg: 10, e0: 1.8, deBy: 'by', frac: 50 }); } },
+      { name: 'CE Ref 6 Apr 2024 #27 — clay 7 m, e₀ 1.2, e decreased by 1/3 (Δe = 0.4) → ΔH = 1.273 m', apply: (s) => { Object.assign(s, base, { method: 'de', Hg: 7, e0: 1.2, deBy: 'de', dE: 0.4 }); } },
+      { name: 'CE Ref 4 May 2015 #28 — NC clay 3 m, e₀ 1.3, C_c 0.3, σ′₀ 125 kPa, Δσ 55 kPa → S_c = 61.97 mm', apply: (s) => { Object.assign(s, base, { src: 'given', Hg: 3, s0g: 125, e0: 1.3, Cc: 0.3, q: 55 }); } },
+      { name: 'CE Ref 5 May 2022 #35 — plastic clay 8 m, e₀ 1.132, C_c 0.315, p₀ 180 kPa, Δp 120 kPa → 262.2 mm', apply: (s) => { Object.assign(s, base, { src: 'given', Hg: 8, s0g: 180, e0: 1.132, Cc: 0.315, q: 120 }); } },
+      { name: 'Coefficient of consolidation from a test: clay 4 m, double drainage, U = 90 % in 1 year → c_v', apply: (s) => { Object.assign(s, base, { src: 'given', Hg: 4, s0g: 100, solve: 'cv', U: 90, t: 1 }); } },
       { name: 'Test C1 — NC clay 4 m (e₀ 0.9, C_c 0.28) below 5 m sand, GWT 2 m, Δσ = 60 kPa → S_c = 145.0 mm', apply: (s) => { GP.set(profC()); Object.assign(s, base); } },
       { name: 'Test C2 — same clay overconsolidated, σ′c = 100 kPa (case 2) → S_c = 94.76 mm', apply: (s) => { GP.set(profC()); Object.assign(s, base, { hist: 'pc', pc: 100 }); } },
       { name: 'Overconsolidated OCR = 3 (case 1, recompression only)', apply: (s) => { GP.set(profC()); Object.assign(s, base, { hist: 'OCR', OCR: 3 }); } },
@@ -34,12 +68,29 @@
     controls(el, C) {
       const s = this.state, U = root.App.U(), en = U.id === 'EN';
       const sl = (p, k, label, min, max, step, unit, extra) => C.slider(p, Object.assign({ label, min, max, step, get: () => s[k], set: (v) => (s[k] = v), unit }, extra || {}));
-      GP.controls(el, C, U, { seepage: false });
+      C.seg(el, { label: 'Settlement from', options: [['cc', 'C_c and stresses'], ['de', 'A change in void ratio']], get: () => s.method, set: (v) => (s.method = v) });
+      if (s.method === 'de') {
+        const d = C.section(el, 'Clay layer');
+        sl(d, 'Hg', 'Thickness of the layer H', 0.01, en ? 300 : 100, 0.01, U.len);
+        sl(d, 'e0', 'Initial void ratio e₀', 0.05, 6, 0.001, '');
+        C.select(d, { label: 'Final void ratio given as', options: [['ef', 'Final e directly'], ['by', 'e decreased BY a percentage'], ['to', 'e decreased TO a percentage of e₀'], ['de', 'Change Δe']], get: () => s.deBy, set: (v) => (s.deBy = v) });
+        if (s.deBy === 'ef') sl(d, 'ef', 'Final void ratio e_f', 0, 6, 0.001, '');
+        else if (s.deBy === 'de') sl(d, 'dE', 'Decrease in void ratio Δe', 0, 6, 0.001, '');
+        else sl(d, 'frac', s.deBy === 'by' ? 'Decrease (halved = 50, one-third = 33.333, one-fourth = 25)' : 'Remaining (one-third = 33.333)', 0, 100, 0.001, '%');
+        return;
+      }
+      C.seg(el, { label: 'Initial stress from', options: [['profile', 'Soil profile'], ['given', 'Given σ′₀ (average in the clay)']], get: () => s.src, set: (v) => (s.src = v) });
+      if (s.src === 'profile') GP.controls(el, C, U, { seepage: false });
       const c = C.section(el, 'Compressible clay layer');
-      if (s.layer >= GP.state.layers.length) s.layer = GP.state.layers.length - 1;
-      C.select(c, { label: 'Layer that consolidates', options: GP.state.layers.map((l, i) => [i, `Layer ${i + 1} (${(G.SOILS[l.soil] || G.SOILS.sand).name}, ${f(l.H)} ${U.len})`]), get: () => s.layer, set: (v) => (s.layer = +v) });
+      if (s.src === 'given') {
+        sl(c, 'Hg', 'Thickness of the clay H', 0.01, en ? 300 : 100, 0.01, U.len);
+        sl(c, 's0g', 'Initial (average) effective stress σ′₀', 0.1, en ? 40000 : 2000, 0.01, U.press);
+      } else {
+        if (s.layer >= GP.state.layers.length) s.layer = GP.state.layers.length - 1;
+        C.select(c, { label: 'Layer that consolidates', options: GP.state.layers.map((l, i) => [i, `Layer ${i + 1} (${(G.SOILS[l.soil] || G.SOILS.sand).name}, ${f(l.H)} ${U.len})`]), get: () => s.layer, set: (v) => (s.layer = +v) });
+      }
       sl(c, 'n', 'Number of sublayers', 1, 20, 1, '');
-      sl(c, 'e0', 'Initial void ratio e₀', 0.2, 4, 0.001, '');
+      sl(c, 'e0', 'Initial void ratio e₀', 0.05, 6, 0.001, '');
       C.seg(c, { label: 'Compression index', options: [['given', 'C_c given'], ['LL', 'From LL (Skempton)']], get: () => s.ccBy, set: (v) => (s.ccBy = v) });
       if (s.ccBy === 'given') sl(c, 'Cc', 'Compression index C_c', 0.01, 3, 0.001, ''); else sl(c, 'LL', 'Liquid limit LL', 15, 150, 0.1, '%');
       sl(c, 'Cs', 'Swell / recompression index C_s', 0, 0.6, 0.001, '');
@@ -52,10 +103,11 @@
       if (s.load !== 'uniform') { sl(l, 'B', 'Footing width B', 0.3, en ? 150 : 50, 0.01, U.len); sl(l, 'L', 'Footing length L', 0.3, en ? 150 : 50, 0.01, U.len); }
       C.note(l, 'The surcharge in the soil profile is part of the initial stress; this load is the new one that causes consolidation.');
       const t = C.section(el, 'Time rate');
-      sl(t, 'cv', 'Coefficient of consolidation c_v', 0.01, en ? 500 : 50, 0.01, U.cv);
+      if (s.solve !== 'cv') sl(t, 'cv', 'Coefficient of consolidation c_v', 0.0001, en ? 500 : 50, 0.0001, U.cv);
       C.seg(t, { label: 'Drainage', options: [['double', 'Double (top and bottom)'], ['top', 'Top only'], ['bottom', 'Bottom only']], get: () => s.drain, set: (v) => (s.drain = v) });
-      C.seg(t, { label: 'Solve for', options: [['t', 'Time for a given U'], ['U', 'U at a given time']], get: () => s.solve, set: (v) => (s.solve = v) });
-      if (s.solve === 't') sl(t, 'U', 'Average degree of consolidation U', 1, 99.9, 0.1, '%'); else sl(t, 't', 'Elapsed time t', 0.001, 100, 0.001, 'yr');
+      C.seg(t, { label: 'Solve for', options: [['t', 'Time for a given U'], ['U', 'U at a given time'], ['cv', 'c_v from U and t']], get: () => s.solve, set: (v) => (s.solve = v) });
+      if (s.solve !== 'U') sl(t, 'U', 'Average degree of consolidation U', 1, 99.9, 0.1, '%');
+      if (s.solve !== 't') sl(t, 't', s.solve === 'cv' ? 'Time to reach U (days = value/365)' : 'Elapsed time t', 0.0001, 100, 0.0001, 'yr');
       const x = C.section(el, 'Secondary compression');
       C.toggle(x, { label: 'Include secondary compression', get: () => s.sec, set: (v) => (s.sec = v) });
       if (s.sec) {
@@ -67,11 +119,12 @@
     },
     onUnits(from, to) {
       const s = this.state, k = to === 'EN' ? 1 : -1, L = Math.pow(LEN, k), S = Math.pow(STR, k), r = (x) => +(+x).toPrecision(5);
-      s.q = r(s.q * S); s.pc = r(s.pc * S); s.B = r(s.B * L); s.L = r(s.L * L); s.cv = r(s.cv * L * L);
+      s.q = r(s.q * S); s.pc = r(s.pc * S); s.s0g = r(s.s0g * S); s.Hg = r(s.Hg * L); s.B = r(s.B * L); s.L = r(s.L * L); s.cv = r(s.cv * L * L);
     },
     compute(U) { return Physics.consolidation(this.state, GP.state, U); },
 
     draw2D(svg, res, U, opts) {
+      if (res.geo.kind === 'consDe') return de2D(svg, res, U);
       const g = res.geo, pr = g.pr, Ht = pr.Ht, s = this.state;
       const show = opts.showP !== false;
       const W = 0.55 * Ht, Pw = 0.75 * Ht, gx = W + 0.3 * Ht;
@@ -124,6 +177,7 @@
     },
 
     draw3D(V, res, U, opts) {
+      if (res.geo.kind === 'consDe') return de3D(V, res, U);
       const g = res.geo, pr = g.pr, Ht = pr.Ht, W = 0.8 * Ht, Lz = 0.8 * Ht, s = this.state;
       GP.column3D(V, pr, { x0: 0, x1: W, z0: 0, z1: Lz });
       V.line([[0, -g.zt, Lz], [W, -g.zt, Lz], [W, -g.zb, Lz], [0, -g.zb, Lz], [0, -g.zt, Lz]], CF, 2.6);
@@ -138,6 +192,7 @@
     },
 
     plot(svg, res, U) {
+      if (res.geo.kind === 'consDe') return false;
       const g = res.geo, s = this.state, { W, H } = G.chartSurface(svg), R = G.panels(W, H, 3);
       // e–log σ′ at mid-depth
       const so = g.mid.e, sc = s.hist === 'NC' ? so : s.hist === 'OCR' ? Math.max(so, s.OCR * so) : Math.max(so, s.pc), sf = so + g.dsFn(g.zt + g.H / 2);

@@ -110,6 +110,12 @@
       const grid = h('div', { class: 'lyr-grid' });
       o.fields.forEach((fd) => {
         if (fd.show && !fd.show(L, i)) return;
+        if (fd.options) {
+          const sel = h('select', { class: 'lyr-src', 'aria-label': `Layer ${i + 1} ${fd.label}`, onchange: () => { L[fd.k] = sel.value; app.rebuild(true); } },
+            ...fd.options.map(([v, t]) => h('option', { value: v, selected: String(L[fd.k] || fd.options[0][0]) === String(v) }, t)));
+          grid.append(h('label', { class: 'lyr-f lyr-wide' }, h('span', { class: 'lyr-fl' }, fd.label), sel));
+          return;
+        }
         const unit = typeof fd.unit === 'function' ? fd.unit() : fd.unit || '';
         const inp = h('input', { type: 'number', step: fd.step || 'any', min: fd.min, value: L[fd.k], class: 'num', 'aria-label': `Layer ${i + 1} ${fd.label}` });
         inp.addEventListener('input', () => { const v = parseFloat(inp.value); if (!isFinite(v)) return; L[fd.k] = v; app.update(); });

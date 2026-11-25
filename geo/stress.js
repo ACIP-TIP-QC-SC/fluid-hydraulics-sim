@@ -13,6 +13,8 @@
   /** Point load Q at horizontal distance r, depth z. */
   function bPoint(Q, r, z) { if (z <= 0) return 0; const t = r / z; return (3 * Q) / (2 * PI * z * z) / Math.pow(1 + t * t, 2.5); }
   /** Line load q (per unit length) at horizontal offset x. */
+  /** Westergaard point load (Poisson ratio μ; μ = 0 gives Q/(πz²) / [1 + 2(r/z)²]^(3/2)). */
+  function wPoint(Q, r, z, mu) { if (z <= 0) return 0; const eta = Math.sqrt((1 - 2 * mu) / (2 - 2 * mu)), t = r / z; return (Q / (2 * PI * z * z)) * eta / Math.pow(eta * eta + t * t, 1.5); }
   function bLine(q, x, z) { if (z <= 0) return 0; return (2 * q * z * z * z) / (PI * Math.pow(x * x + z * z, 2)); }
   /** Uniform strip of width B centred at x = 0. */
   function bStrip(q, B, x, z) {
@@ -56,7 +58,8 @@
     const t = p.type;
     if (t === 'point') {
       const L = p.points.filter((q) => q.Q !== 0);
-      return { fn: (x, y, z) => L.reduce((s, q) => s + bPoint(q.Q, Math.hypot(x - q.x, y - q.y), z), 0), qRef: null, L };
+      const W = p.pm === 'west', mu = p.mu || 0;
+      return { fn: (x, y, z) => L.reduce((s, q) => s + (W ? wPoint(q.Q, Math.hypot(x - q.x, y - q.y), z, mu) : bPoint(q.Q, Math.hypot(x - q.x, y - q.y), z)), 0), qRef: null, L };
     }
     if (t === 'line') return { fn: (x, y, z) => bLine(p.line.q, x - p.line.x, z) + (p.line.two ? bLine(p.line.q2, x - p.line.x2, z) : 0), qRef: null };
     if (t === 'strip') return { fn: (x, y, z) => bStrip(p.strip.q, p.strip.B, x, z), qRef: p.strip.q };
@@ -83,9 +86,25 @@
     if (p.type === 'circle' && !(p.circle.R > 0)) err.push('Radius must be positive.');
     if (p.type === 'rect' && p.rects.some((r) => !(r.B > 0) || !(r.L > 0))) err.push('Rectangle sides must be positive.');
     if (err.length) return fail(err);
+    if (p.type === 'circle' && p.circle.byP) {
+      const q = p.circle.P / (Math.PI * p.circle.R * p.circle.R);
+      p = Object.assign({}, p, { circle: Object.assign({}, p.circle, { q }) });
+      st.add('Contact pressure from the total load', 'q = P / (πR²)', `q = ${f(p.circle.P)} / (π × ${f(p.circle.R)}²)`, `q = ${f(q)} ${Pu}`);
+    }
     const LS = loadSet(p);
     let ds = 0;
-    if (p.type === 'point') {
+    if (p.type === 'point' && p.pm === 'west') {
+      const mu = p.mu || 0, eta = Math.sqrt((1 - 2 * mu) / (2 - 2 * mu));
+      st.add('Westergaard: vertical stress below a point load', 'Δσz = (Q / 2πz²) η / [η² + (r/z)²]^(3/2),  η = √[(1 − 2μ)/(2 − 2μ)];  μ = 0: Δσz = (0.318 Q / z²) / [1 + 2(r/z)²]^(3/2)', `μ = ${f(mu)},  η = ${f(eta)}`, '', 'Elastic soil reinforced by thin rigid horizontal sheets (layered or varved deposits); no lateral strain.');
+      LS.L.forEach((q, i) => {
+        const r = Math.hypot(x - q.x, y - q.y), I = eta / (2 * PI) / Math.pow(eta * eta + (r / z) ** 2, 1.5), d = (q.Q / (z * z)) * I;
+        ds += d;
+        st.add(`Load ${i + 1}: Q = ${f(q.Q)} ${Fu} at (${f(q.x)}, ${f(q.y)})`, 'Δσz = (Q / z²) I_W', `r = ${f(r)} ${Lu},  r/z = ${f(r / z)},  I_W = ${f(I)};  Δσz = ${f(q.Q)} / ${f(z)}² × ${f(I)}`, `Δσz = ${f(d)} ${Pu}`);
+      });
+      if (LS.L.length > 1) st.add('Superposition of all point loads', 'Δσz = Σ Δσz,i', '', `Δσz = ${f(ds)} ${Pu}`);
+      const db = LS.L.reduce((s0, q) => s0 + bPoint(q.Q, Math.hypot(x - q.x, y - q.y), z), 0);
+      out.push({ k: 'Boussinesq value for comparison', v: db, u: Pu });
+    } else if (p.type === 'point') {
       st.add('Boussinesq: vertical stress below a point load', 'Δσz = 3Q z³ / (2π R⁵) = (Q/z²) I,  I = (3/2π) / [1 + (r/z)²]^(5/2)', '', '', 'Elastic, homogeneous, isotropic half-space; the surface load acts at a point.');
       LS.L.forEach((q, i) => {
         const r = Math.hypot(x - q.x, y - q.y), I = (3 / (2 * PI)) / Math.pow(1 + (r / z) ** 2, 2.5), d = (q.Q / (z * z)) * I;
@@ -124,7 +143,42 @@
       });
       if (p.rects.length > 1) st.add('Composite footprint: sum of the rectangles', 'Δσz = Σ qᵢ Iᵢ', '', `Δσz = ${f(ds)} ${Pu}`);
     }
-    out.push({ k: `Δσz at P (${f(x)}, ${f(y)}, z = ${f(z)})`, v: ds, u: Pu, hl: true });
+    out.unshift({ k: `Δσz at P (${f(x)}, ${f(y)}, z = ${f(z)})`, v: ds, u: Pu, hl: true });
+    if (p.type === 'circle' || p.type === 'strip' || p.type === 'rect') {
+      const qa = p.type === 'circle' ? p.circle.q : p.type === 'strip' ? p.strip.q : p.rects[0].q;
+      out.push({ k: 'Contact pressure at the base q', v: qa, u: Pu });
+    }
+    // inverse questions
+    let inv = null;
+    if (p.find === 'depth') {
+      const target = p.tBy === 'abs' ? p.target : (p.ratio / 100) * (LS.qRef || 0);
+      if (!(target > 0)) warn.push(p.tBy === 'abs' ? 'Enter a positive target stress.' : 'A fraction of q needs a distributed load (strip, circle or rectangle).');
+      else {
+        const g = (zz) => LS.fn(x, y, zz);
+        // Δσ decreases with depth below the load; bracket and bisect (search from just below the surface)
+        let lo = 1e-4, hi = 1, it = 0;
+        while (g(hi) > target && it++ < 80) hi *= 2;
+        if (g(lo) < target) warn.push('The stress never reaches that value below this point.');
+        else {
+          for (let i = 0; i < 200; i++) { const m = 0.5 * (lo + hi); if (g(m) > target) lo = m; else hi = m; }
+          const zr = 0.5 * (lo + hi);
+          inv = { z: zr, target };
+          st.add('Depth at which Δσz reaches the target', p.tBy === 'abs' ? 'Δσz(z) = target' : 'Δσz(z) = ratio × q', `target = ${p.tBy === 'abs' ? '' : `${f(p.ratio)} % × ${f(LS.qRef)} = `}${f(target)} ${Pu}`, `z = ${f(zr)} ${Lu}`, p.type === 'circle' && Math.hypot(x, y) < 1e-9 ? 'Below the centre of a circle: ratio = 1 − 1/[1 + (R/z)²]^1.5, so z = R / √[(1 − ratio)^(−2/3) − 1].' : 'Solved by bisection on the stress–depth curve below P.');
+          out.unshift({ k: `Depth where Δσz = ${f(target)} ${Pu}`, v: zr, u: Lu, hl: true });
+        }
+      }
+    } else if (p.find === 'offset' && (p.type === 'point' || p.type === 'line')) {
+      const x0 = p.type === 'point' ? LS.L[0].x : p.line.x, y0 = p.type === 'point' ? LS.L[0].y : 0;
+      const g = (r) => LS.fn(x0 + r, y0, z);
+      const d0 = g(0), target = (p.ratio / 100) * d0;
+      let lo = 0, hi = z, it = 0;
+      while (g(hi) > target && it++ < 80) hi *= 2;
+      for (let i = 0; i < 200; i++) { const m = 0.5 * (lo + hi); if (g(m) > target) lo = m; else hi = m; }
+      const rr = 0.5 * (lo + hi);
+      inv = { r: rr, target };
+      st.add(`Horizontal distance where Δσz falls to ${f(p.ratio)} % of the value directly below`, 'Δσz(r, z) = ratio × Δσz(0, z)', `Δσz(0, ${f(z)}) = ${f(d0)} ${Pu};  target = ${f(target)} ${Pu}`, `r = ${f(rr)} ${Lu}`, 'Measured from the (first) load at the same depth.');
+      out.unshift({ k: `Offset where Δσz = ${f(p.ratio)} % of the value below the load`, v: rr, u: Lu, hl: true }, { k: 'Δσz directly below at this depth', v: d0, u: Pu });
+    }
     if (LS.qRef) out.push({ k: 'Influence factor Δσz / q', v: ds / LS.qRef, u: '' });
     // 2:1 method
     const t21 = twoToOne(p, z);
@@ -155,7 +209,7 @@
     if (Qtot !== null) out.push({ k: 'Total applied load', v: Qtot, u: Fu });
     if (p.type === 'strip') out.push({ k: 'Load per unit length qB', v: p.strip.q * p.strip.B, u: U.fpl });
     if (z < 0.1 * (p.type === 'strip' ? p.strip.B : 1) && p.type === 'point') warn.push('Very close to a point load the Boussinesq stress becomes very large (theoretical singularity).');
-    return { ok: true, err: [], warn, status: { cls: 'ok', text: `Δσz = ${f(ds)} ${Pu} at z = ${f(z)} ${Lu}` }, out, steps: st.list, geo: { kind: 'stress', ds, LS, p, prof, t21, avg, qRef: LS.qRef } };
+    return { ok: true, err: [], warn, status: { cls: 'ok', text: inv && inv.z !== undefined ? `z = ${f(inv.z)} ${Lu} where Δσz = ${f(inv.target)} ${Pu}` : inv && inv.r !== undefined ? `r = ${f(inv.r)} ${Lu} where Δσz = ${f(p.ratio)} % of the value below` : `Δσz = ${f(ds)} ${Pu} at z = ${f(z)} ${Lu}` }, out, steps: st.list, geo: { kind: 'stress', ds, LS, p, prof, t21, avg, qRef: LS.qRef } };
   }
 
   /** Pressure-bulb grid in the x–z plane through y = y0. */

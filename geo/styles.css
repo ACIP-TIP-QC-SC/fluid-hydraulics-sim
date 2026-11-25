@@ -11,6 +11,12 @@
 .lyr-x:disabled { opacity: .4; cursor: default; }
 .lyr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 8px; }
 .lyr-f { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lyr-wide { grid-column: 1 / -1; }
+.lyr-src { width: 100%; }
+.known-row { display: grid; grid-template-columns: auto 1fr minmax(0, 92px) auto; gap: 6px; align-items: center; margin: 3px 0; font-size: 13px; }
+.known-row input.num { width: 100%; }
+.known-row.off .num { opacity: .45; }
+.known-row .unit { min-width: 2.6em; }
 .lyr-fl { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lyr-fi { display: flex; align-items: center; gap: 3px; }
 .lyr-fi input.num { width: 100%; min-width: 0; text-align: right; font-size: 12px; padding: 3px 4px; }

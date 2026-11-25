@@ -9,11 +9,11 @@
   const SP = '#d35400', WP = '#2980b9', TP = '#8e44ad', WT = '#2c3e50', PP = '#16a085', BP = '#c0392b', SUR = '#e67e22';
   const LEN = 1 / 0.3048, GAM = 6.365880, STR = 20.885434;
 
-  const lay = (soil, H, g, gsat, phi, c) => ({ soil, H, g, gsat, phi, c });
+  const lay = (soil, H, g, gsat, phi, c, more) => Object.assign({ soil, H, g, gsat, phi, c, src: 'gamma', gd: 16, Gs: 2.65, e: 0.6, w: 15, S: 100 }, more || {});
   const cant = { t1: 0.3, bf: 0.2, bb: 0, Lt: 0.7, Lh: 2.3, tb: 0.7, Hs: 5.3 };
   const grav = { t1: 0.6, bf: 0.4, bb: 1.2, Lt: 0.5, Lh: 0.4, tb: 0.8, Hs: 4.2 };
   const base = {
-    sub: 'wall', theory: 'rankine', state: 'A', H: 6, layers: [lay('sand', 6, 18, 20, 30, 0)], wt: false, zw: 3, q: 0, beta: 0, theta: 0, delta: 20, OCR: 1, neglect: true,
+    sub: 'wall', theory: 'rankine', state: 'A', H: 6, layers: [lay('sand', 6, 18, 20, 30, 0)], wt: false, zw: 3, q: 0, beta: 0, theta: 0, delta: 20, OCR: 1, neglect: true, kInv: false, Kg: 0.333,
     gc: 24, uplift: true, passive: false, wall: Object.assign({}, cant), found: { phi: 20, c: 40, g: 19, Df: 1.5, k1: 2 / 3, k2: 2 / 3, qu: 600 },
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -82,6 +82,9 @@
     presets: [
       { name: 'Test L1 — Rankine active, sand H = 6 m, γ = 18 kN/m³, φ = 30° → K_a = 1/3, P_a = 108 kN/m at 2 m', apply: (s) => set(s, { sub: 'press' }) },
       { name: 'Same wall with a surcharge q = 20 kPa → P_a = 148 kN/m at 2.27 m', apply: (s) => set(s, { sub: 'press', q: 20 }) },
+      { name: 'Friction angle from K_a = 0.333 (Rankine) → φ = 30°', apply: (s) => set(s, { sub: 'press', kInv: true, Kg: 0.3333 }) },
+      { name: 'Friction angle from K_p = 4 (Rankine) → φ = 36.87°', apply: (s) => set(s, { sub: 'press', state: 'P', kInv: true, Kg: 4 }) },
+      { name: 'Backfill from soil data: G_s 2.7, e 0.6, w 20 %, φ 30°, water table 2 m below the top, wall 6 m', apply: (s) => set(s, { sub: 'press', wt: true, zw: 2, layers: [lay('sand', 6, 18, 20, 30, 0, { src: 'gew', Gs: 2.7, e: 0.6, w: 20 })] }) },
       { name: 'Test L2 — c–φ soil (γ = 17, φ = 26°, c = 15 kPa): tension crack z_c = 2.824 m, P_a = 33.48 kN/m', apply: (s) => set(s, { sub: 'press', layers: [lay('clay', 6, 17, 19, 26, 15)] }) },
       { name: 'Test L3 — two layers with water table at 3 m → P_soil = 76.40, P_w = 44.14 kN/m', apply: (s) => set(s, { sub: 'press', layers: [lay('sand', 3, 16, 18, 30, 0), lay('gravel', 3, 17, 19, 34, 0)], wt: true, zw: 3 }) },
       { name: 'Rankine passive, sand H = 6 m → K_p = 3, P_p = 972 kN/m', apply: (s) => set(s, { sub: 'press', state: 'P' }) },
@@ -120,8 +123,12 @@
         else C.note(t, 'The Coulomb plane runs from the heel bottom to the top of the stem back; its angle θ follows from the wall shape.');
       }
       if (s.sub === 'press') sl(t, s, 'H', 'Wall height H', 0.5, en ? 60 : 20, 0.01, U.len);
+      if (s.sub === 'press' && s.state !== '0') {
+        C.toggle(t, { label: `φ from a given ${s.state === 'P' ? 'K_p' : 'K_a'} (Rankine, level backfill)`, get: () => s.kInv, set: (v) => { s.kInv = v; if (v) { s.theory = 'rankine'; s.beta = 0; } } });
+        if (s.kInv) { sl(t, s, 'Kg', `Given ${s.state === 'P' ? 'K_p' : 'K_a'}`, 0.01, s.state === 'P' ? 15 : 0.99, 0.001, ''); C.note(t, 'The friction angle found is used for every layer.'); }
+      }
       const b = C.section(el, 'Backfill layers (from the top of the wall)');
-      C.layers(b, { layers: s.layers, max: 4, min: 1, title: (i) => `Layer ${i + 1}`, fields: [{ k: 'H', label: 'Thickness', unit: U.len }, { k: 'g', label: 'γ (moist)', unit: U.gamma }, { k: 'gsat', label: 'γ_sat', unit: U.gamma }, { k: 'phi', label: 'φ', unit: '°' }, { k: 'c', label: 'c', unit: U.press }], make: (ls) => { const l = ls[ls.length - 1]; return Object.assign({}, l, { soil: l.soil === 'sand' ? 'clay' : 'sand', H: +(l.H / 2).toPrecision(3) }); } });
+      C.layers(b, { layers: s.layers, max: 4, min: 1, title: (i) => `Layer ${i + 1}`, fields: [{ k: 'src', label: 'Unit weight from', options: Physics.UW_SRC }, { k: 'H', label: 'Thickness', unit: U.len }].concat(Physics.uwFields(U, 'S above water'), [{ k: 'phi', label: 'φ', unit: '°', show: () => !(s.kInv && s.sub === 'press' && s.state !== '0') }, { k: 'c', label: 'c', unit: U.press }]), make: (ls) => { const l = ls[ls.length - 1]; return Object.assign({}, l, { soil: l.soil === 'sand' ? 'clay' : 'sand', H: +(l.H / 2).toPrecision(3) }); } });
       C.note(b, 'The last layer continues below the base. Coulomb and sloping Rankine solutions ignore c.');
       const w = C.section(el, 'Surcharge and water');
       sl(w, s, 'q', 'Uniform surcharge q', 0, 200 * P, 0.1, U.press);
@@ -155,7 +162,7 @@
     onUnits(from, to) {
       const s = this.state, k = to === 'EN' ? 1 : -1, L = Math.pow(LEN, k), Gm = Math.pow(GAM, k), S = Math.pow(STR, k), r = (x) => +(+x).toPrecision(5);
       s.H = r(s.H * L); s.zw = r(s.zw * L); s.q = r(s.q * S); s.gc = r(s.gc * Gm);
-      s.layers.forEach((l) => { l.H = r(l.H * L); l.g = r(l.g * Gm); l.gsat = r(l.gsat * Gm); l.c = r(l.c * S); });
+      s.layers.forEach((l) => { l.H = r(l.H * L); l.g = r(l.g * Gm); l.gsat = r(l.gsat * Gm); if (l.gd) l.gd = r(l.gd * Gm); l.c = r(l.c * S); });
       ['t1', 'bf', 'bb', 'Lt', 'Lh', 'tb', 'Hs'].forEach((q) => (s.wall[q] = r(s.wall[q] * L)));
       s.found.c = r(s.found.c * S); s.found.g = r(s.found.g * Gm); s.found.Df = r(s.found.Df * L); s.found.qu = r(s.found.qu * S);
     },
@@ -346,7 +353,7 @@
       } else {
         const ka = [], kp = [], k0 = [];
         for (let p = 0; p <= 45; p += 1) { const r1 = p * DEG; ka.push([p, Physics.kRankine(r1, 0, false)]); kp.push([p, Physics.kRankine(r1, 0, true)]); k0.push([p, Physics.kRest(r1, 1)]); }
-        const phi = s.layers[0].phi;
+        const phi = (g.layersU || s.layers)[0].phi;
         G.chart(svg, R[1], { title: 'K_a, K_p and K₀ versus φ (level backfill)', xlab: 'φ (°)', ylab: 'K', xmin: 0, xmax: 45, ymin: 0, ymax: 6, series: [{ pts: kp.filter((q) => q[1] <= 6), color: PP, w: 2.2, label: 'K_p' }, { pts: k0, color: '#7f8c8d', w: 2, dash: '5 4', label: 'K₀' }, { pts: ka, color: SP, w: 2.2, label: 'K_a' }], vlines: [{ x: phi, label: `φ = ${f(phi)}°`, color: '#34495e' }], marks: [{ x: phi, y: r.Ks[0], label: `K = ${f(r.Ks[0])}`, color: SP }] });
       }
       return true;

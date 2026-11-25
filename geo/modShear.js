@@ -13,9 +13,9 @@
   const base = {
     sub: 'triax',
     stress: { by: 'xy', sx: 100, sy: 40, txy: 30, s1: 200, s3: 80, theta: 30, c: 10, phi: 30 },
-    direct: { input: 'force', A: 36, fit: 'cphi', tests: [{ N: 180, S: 110 }, { N: 360, S: 200 }, { N: 540, S: 290 }] },
-    triax: { type: 'CD', fit: 'phi', specs: [{ s3: 100, dd: 200, du: 0 }] },
-    ucs: { input: 'load', D: 3.8, eps: 8, Pf: 170, qu: 100, sens: false, quR: 30 },
+    direct: { input: 'force', aBy: 'A', D: 5, ask: 'none', askV: 100, A: 36, fit: 'cphi', tests: [{ N: 180, S: 110 }, { N: 360, S: 200 }, { N: 540, S: 290 }] },
+    triax: { type: 'CD', input: 'circ', planes: [{ sn: 100, tau: 60 }], fit: 'phi', specs: [{ s3: 100, dd: 200, du: 0 }] },
+    ucs: { input: 'load', useTh: false, th: 45, D: 3.8, eps: 8, Pf: 170, qu: 100, sens: false, quR: 30 },
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const set = (s, over) => { const b = clone(base); Object.keys(b).forEach((k) => { s[k] = typeof b[k] === 'object' ? Object.assign(b[k], (over || {})[k] || {}) : (over && over[k] !== undefined ? over[k] : b[k]); }); };
@@ -245,6 +245,9 @@
       { name: 'UU tests at three cell pressures → s_u = 42.5 kPa (φ_u = 0)', apply: (s) => set(s, { sub: 'triax', triax: { type: 'UU', fit: 'phi', specs: [{ s3: 50, dd: 84, du: 0 }, { s3: 100, dd: 85, du: 0 }, { s3: 150, dd: 86, du: 0 }] } }) },
       { name: 'Test M5 — unconfined: D = 3.8 cm, P = 170 N at ε = 8 % → q_u = 137.9 kPa, s_u = 68.95 kPa', apply: (s) => set(s, { sub: 'unconf' }) },
       { name: 'Sensitive clay: q_u = 120 kPa undisturbed, 25 kPa remolded (S_t = 4.8)', apply: (s) => set(s, { sub: 'unconf', ucs: { input: 'qu', qu: 120, sens: true, quR: 25 } }) },
+      { name: 'CE Ref 5 May 2022 Sit. 10 — direct shear, D = 50 mm: N 134/206 N, S 68.5/105 N → c ≈ 0.29 kPa, φ = 26.9°, N for S = 130 N', apply: (s) => set(s, { sub: 'direct', direct: { input: 'force', aBy: 'D', D: 5, fit: 'cphi', ask: 'N', askV: 130, tests: [{ N: 134, S: 68.5 }, { N: 206, S: 105 }] } }) },
+      { name: 'CE Ref 4 Nov 2018 Sit. 8 — sand, failure plane σ = 72, τ = 47 kPa → φ = 33.14°, θ = 61.57°, σ₃ = 46.55, σ₁ = 158.8 kPa', apply: (s) => set(s, { sub: 'triax', triax: { type: 'CD', input: 'plane', fit: 'phi', planes: [{ sn: 72, tau: 47 }] } }) },
+      { name: 'CE Ref 4 Nov 2017 #24 — unconfined test q_u = 100 kPa, failure plane at 45° → φ = 0, c = 50 kPa', apply: (s) => set(s, { sub: 'unconf', ucs: { input: 'qu', qu: 100, useTh: true, th: 45 } }) },
       { name: 'English units: CD test σ₃ = 2000 psf, Δσ_d = 4000 psf → φ′ = 30°', units: 'EN', apply: (s) => { set(s, { sub: 'triax', triax: { type: 'CD', fit: 'phi', specs: [{ s3: 2000, dd: 4000, du: 0 }] } }); Object.assign(s.stress, { sx: 2000, sy: 800, txy: 600, s1: 4000, s3: 1600, c: 200 }); Object.assign(s.direct, { A: 6.25, tests: [{ N: 50, S: 33 }, { N: 100, S: 62 }, { N: 150, S: 91 }] }); Object.assign(s.ucs, { D: 1.5, Pf: 40, qu: 2000, quR: 500 }); } },
       { name: 'English units: direct shear, 2.5 × 2.5 in box, N = 50/100/150 lb → φ = 30.11°, c = 92.16 psf', units: 'EN', apply: (s) => { set(s, { sub: 'direct', direct: { input: 'force', A: 6.25, fit: 'cphi', tests: [{ N: 50, S: 33 }, { N: 100, S: 62 }, { N: 150, S: 91 }] } }); Object.assign(s.stress, { sx: 2000, sy: 800, txy: 600, s1: 4000, s3: 1600, c: 200 }); Object.assign(s.triax.specs[0], { s3: 2000, dd: 4000 }); Object.assign(s.ucs, { D: 1.5, Pf: 40, qu: 2000, quR: 500 }); } },
     ],
@@ -280,20 +283,35 @@
         const o = s.direct, g = C.section(el, 'Direct shear tests');
         const fu = en ? 'lb' : 'N', byF = o.input === 'force';
         C.seg(g, { label: 'Readings', options: [['force', `Loads N, S (${fu})`], ['stress', `Stresses σ, τ (${U.press})`]], get: () => o.input, set: (v) => (o.input = v) });
-        if (byF) sl(g, o, 'A', 'Box area A', 1, en ? 20 : 150, 0.01, U.areaS);
+        if (byF) {
+          C.seg(g, { label: 'Specimen', options: [['A', 'Area given'], ['D', 'Circular, diameter D']], get: () => o.aBy, set: (v) => (o.aBy = v) });
+          if (o.aBy === 'D') sl(g, o, 'D', 'Specimen diameter D', 0.5, en ? 6 : 15, 0.01, U.lenS);
+          else sl(g, o, 'A', 'Box area A', 1, en ? 20 : 150, 0.01, U.areaS);
+        }
         C.layers(g, { layers: o.tests, max: 5, min: 1, soil: false, add: '+ Add test', title: (i) => `Test ${i + 1}`, fields: [{ k: 'N', label: byF ? 'Normal load N' : 'Normal stress σ', unit: byF ? fu : U.press }, { k: 'S', label: byF ? 'Shear at failure S' : 'Shear stress τ_f', unit: byF ? fu : U.press }], make: (ls) => { const l = ls[ls.length - 1]; return { N: +(l.N * 1.5).toPrecision(4), S: +(l.S * 1.4).toPrecision(4) }; } });
         C.seg(g, { label: 'Envelope', options: [['cphi', 'c and φ (least squares)'], ['phi', 'φ only (c = 0)']], get: () => o.fit, set: (v) => (o.fit = v) });
+        C.seg(g, { label: 'Also find', options: [['none', 'Nothing more'], ['N', byF ? 'N for a shear load' : 'σ for a shear stress'], ['S', byF ? 'S for a normal load' : 'τ_f for a normal stress']], get: () => o.ask, set: (v) => (o.ask = v) });
+        if (o.ask !== 'none') sl(g, o, 'askV', o.ask === 'N' ? (byF ? 'Shear load at failure S' : 'Shear stress τ') : (byF ? 'Normal load N' : 'Normal stress σ'), 0.1, byF ? (en ? 500 : 2000) : 1000 * P, 0.1, byF ? fu : U.press);
       } else if (s.sub === 'triax') {
         const o = s.triax, g = C.section(el, 'Triaxial test');
         C.seg(g, { label: 'Test type', options: [['CD', 'CD (drained)'], ['CU', 'CU (with Δu)'], ['UU', 'UU (undrained)']], get: () => o.type, set: (v) => (o.type = v) });
+        C.seg(g, { label: 'Data given', options: [['circ', 'σ₃ and deviator Δσ_d'], ['plane', 'σ and τ on the failure plane']], get: () => o.input, set: (v) => (o.input = v) });
+        if (o.input === 'plane') {
+          C.layers(g, { layers: o.planes, max: 4, min: 1, soil: false, add: '+ Add specimen', title: (i) => `Specimen ${i + 1}`, fields: [{ k: 'sn', label: 'Normal stress on failure plane σ_f', unit: U.press }, { k: 'tau', label: 'Shear stress on failure plane τ_f', unit: U.press }], make: (ls) => { const l = ls[ls.length - 1]; return { sn: +(l.sn * 2).toPrecision(4), tau: +(l.tau * 1.8).toPrecision(4) }; } });
+          C.seg(g, { label: 'Envelope', options: [['phi', 'φ only (c = 0)'], ['cphi', 'c and φ (line through the points)']], get: () => o.fit, set: (v) => (o.fit = v) });
+          C.note(g, 'Gives φ, the failure plane angle θ = 45° + φ/2, the principal stresses σ₁ and σ₃ at failure and the maximum shear stress.');
+        } else {
         C.layers(g, { layers: o.specs, max: 4, min: 1, soil: false, add: '+ Add specimen', title: (i) => `Specimen ${i + 1}`, fields: [{ k: 's3', label: 'Cell pressure σ₃', unit: U.press }, { k: 'dd', label: 'Deviator at failure Δσ_d', unit: U.press }, { k: 'du', label: 'Pore pressure Δu_f', unit: U.press, show: () => o.type === 'CU' }], make: (ls) => { const l = ls[ls.length - 1]; return { s3: +(l.s3 * 2).toPrecision(4), dd: +(l.dd * 1.8).toPrecision(4), du: +(l.du * 2).toPrecision(4) }; } });
         if (o.type !== 'UU') C.seg(g, { label: 'Envelope', options: [['phi', 'φ only (c = 0)'], ['cphi', 'c and φ (p–q fit)']], get: () => o.fit, set: (v) => (o.fit = v) });
         C.note(g, o.type === 'CD' ? 'Drained: Δu = 0, so total and effective stresses are equal.' : o.type === 'CU' ? 'Consolidated undrained: the effective circles are the total circles shifted left by Δu.' : 'Unconsolidated undrained on saturated clay: every circle has the same size, φ_u = 0.');
+        }
       } else {
         const o = s.ucs, g = C.section(el, 'Unconfined compression test');
         C.seg(g, { label: 'Input', options: [['load', 'Failure load and strain'], ['qu', 'q_u given']], get: () => o.input, set: (v) => (o.input = v) });
         if (o.input === 'load') { sl(g, o, 'D', 'Specimen diameter D', 0.5, en ? 6 : 15, 0.01, U.lenS); sl(g, o, 'Pf', 'Axial load at failure P', 1, en ? 500 : 2000, 0.1, en ? 'lb' : 'N'); sl(g, o, 'eps', 'Axial strain at failure ε', 0, 30, 0.1, '%'); }
         else sl(g, o, 'qu', 'Unconfined strength q_u', 1, 1000 * P, 0.1, U.press);
+        C.toggle(g, { label: 'Failure plane angle measured (gives φ and c)', get: () => o.useTh, set: (v) => (o.useTh = v) });
+        if (o.useTh) sl(g, o, 'th', 'Failure plane angle θ from the horizontal', 45, 89, 0.1, '°');
         C.toggle(g, { label: 'Sensitivity (remolded test)', get: () => o.sens, set: (v) => (o.sens = v) });
         if (o.sens) sl(g, o, 'quR', 'Remolded strength q_u,r', 0.1, 500 * P, 0.1, U.press);
       }
@@ -302,7 +320,8 @@
       const s = this.state, k = to === 'EN' ? 1 : -1, S = Math.pow(STR, k), F = Math.pow(FRC, k), A = Math.pow(AR, k), L = Math.pow(LN, k), r = (x) => +(+x).toPrecision(5);
       ['sx', 'sy', 'txy', 's1', 's3', 'c'].forEach((q) => (s.stress[q] = r(s.stress[q] * S)));
       const byF = s.direct.input === 'force';
-      s.direct.A = r(s.direct.A * A);
+      s.direct.A = r(s.direct.A * A); s.direct.D = r(s.direct.D * L); s.direct.askV = r(s.direct.askV * (byF ? F : S));
+      s.triax.planes.forEach((t) => { t.sn = r(t.sn * S); t.tau = r(t.tau * S); });
       s.direct.tests.forEach((t) => { t.N = r(t.N * (byF ? F : S)); t.S = r(t.S * (byF ? F : S)); });
       s.triax.specs.forEach((t) => { t.s3 = r(t.s3 * S); t.dd = r(t.dd * S); t.du = r(t.du * S); });
       s.ucs.D = r(s.ucs.D * L); s.ucs.Pf = r(s.ucs.Pf * F); s.ucs.qu = r(s.ucs.qu * S); s.ucs.quR = r(s.ucs.quR * S);

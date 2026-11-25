@@ -17,6 +17,12 @@
       const cap = P.phase(L.Gs, L.e, (prof.capS || 100) / 100, gw);
       return { gm: ph.gm, gsat: ph.gsat, gcap: cap.gm, gd: ph.gd };
     }
+    if (prof.by === 'each') {
+      const src = L.src || 'gamma';
+      const g = P.layerUW(L, src, gw);
+      const cap = src === 'gamma' ? L.gsat : P.layerUW(Object.assign({}, L, { S: prof.capS || 100 }), src === 'gew' ? 'phase' : src, gw).gm;
+      return { gm: g.gm, gsat: g.gsat, gcap: cap, gd: g.gd, e: g.e };
+    }
     return { gm: L.g, gsat: L.gsat, gcap: L.gsat, gd: L.g };
   }
 
@@ -112,6 +118,14 @@
       pr.Ls.forEach((l, i) => {
         const g = pr.G[i];
         st.add(`Layer ${i + 1} unit weights from G_s, e, S`, 'γ = (G_s + S e) γw / (1 + e),  γ_sat = (G_s + e) γw / (1 + e)', `γ = (${f(l.Gs)} + ${f((l.S || 0) / 100)} × ${f(l.e)}) × ${f(gw)} / (1 + ${f(l.e)});  γ_sat = (${f(l.Gs)} + ${f(l.e)}) × ${f(gw)} / (1 + ${f(l.e)})`, `γ = ${f(g.gm)},  γ_sat = ${f(g.gsat)} ${U.gamma}${pr.hc > 0 ? `,  capillary γ = ${f(g.gcap)}` : ''}`);
+      });
+    }
+    if (prof.by === 'each') {
+      pr.Ls.forEach((l, i) => {
+        const g = pr.G[i], src = l.src || 'gamma';
+        if (src === 'gamma') return;
+        const [fm, sb] = P.layerUWtext(l, src, gw, g);
+        st.add(`Layer ${i + 1} unit weights`, fm, sb, `γ = ${f(g.gm)},  γ_sat = ${f(g.gsat)} ${U.gamma}${g.e !== undefined ? `  (e = ${f(g.e)})` : ''}`);
       });
     }
     if (pr.s0 > 0) st.add('Stress at the ground surface', 'σ₀ = q + γw h_pond', `σ₀ = ${f(pr.q)} + ${f(gw)} × ${f(pr.pond)}`, `σ₀ = ${f(pr.s0)} ${Pu}`, pr.pond > 0 ? 'Water ponded above the ground adds equally to σ and u, so σ′ is unchanged by it.' : 'A wide surcharge raises σ and σ′ by q at every depth.');

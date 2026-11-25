@@ -18,18 +18,23 @@
       circle: { q: 120, R: 1.5 },
       rects: [{ B: 2, L: 3, x: 0, y: 0, q: 150 }],
       xP: 0, yP: 0, zP: 3, zMax: 10, avg: false, z1: 2, z2: 6,
+      pm: 'bous', mu: 0, find: 'stress', tBy: 'frac', ratio: 12.5, target: 10,
     },
     presets: [
-      { name: 'Test T1 — point load Q = 1000 kN, directly below at z = 2 m (Δσz = 119.4 kPa)', apply: (s) => Object.assign(s, { type: 'point', points: [{ Q: 1000, x: 0, y: 0 }], xP: 0, yP: 0, zP: 2, zMax: 8, avg: false }) },
-      { name: 'Three point loads (500, 300, 400 kN) and a point between them', apply: (s) => Object.assign(s, { type: 'point', points: [{ Q: 500, x: 0, y: 0 }, { Q: 300, x: 3, y: 0 }, { Q: 400, x: 1.5, y: 2.5 }], xP: 1.5, yP: 1, zP: 2.5, zMax: 8, avg: false }) },
-      { name: 'Line load 100 kN/m, point 2 m aside at 3 m depth', apply: (s) => Object.assign(s, { type: 'line', line: { q: 100, x: 0, two: false, q2: 80, x2: 4 }, xP: 2, yP: 0, zP: 3, zMax: 8, avg: false }) },
-      { name: 'Test T2 — strip B = 2 m, q = 100 kPa, below the centre at z = 2 m (Δσz = 54.98 kPa)', apply: (s) => Object.assign(s, { type: 'strip', strip: { q: 100, B: 2 }, xP: 0, yP: 0, zP: 2, zMax: 8, avg: false }) },
-      { name: 'Test T3 — circle R = 1.5 m, q = 100 kPa, centre z = 3 m (Δσz = 28.45 kPa)', apply: (s) => Object.assign(s, { type: 'circle', circle: { q: 100, R: 1.5 }, xP: 0, yP: 0, zP: 3, zMax: 8, avg: false }) },
-      { name: 'Circular tank R = 6 m, q = 120 kPa, below the edge at 4 m', apply: (s) => Object.assign(s, { type: 'circle', circle: { q: 120, R: 6 }, xP: 6, yP: 0, zP: 4, zMax: 24, avg: false }) },
-      { name: 'Test T4 — rectangle 2 × 3 m, q = 150 kPa, below a corner at z = 3 m (I = 0.1451, Δσz = 21.76 kPa)', apply: (s) => Object.assign(s, { type: 'rect', rects: [{ B: 2, L: 3, x: 1, y: 1.5, q: 150 }], xP: 0, yP: 0, zP: 3, zMax: 10, avg: false }) },
-      { name: 'Footing 3 × 3 m, 200 kPa: centre, with the 2:1 method and the average in a clay layer 2–6 m', apply: (s) => Object.assign(s, { type: 'rect', rects: [{ B: 3, L: 3, x: 0, y: 0, q: 200 }], xP: 0, yP: 0, zP: 4, zMax: 12, avg: true, z1: 2, z2: 6 }) },
-      { name: 'L-shaped footprint (two rectangles), point outside the footing', apply: (s) => Object.assign(s, { type: 'rect', rects: [{ B: 6, L: 2, x: 0, y: 0, q: 120 }, { B: 2, L: 4, x: -2, y: 3, q: 120 }], xP: 2, yP: 3, zP: 3, zMax: 12, avg: false }) },
-      { name: 'English units: footing 10 × 10 ft, 3000 psf, centre at 10 ft', units: 'EN', apply: (s) => Object.assign(s, { type: 'rect', rects: [{ B: 10, L: 10, x: 0, y: 0, q: 3000 }], xP: 0, yP: 0, zP: 10, zMax: 35, avg: false }) },
+      { name: 'Test T1 — point load Q = 1000 kN, directly below at z = 2 m (Δσz = 119.4 kPa)', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'point', points: [{ Q: 1000, x: 0, y: 0 }], xP: 0, yP: 0, zP: 2, zMax: 8, avg: false }) },
+      { name: 'Three point loads (500, 300, 400 kN) and a point between them', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'point', points: [{ Q: 500, x: 0, y: 0 }, { Q: 300, x: 3, y: 0 }, { Q: 400, x: 1.5, y: 2.5 }], xP: 1.5, yP: 1, zP: 2.5, zMax: 8, avg: false }) },
+      { name: 'Line load 100 kN/m, point 2 m aside at 3 m depth', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'line', line: { q: 100, x: 0, two: false, q2: 80, x2: 4 }, xP: 2, yP: 0, zP: 3, zMax: 8, avg: false }) },
+      { name: 'Test T2 — strip B = 2 m, q = 100 kPa, below the centre at z = 2 m (Δσz = 54.98 kPa)', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'strip', strip: { q: 100, B: 2 }, xP: 0, yP: 0, zP: 2, zMax: 8, avg: false }) },
+      { name: 'Test T3 — circle R = 1.5 m, q = 100 kPa, centre z = 3 m (Δσz = 28.45 kPa)', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'circle', circle: { q: 100, R: 1.5 }, xP: 0, yP: 0, zP: 3, zMax: 8, avg: false }) },
+      { name: 'Circular tank R = 6 m, q = 120 kPa, below the edge at 4 m', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'circle', circle: { q: 120, R: 6 }, xP: 6, yP: 0, zP: 4, zMax: 24, avg: false }) },
+      { name: 'Test T4 — rectangle 2 × 3 m, q = 150 kPa, below a corner at z = 3 m (I = 0.1451, Δσz = 21.76 kPa)', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'rect', rects: [{ B: 2, L: 3, x: 1, y: 1.5, q: 150 }], xP: 0, yP: 0, zP: 3, zMax: 10, avg: false }) },
+      { name: 'Footing 3 × 3 m, 200 kPa: centre, with the 2:1 method and the average in a clay layer 2–6 m', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'rect', rects: [{ B: 3, L: 3, x: 0, y: 0, q: 200 }], xP: 0, yP: 0, zP: 4, zMax: 12, avg: true, z1: 2, z2: 6 }) },
+      { name: 'L-shaped footprint (two rectangles), point outside the footing', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'rect', rects: [{ B: 6, L: 2, x: 0, y: 0, q: 120 }, { B: 2, L: 4, x: -2, y: 3, q: 120 }], xP: 2, yP: 3, zP: 3, zMax: 12, avg: false }) },
+      { name: 'CE Ref 5 May 2022 #45–47 — Westergaard Q = 2.5 MN: 2 m below (198.8 kPa), 4 m below (49.7 kPa); set x_P = 3 m, z = 6 m for #47 (12.02 kPa)', apply: (s) => Object.assign(s, { xP: 0, yP: 0, avg: false, z1: 2, z2: 6, mu: 0, tBy: 'frac', target: 10, type: 'point', points: [{ Q: 2500, x: 0, y: 0 }], pm: 'west', find: 'stress', ratio: 12.5, zP: 2, zMax: 10 }) },
+      { name: 'CE Ref 5 Nov 2021 #35 — tunnel under Q = 10,000 kN at z = 10 m: offset where Δσz is 5 % of the value below (r = 15.21 m)', apply: (s) => Object.assign(s, { xP: 0, yP: 0, avg: false, z1: 2, z2: 6, mu: 0, tBy: 'frac', target: 10, type: 'point', points: [{ Q: 10000, x: 0, y: 0 }], pm: 'bous', find: 'offset', ratio: 5, zP: 10, zMax: 20 }) },
+      { name: 'CE Ref 5 Nov 2021 #48–50 — circular footing D = 4 m, P = 1800 kN: q = 143.24 kPa, 20.94 kPa at 6 m, depth for q/10 = 7.414 m', apply: (s) => Object.assign(s, { xP: 0, yP: 0, avg: false, z1: 2, z2: 6, mu: 0, tBy: 'frac', target: 10, type: 'circle', circle: { q: 143.24, R: 2, byP: true, P: 1800 }, find: 'depth', ratio: 10, zP: 6, zMax: 16 }) },
+      { name: 'CE Ref 6 Apr 2025 #25 — circular footing D = 6 m: depth where Δσz = 1/8 of the base pressure (9.83 m)', apply: (s) => Object.assign(s, { xP: 0, yP: 0, avg: false, z1: 2, z2: 6, mu: 0, tBy: 'frac', target: 10, type: 'circle', circle: { q: 100, R: 3, byP: false, P: 2827.4 }, find: 'depth', ratio: 12.5, zP: 3, zMax: 20 }) },
+      { name: 'English units: footing 10 × 10 ft, 3000 psf, centre at 10 ft', units: 'EN', apply: (s) => Object.assign(s, { pm: 'bous', find: 'stress', type: 'rect', rects: [{ B: 10, L: 10, x: 0, y: 0, q: 3000 }], xP: 0, yP: 0, zP: 10, zMax: 35, avg: false }) },
     ],
     legend: [[BULB, 'pressure bulb (Δσz / q)', 'ln'], [LOAD, 'surface load', 'sq'], [SPREAD, '2:1 spread', 'ln'], [PT, 'point P']],
     toggle: 'Pressure bulb',
@@ -45,6 +50,8 @@
       if (s.type === 'point') {
         C.layers(g, { layers: s.points, max: 4, soil: false, add: '+ Add load', title: (i) => `Load ${i + 1}`, fields: [{ k: 'Q', label: 'Q', unit: U.force }, { k: 'x', label: 'x', unit: U.len }, { k: 'y', label: 'y', unit: U.len }], make: (ls) => ({ Q: en ? 50000 : 200, x: (ls.length) * (en ? 6 : 2), y: 0 }) });
         C.note(g, 'Plan coordinates x, y of each load; the 2D section is taken through point P (y = y_P).');
+        C.seg(g, { label: 'Point-load theory', options: [['bous', 'Boussinesq'], ['west', 'Westergaard']], get: () => s.pm, set: (v) => (s.pm = v) });
+        if (s.pm === 'west') { sl(g, s, 'mu', 'Poisson ratio μ of the soil', 0, 0.49, 0.01, ''); C.note(g, 'Westergaard (layered soil with thin rigid sheets). μ = 0 is the usual textbook case: Δσz = Q / (πz²) · 1/[1 + 2(r/z)²]^1.5.'); }
       } else if (s.type === 'line') {
         sl(g, s.line, 'q', 'Line load q (per unit length)', 1, en ? 20000 : 1000, 0.1, U.fpl);
         sl(g, s.line, 'x', 'Position of the line x', -Lmax, Lmax, 0.01, U.len);
@@ -55,7 +62,9 @@
         sl(g, s.strip, 'q', 'Uniform pressure q', 1, qmax, 0.1, U.press);
       } else if (s.type === 'circle') {
         sl(g, s.circle, 'R', 'Radius R', 0.1, Lmax, 0.01, U.len);
-        sl(g, s.circle, 'q', 'Uniform pressure q', 1, qmax, 0.1, U.press);
+        C.toggle(g, { label: 'Load given as a total force P (q = P / area)', get: () => !!s.circle.byP, set: (v) => { s.circle.byP = v; if (v && !(s.circle.P > 0)) s.circle.P = +(s.circle.q * Math.PI * s.circle.R * s.circle.R).toFixed(1); } });
+        if (s.circle.byP) sl(g, s.circle, 'P', 'Total load P', 1, en ? 2e6 : 1e5, 0.1, U.force);
+        else sl(g, s.circle, 'q', 'Uniform pressure q', 1, qmax, 0.1, U.press);
       } else {
         C.layers(g, { layers: s.rects, max: 3, soil: false, add: '+ Add rectangle', title: (i) => `Rectangle ${i + 1}`, fields: [{ k: 'B', label: 'B (along x)', unit: U.len }, { k: 'L', label: 'L (along y)', unit: U.len }, { k: 'x', label: 'centre x', unit: U.len }, { k: 'y', label: 'centre y', unit: U.len }, { k: 'q', label: 'q', unit: U.press }], make: (ls) => { const l = ls[ls.length - 1]; return { B: l.B, L: l.L, x: l.x + l.B, y: l.y, q: l.q }; } });
         C.note(g, 'Several rectangles make an L, T or U footprint; each may carry its own q. The stress is found by superposition of corner influence factors.');
@@ -64,6 +73,21 @@
       if (s.type !== 'line' && s.type !== 'strip') sl(p, s, 'yP', 'y_P (plan, across the section)', -Lmax, Lmax, 0.01, U.len);
       sl(p, s, 'xP', 'x_P (plan, along the section)', -Lmax, Lmax, 0.01, U.len);
       sl(p, s, 'zP', 'Depth z', 0.01, en ? 150 : 50, 0.01, U.len);
+      const fd = C.section(el, 'What to find');
+      const fopts = [['stress', 'Δσz at point P'], ['depth', 'Depth for a given Δσz']];
+      if (s.type === 'point' || s.type === 'line') fopts.push(['offset', 'Offset for a % of the stress below']);
+      if (s.find === 'offset' && s.type !== 'point' && s.type !== 'line') s.find = 'stress';
+      C.seg(fd, { label: 'Find', options: fopts, get: () => s.find, set: (v) => (s.find = v) });
+      if (s.find === 'depth') {
+        if (s.type === 'point' || s.type === 'line') s.tBy = 'abs';
+        else C.seg(fd, { label: 'Target given as', options: [['frac', '% of surface q'], ['abs', 'Stress value']], get: () => s.tBy, set: (v) => (s.tBy = v) });
+        if (s.tBy === 'abs') sl(fd, s, 'target', 'Target Δσz', 0.01, qmax, 0.01, U.press);
+        else sl(fd, s, 'ratio', 'Target Δσz as % of q (e.g. 1/8 = 12.5 %)', 0.1, 99.9, 0.1, '%');
+        C.note(fd, 'Searches downward below point P (x_P, y_P) for the depth where the stress increase equals the target.');
+      } else if (s.find === 'offset') {
+        sl(fd, s, 'ratio', 'Stress as % of the value directly below the load', 0.1, 99.9, 0.1, '%');
+        C.note(fd, 'Uses depth z of point P; gives the horizontal distance from the (first) load where Δσz drops to this percentage.');
+      }
       const o = C.section(el, 'Depth range and layer average');
       sl(o, s, 'zMax', 'Depth shown in the section and chart', 1, en ? 200 : 60, 0.1, U.len);
       C.toggle(o, { label: 'Average increase in a layer (e.g. a clay layer)', get: () => s.avg, set: (v) => (s.avg = v) });

@@ -248,7 +248,24 @@
   }
 
   function lateral(p, U) {
-    const st = Steps();
+    const st = Steps(), pre = [];
+    if (p.layers.some((l) => l.src && l.src !== 'gamma')) {
+      p = Object.assign({}, p, { layers: p.layers.map((l, i) => {
+        if (!l.src || l.src === 'gamma') return l;
+        const g = P.layerUW(l, l.src, U.gw), t = P.layerUWtext(l, l.src, U.gw, g);
+        st.add(`Layer ${i + 1}: unit weights from the soil data`, t[0], t[1], `γ = ${f(g.gm)},  γ_sat = ${f(g.gsat)} ${U.gamma}${g.e !== undefined && l.src === 'gsw' ? `,  e = ${f(g.e)}` : ''}`);
+        pre.push({ k: `Layer ${i + 1}: γ / γ_sat`, v: `${f(g.gm)} / ${f(g.gsat)}`, u: U.gamma });
+        return Object.assign({}, l, { g: g.gm, gsat: g.gsat });
+      }) });
+    }
+    if (p.kInv && p.sub === 'press' && p.state !== '0') {
+      const K = p.Kg, pas = p.state === 'P';
+      if (!(K > 0) || (pas ? K <= 1 : K >= 1)) return fail([pas ? 'K_p must be larger than 1.' : 'K_a must be between 0 and 1.']);
+      const phi = pas ? 2 * Math.atan(sqrt(K)) / DEG - 90 : 90 - 2 * Math.atan(sqrt(K)) / DEG;
+      st.add('Friction angle from the earth pressure coefficient', pas ? 'K_p = tan²(45° + φ/2)  →  φ = 2 tan⁻¹√K_p − 90°' : 'K_a = tan²(45° − φ/2)  →  φ = 90° − 2 tan⁻¹√K_a', `${pas ? 'K_p' : 'K_a'} = ${f(K)}`, `φ = ${f(phi)}°`, pas ? `Same as sin φ = (K_p − 1)/(K_p + 1); K_a = 1/K_p = ${f(1 / K)}.` : `Same as sin φ = (1 − K_a)/(1 + K_a); K_p = 1/K_a = ${f(1 / K)}.`);
+      pre.unshift({ k: 'Friction angle φ', v: phi, u: '°', hl: true });
+      p = Object.assign({}, p, { theory: 'rankine', beta: 0, layers: p.layers.map((l) => Object.assign({}, l, { phi })) });
+    }
     if (!p.layers.length || p.layers.some((l) => !(l.H > 0) || !(l.g > 0))) return fail(['Each layer needs a positive thickness and unit weight.']);
     if (p.layers.some((l) => !(l.phi >= 0 && l.phi < 60))) return fail(['φ must be between 0° and 60°.']);
     if (p.sub === 'wall' && p.theory === 'rankine' && p.beta > 0 && p.layers.some((l) => p.beta >= l.phi)) return fail(['The backfill slope β must be smaller than φ.']);
@@ -260,7 +277,7 @@
       cls = min < 1 ? 'bad' : min < 1.1 ? 'warn' : 'ok';
       text = `FS overturning ${f(r.FSo, 3)} · sliding ${f(r.FSs, 3)}${r.FSb !== null ? ` · bearing ${f(r.FSb, 3)}` : ''}`;
     } else text = `P = ${f(r.r.Ps)} ${U.fpl} at ${f(r.r.yPs)} ${U.len}${r.r.Pw > 0 ? ` · P_w = ${f(r.r.Pw)}` : ''}`;
-    return { ok: true, err: [], warn: r.warn, status: { cls, text }, out: r.out, steps: st.list, geo: Object.assign({ kind: 'lat', sub: p.sub }, r) };
+    return { ok: true, err: [], warn: r.warn, status: { cls, text }, out: pre.concat(r.out), steps: st.list, geo: Object.assign({ kind: 'lat', sub: p.sub, layersU: p.layers }, r) };
   }
 
   Object.assign(P, { lateral, kRankine, kCoulomb, kRest, latPressure: pressure, wallGeom, polyArea: polyAC });

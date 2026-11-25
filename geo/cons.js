@@ -20,9 +20,36 @@
   }
   function TvofU(U) { if (U <= 0) return 0; if (U >= 1) return Infinity; return P.bisect(UofTv, U, 0, 10, 120); }
 
+  /** Settlement of a layer from a change in void ratio: ΔH = H Δe / (1 + e₀). */
+  function consDe(p, U) {
+    const st = Steps(), Lu = U.len;
+    const H = p.Hg, e0 = p.e0;
+    if (!(H > 0) || !(e0 > 0)) return fail(['Enter the layer thickness and e₀.']);
+    let ef, how;
+    switch (p.deBy) {
+      case 'by': ef = e0 * (1 - p.frac / 100); how = [`e_f = e₀ (1 − ${f(p.frac)} %)`, `e_f = ${f(e0)} × (1 − ${f(p.frac / 100)})`]; break;
+      case 'to': ef = e0 * (p.frac / 100); how = [`e_f = ${f(p.frac)} % of e₀`, `e_f = ${f(p.frac / 100)} × ${f(e0)}`]; break;
+      case 'de': ef = e0 - p.dE; how = ['e_f = e₀ − Δe', `e_f = ${f(e0)} − ${f(p.dE)}`]; break;
+      default: ef = p.ef; how = ['e_f given', ''];
+    }
+    if (!(ef >= 0)) return fail(['The final void ratio must not be negative.']);
+    st.add('Final void ratio', how[0], how[1], `e_f = ${f(ef)}`, 'Halved = decreased by 50 %; "decreased by one-third" = 66.67 % of e₀ remains; "decreased to one-third" = 33.33 % remains.');
+    const dH = (H * (e0 - ef)) / (1 + e0);
+    st.add('Change in thickness', 'ΔH = H (e₀ − e_f) / (1 + e₀)', `ΔH = ${f(H)} × (${f(e0)} − ${f(ef)}) / (1 + ${f(e0)})`, `ΔH = ${f(dH)} ${Lu} = ${f(dH * U.settleF)} ${U.settle}`, 'The solids keep their volume; the layer shortens by the lost void volume, V_s = H / (1 + e₀) per unit area.');
+    const out = [{ k: 'Reduction in thickness ΔH', v: dH, u: Lu, hl: true }, { k: '   in ' + U.settle, v: dH * U.settleF, u: U.settle }, { k: 'Final thickness H − ΔH', v: H - dH, u: Lu }, { k: 'Final void ratio e_f', v: ef, u: '' }, { k: 'Δe', v: e0 - ef, u: '' }, { k: 'Vertical strain ΔH / H', v: (dH / H) * 100, u: '%' }];
+    return { ok: true, err: [], warn: [], status: { cls: 'ok', text: `ΔH = ${f(dH)} ${Lu}` }, out, steps: st.list, geo: { kind: 'consDe', H, e0, ef, dH } };
+  }
+
   function consolidation(p, prof, U) {
+    if (p.method === 'de') return consDe(p, U);
     const st = Steps(), out = [], warn = [];
     const Lu = U.len, Pu = U.press;
+    if (p.src === 'given') {
+      if (!(p.Hg > 0) || !(p.s0g > 0)) return fail(['Enter the clay thickness and the initial effective stress.']);
+      // one clay layer whose effective stress at mid-depth equals the given σ′₀
+      prof = { by: 'gamma', wt: 0, cap: 0, q: 0, seep: 'none', layers: [{ soil: 'clay', H: p.Hg, g: U.gw + (2 * p.s0g) / p.Hg, gsat: U.gw + (2 * p.s0g) / p.Hg }] };
+      p = Object.assign({}, p, { layer: 0 });
+    }
     const pr = P.soilProfile(prof, U);
     if (pr.err) return fail(pr.err);
     const k = Math.min(pr.Ls.length - 1, Math.max(0, p.layer | 0));
@@ -72,7 +99,8 @@
     subs.forEach((q, j) => {
       const tag = n === 1 ? 'Mid-depth of the clay' : `Sublayer ${j + 1} (mid-depth z = ${f(q.zm)} ${Lu})`;
       if (n <= 5 || j === 0 || j === n - 1 || j === Math.floor(n / 2)) {
-        st.add(`${tag}: initial effective stress`, 'σ′₀ = σ − u  (from the soil profile)', `σ = ${f(q.s)},  u = ${f(q.u)}`, `σ′₀ = ${f(q.so)} ${Pu}`);
+        if (p.src === 'given') { if (j === 0) st.add('Initial effective stress (given)', 'σ′₀ = average effective overburden pressure in the clay', n > 1 ? `σ′₀ at mid-depth = ${f(p.s0g)} ${Pu}, varying with the submerged weight of the clay` : '', `σ′₀ = ${f(q.so)} ${Pu}`); }
+        else st.add(`${tag}: initial effective stress`, 'σ′₀ = σ − u  (from the soil profile)', `σ = ${f(q.s)},  u = ${f(q.u)}`, `σ′₀ = ${f(q.so)} ${Pu}`);
         st.add(`${tag}: stress increase and preconsolidation`, p.hist === 'NC' ? 'normally consolidated: σ′c = σ′₀' : p.hist === 'OCR' ? 'σ′c = OCR × σ′₀' : 'σ′c given (same margin above σ′₀ through the layer)', `Δσ = ${f(q.ds)} ${Pu},  σ′_f = σ′₀ + Δσ = ${f(q.sf)},  σ′c = ${f(q.sc)}`, q.kind === 'NC' ? 'Normally consolidated' : q.kind === 'OC-1' ? 'Overconsolidated, case 1 (σ′_f ≤ σ′c)' : 'Overconsolidated, case 2 (σ′_f > σ′c)');
         const fml = q.kind === 'NC' ? 'S = C_c H/(1+e₀) log(σ′_f/σ′₀)' : q.kind === 'OC-1' ? 'S = C_s H/(1+e₀) log(σ′_f/σ′₀)' : 'S = C_s H/(1+e₀) log(σ′c/σ′₀) + C_c H/(1+e₀) log(σ′_f/σ′c)';
         const sub = q.kind === 'NC' ? `S = ${f(Cc)} × ${f(h)}/(1+${f(e0)}) × log(${f(q.sf)}/${f(q.so)})` : q.kind === 'OC-1' ? `S = ${f(Cs)} × ${f(h)}/(1+${f(e0)}) × log(${f(q.sf)}/${f(q.so)})` : `S = ${f(Cs)} × ${f(h)}/(1+${f(e0)}) log(${f(q.sc)}/${f(q.so)}) + ${f(Cc)} × ${f(h)}/(1+${f(e0)}) log(${f(q.sf)}/${f(q.sc)})`;
@@ -87,10 +115,22 @@
     // time rate
     const Hdr = p.drain === 'double' ? H / 2 : H;
     st.add('Drainage path', p.drain === 'double' ? 'double drainage: H_dr = H / 2' : 'single drainage: H_dr = H', `H_dr = ${f(Hdr)} ${Lu}`, '', p.drain === 'double' ? 'Pervious layers above and below the clay.' : p.drain === 'top' ? 'Drains only through the top.' : 'Drains only through the bottom.');
-    const cv = p.cv;
+    let cv = p.cv;
     let t, Uavg, Tv;
-    if (!(cv > 0)) return fail(['c_v must be positive.']);
-    if (p.solve === 't') {
+    if (p.solve === 'cv') {
+      Uavg = Math.min(0.9999, Math.max(1e-4, p.U / 100));
+      Tv = TvofU(Uavg);
+      t = p.t;
+      if (!(t > 0)) return fail(['Enter the time for the given degree of consolidation.']);
+      const cvF = (Tv * Hdr * Hdr) / t;
+      cv = cvF;
+      st.add(`Time factor for U = ${f(p.U)} %`, Uavg < 0.6 ? 'T_v = (π/4) U²  (U < 60 %)' : 'T_v = 1.781 − 0.933 log(100 − U%)  (U ≥ 60 %)', Uavg < 0.6 ? `T_v = (π/4) × ${f(Uavg)}²` : `T_v = 1.781 − 0.933 log(100 − ${f(p.U)})`, `T_v = ${f(Uavg < 0.6 ? (PI / 4) * Uavg * Uavg : 1.781 - 0.933 * log10(100 - p.U))}  (exact series: ${f(Tv)}; U = 90 % gives 0.848, 50 % gives 0.197)`);
+      st.add('Coefficient of consolidation', 'c_v = T_v H_dr² / t', `c_v = ${f(Tv)} × ${f(Hdr)}² / ${f(t)}`, `c_v = ${f(cvF)} ${U.cv}`);
+      out.unshift({ k: 'Coefficient of consolidation c_v', v: cvF, u: U.cv, hl: true }, { k: '   per day', v: cvF / 365, u: U.cv.replace('yr', 'day') }, { k: '   per month (1/12 yr)', v: cvF / 12, u: U.cv.replace('yr', 'month') });
+      if (U.id === 'SI') out.splice(3, 0, { k: '   in cm²/s', v: (cvF * 1e4) / (365 * 86400), u: 'cm²/s' });
+      out.push({ k: 'Time factor T_v', v: Tv, u: '' });
+    } else if (!(cv > 0)) return fail(['c_v must be positive.']);
+    else if (p.solve === 't') {
       Uavg = Math.min(0.9999, Math.max(1e-4, p.U / 100));
       Tv = TvofU(Uavg);
       t = (Tv * Hdr * Hdr) / cv;
@@ -129,7 +169,7 @@
     const tvU = [];
     for (let i = 0; i <= 120; i++) { const tv = Math.pow(10, -3 + (4 * i) / 120); tvU.push([tv, UofTv(tv) * 100]); }
     const cls = 'ok';
-    return { ok: true, err: [], warn, status: { cls, text: `S_c = ${f(Sc * U.settleF)} ${U.settle}` + (p.solve === 't' ? ` · t(${f(p.U)} %) = ${f(t)} yr` : ` · U = ${f(Uavg * 100, 3)} % at ${f(t)} yr`) }, out, steps: st.list,
+    return { ok: true, err: [], warn, status: { cls, text: `S_c = ${f(Sc * U.settleF)} ${U.settle}` + (p.solve === 't' ? ` · t(${f(p.U)} %) = ${f(t)} yr` : p.solve === 'cv' ? ` · c_v = ${f(cv)} ${U.cv}` : ` · U = ${f(Uavg * 100, 3)} % at ${f(t)} yr`) }, out, steps: st.list,
       geo: { kind: 'cons', pr, k, zt, zb, H, subs, Sc, Ss, e0, Cc, Cs, Hdr, t, Tv, Uavg, curve, tvU, sec, mid, dsFn, p } };
   }
 

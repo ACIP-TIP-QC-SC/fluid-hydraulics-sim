@@ -13,8 +13,8 @@
   const DEFAULT = {
     by: 'gamma', wt: 2, cap: 0, capS: 100, capNeg: true, q: 0, seep: 'none', seepLayer: 1, dh: 0,
     layers: [
-      { soil: 'sand', H: 4, g: 17, gsat: 19, Gs: 2.65, e: 0.6, S: 40 },
-      { soil: 'clay', H: 5, g: 17.5, gsat: 18.5, Gs: 2.7, e: 1.0, S: 90 },
+      { soil: 'sand', H: 4, g: 17, gsat: 19, Gs: 2.65, e: 0.6, S: 40, src: 'gamma', w: 15, gd: 16 },
+      { soil: 'clay', H: 5, g: 17.5, gsat: 18.5, Gs: 2.7, e: 1.0, S: 90, src: 'gamma', w: 35, gd: 14 },
     ],
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -26,7 +26,7 @@
       const s = this.state;
       Object.keys(s).forEach((k) => delete s[k]);
       Object.assign(s, clone(DEFAULT), clone(p));
-      s.layers = (p.layers || DEFAULT.layers).map((l) => Object.assign({ soil: 'sand', H: 1, g: 17, gsat: 19, Gs: 2.65, e: 0.6, S: 50 }, clone(l)));
+      s.layers = (p.layers || DEFAULT.layers).map((l) => Object.assign({ soil: 'sand', H: 1, g: 17, gsat: 19, Gs: 2.65, e: 0.6, S: 50, src: 'gamma', w: 20, gd: 16 }, clone(l)));
     },
     convert(from, to) {
       if (from === to) return;
@@ -34,7 +34,7 @@
       const L = Math.pow(LEN, k), Gm = Math.pow(GAM, k), S = Math.pow(STR, k);
       const r = (x, d) => +(+x).toPrecision(d || 5);
       s.wt = r(s.wt * L); s.cap = r(s.cap * L); s.dh = r(s.dh * L); s.q = r(s.q * S);
-      s.layers.forEach((l) => { l.H = r(l.H * L); l.g = r(l.g * Gm); l.gsat = r(l.gsat * Gm); });
+      s.layers.forEach((l) => { l.H = r(l.H * L); l.g = r(l.g * Gm); l.gsat = r(l.gsat * Gm); if (l.gd !== undefined) l.gd = r(l.gd * Gm); });
     },
 
     /** Editor. o = { seepage: true|false } */
@@ -42,11 +42,14 @@
       o = o || {};
       const s = this.state, en = U.id === 'EN';
       const g = C.section(el, 'Soil profile (shared with Consolidation)');
-      C.seg(g, { label: 'Unit weights from', options: [['gamma', 'γ and γ_sat'], ['phase', 'G_s, e and S']], get: () => s.by, set: (v) => (s.by = v) });
+      C.seg(g, { label: 'Unit weights from', options: [['gamma', 'γ and γ_sat'], ['phase', 'G_s, e and S'], ['each', 'Each layer its own data']], get: () => s.by, set: (v) => (s.by = v) });
       const fields = s.by === 'phase'
         ? [{ k: 'H', label: 'Thickness H', unit: U.len }, { k: 'Gs', label: 'G_s', unit: '' }, { k: 'e', label: 'Void ratio e', unit: '' }, { k: 'S', label: 'S above GWT', unit: '%' }]
-        : [{ k: 'H', label: 'Thickness H', unit: U.len }, { k: 'g', label: 'γ (above GWT)', unit: U.gamma }, { k: 'gsat', label: 'γ_sat', unit: U.gamma }];
+        : s.by === 'each'
+          ? [{ k: 'src', label: 'Data given', options: root.Physics.UW_SRC }, { k: 'H', label: 'Thickness H', unit: U.len }].concat(root.Physics.uwFields(U))
+          : [{ k: 'H', label: 'Thickness H', unit: U.len }, { k: 'g', label: 'γ (above GWT)', unit: U.gamma }, { k: 'gsat', label: 'γ_sat', unit: U.gamma }];
       C.layers(g, { layers: s.layers, max: 5, fields, make: (ls) => { const l = ls[ls.length - 1] || DEFAULT.layers[0]; return Object.assign(clone(l), { soil: l.soil === 'clay' ? 'sand' : 'clay', H: en ? 10 : 3 }); } });
+      if (s.by === 'each') C.note(g, 'G_s, w (saturated): e = w G_s; the layer is saturated unless S above the water table is given. γ_d, γ_sat, S: n = (γ_sat − γ_d)/γw and γ = γ_d + S n γw.');
       const w = C.section(el, 'Water');
       C.slider(w, { label: 'Depth of the water table z_w (negative = water above ground)', min: en ? -30 : -10, max: en ? 200 : 60, step: 0.01, get: () => s.wt, set: (v) => (s.wt = v), unit: U.len });
       C.slider(w, { label: 'Capillary rise above the water table h_c', min: 0, max: en ? 30 : 10, step: 0.01, get: () => s.cap, set: (v) => (s.cap = v), unit: U.len, rebuild: true });

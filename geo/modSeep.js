@@ -16,10 +16,18 @@
       sub: 'const',
       const: { solve: 'k', L: 30, D: 10, h: 50, Q: 350, t: 120, k: 0.02, temp: false, T: 25, useE: false, e: 0.6 },
       fall: { solve: 'k', L: 15, D: 10, d: 1, h1: 100, h2: 50, t: 600, k: 2e-4, temp: false, T: 25 },
-      layers: { aniso: false, dh: 2, ih: 0.05, layers: [{ soil: 'sand', H: 1, k: 1e-4, kv: 1e-4 }, { soil: 'gravel', H: 2, k: 1e-3, kv: 1e-3 }, { soil: 'silt', H: 1.5, k: 1e-5, kv: 1e-5 }] },
+      layers: { aniso: false, vBy: 'dh', iv: 0.5, dh: 2, ih: 0.05, layers: [{ soil: 'sand', H: 1, k: 1e-4, kv: 1e-4 }, { soil: 'gravel', H: 2, k: 1e-3, kv: 1e-3 }, { soil: 'silt', H: 1.5, k: 1e-5, kv: 1e-5 }] },
       net: Object.assign({}, net0),
+      well: { type: 'unconfined', solve: 'k', Q: 69, qu: 'ls', k: 50, ku: 'mday', r1: 35, r2: 95, hBy: 'draw', H0: 27, s1: 1.1, s2: 0.5, h1: 25.9, h2: 26.5, b: 27 },
+      aq: { k: 35, ku: 'mday', iBy: 'heads', iFn: 'sin', dh: 10, L: 1000, Lalong: false, alpha: 0, tBy: 'norm', t: 4, W: 4000, n: 25, d: 4000 },
+      nc: { k: 3, ku: 'mday', H: 30, Nf: 4, Nd: 10, Lw: 0, uplift: true, nH: 1, toeBy: 'between', nB: 8, nT: 9, dB: 0, B: 25 },
     },
     presets: [
+      { name: 'CE Ref 5 May 2019 — pumping test, unconfined, 75 L/s, r 35/95 m, drawdowns 1.1/0.5 m, H 27 m → k = 65.51 m/day, T = 1716 m²/day', apply: (s) => { s.sub = 'well'; s.well = { type: 'unconfined', solve: 'k', Q: 75, qu: 'ls', k: 50, ku: 'mday', r1: 35, r2: 95, hBy: 'draw', H0: 27, s1: 1.1, s2: 0.5, h1: 25.9, h2: 26.5, b: 27 }; } },
+      { name: 'CE Ref 4 Nov 2018 Sit. 7 — 40 L/s, r 50/100 m, drawdowns 1.0/0.5 m, H 27 m → 3456 m³/day, k = 29.05 m/day, T = 763 m²/day', apply: (s) => { s.sub = 'well'; s.well = { type: 'unconfined', solve: 'k', Q: 75, qu: 'ls', k: 50, ku: 'mday', r1: 35, r2: 95, hBy: 'draw', H0: 27, s1: 1.1, s2: 0.5, h1: 25.9, h2: 26.5, b: 27, Q: 40, r1: 50, r2: 100, s1: 1, s2: 0.5 }; } },
+      { name: 'CE Ref 4 May 2015 — confined aquifer 4 m thick, k 35 m/day, Δh 10 m over 1000 m, 4 km wide, n 25 % → q = 5600 m³/day, v_s = 1.4 m/day, 2857 days for 4 km', apply: (s) => { s.sub = 'aquifer'; s.aq = { k: 35, ku: 'mday', iBy: 'heads', iFn: 'sin', dh: 10, L: 1000, Lalong: false, alpha: 0, tBy: 'norm', t: 4, W: 4000, n: 25, d: 4000 }; } },
+      { name: 'CE Ref 4 Nov 2016 #38 — sloping permeable layer 5°, 4 m thick, k 0.005 cm/s → 62.75 L/hr per m width', apply: (s) => { s.sub = 'aquifer'; s.aq = { k: 35, ku: 'mday', iBy: 'heads', iFn: 'sin', dh: 10, L: 1000, Lalong: false, alpha: 0, tBy: 'norm', t: 4, W: 4000, n: 25, d: 4000, k: 0.005, ku: 'cms', iBy: 'slope', alpha: 5, W: 1, n: 0 }; } },
+      { name: 'CE Ref 5 Nov 2021 Sit. 12 — flow net N_f 4, N_d 10, H 30 m, k 3 m/day; uplift at heel and toe, base 25 m → q 36 m³/day, U = 3679 kN/m', apply: (s) => { s.sub = 'netc'; s.nc = { k: 3, ku: 'mday', H: 30, Nf: 4, Nd: 10, Lw: 0, uplift: true, nH: 1, toeBy: 'between', nB: 8, nT: 9, dB: 0, B: 25 }; } },
       { name: 'Test S1 — constant head: L = 30 cm, D = 10 cm, h = 50 cm, Q = 350 cm³ in 120 s (k = 0.02228 cm/s)', apply: (s) => { s.sub = 'const'; Object.assign(s.const, { solve: 'k', L: 30, D: 10, h: 50, Q: 350, t: 120, temp: false, useE: false }); } },
       { name: 'Constant head with temperature correction (25 °C) and e = 0.55', apply: (s) => { s.sub = 'const'; Object.assign(s.const, { solve: 'k', L: 25, D: 7.5, h: 60, Q: 500, t: 180, temp: true, T: 25, useE: true, e: 0.55 }); } },
       { name: 'Test S2 — falling head: L = 15 cm, D = 10 cm, d = 1 cm, 100 → 50 cm in 600 s (k = 1.733 × 10⁻⁴ cm/s)', apply: (s) => { s.sub = 'fall'; Object.assign(s.fall, { solve: 'k', L: 15, D: 10, d: 1, h1: 100, h2: 50, t: 600, temp: false }); } },
@@ -39,14 +47,73 @@
       const s = this.state.sub;
       if (s === 'pile' || s === 'dam') return [[FL, 'flow line', 'ln'], [EQ, 'equipotential line', 'ln'], ['#8e44ad', 'point P'], ['#1e8449', 'exit element / heave prism', 'ln']];
       if (s === 'layers') return [['#2980b9', 'flow direction', 'ln'], ['#c0392b', 'total head', 'ln']];
+      if (s === 'well' || s === 'aquifer') return [['#1f6fa8', s === 'well' ? 'drawdown curve' : 'flow', 'ln'], [G.SOILS.sand.fill, 'aquifer', 'sq']];
+      if (s === 'netc') return [[FL, 'flow line (schematic)', 'ln'], [EQ, 'equipotential (schematic)', 'ln'], ['#8e44ad', 'uplift pressure', 'sq']];
       return [[WAT, 'water', 'sq'], [G.SOILS.sand.fill, 'soil specimen', 'sq'], ['#34495e', 'dimensions', 'ln']];
     },
     get plotCaption() { const s = this.state.sub; return s === 'fall' ? 'Head versus time' : s === 'pile' ? 'Pore pressure on the sheet pile' : s === 'dam' ? 'Uplift pressure on the base' : 'Charts'; },
 
     controls(el, C) {
       const S = this.state, U = root.App.U(), en = U.id === 'EN';
-      C.seg(el, { label: 'Situation', options: [['const', 'Constant head test'], ['fall', 'Falling head test'], ['layers', 'Layered soil'], ['pile', 'Flow net: sheet pile'], ['dam', 'Flow net: dam']], get: () => S.sub, set: (v) => (S.sub = v) });
+      C.seg(el, { label: 'Situation', options: [['const', 'Constant head test'], ['fall', 'Falling head test'], ['layers', 'Layered soil'], ['pile', 'Flow net: sheet pile'], ['dam', 'Flow net: dam'], ['netc', 'Flow net: counts given'], ['well', 'Pumping test (wells)'], ['aquifer', 'Aquifer / sloping layer']], get: () => S.sub, set: (v) => (S.sub = v) });
       const sl = (p, o, k, label, min, max, step, unit, extra) => C.slider(p, Object.assign({ label, min, max, step, get: () => o[k], set: (v) => (o[k] = v), unit }, extra || {}));
+      const kSel = (p, o) => C.select(p, { label: 'Unit of k', options: Object.entries(Physics.seepKUnits(U)).map(([k, t]) => [k, t[0]]), get: () => (Physics.seepKUnits(U)[o.ku] ? o.ku : Object.keys(Physics.seepKUnits(U))[0]), set: (v) => (o.ku = v) });
+      if (S.sub === 'well') {
+        const o = S.well, g = C.section(el, 'Aquifer and wells');
+        C.seg(g, { label: 'Aquifer', options: [['unconfined', 'Unconfined (water table)'], ['confined', 'Confined (artesian)']], get: () => o.type, set: (v) => (o.type = v) });
+        C.seg(g, { label: 'Solve for', options: [['k', 'k and T from Q'], ['Q', 'Q from k']], get: () => o.solve, set: (v) => (o.solve = v) });
+        if (o.solve === 'k') {
+          if (!Physics.seepQUnits(U)[o.qu]) o.qu = Object.keys(Physics.seepQUnits(U))[0];
+          C.select(g, { label: 'Unit of Q', options: Object.entries(Physics.seepQUnits(U)).map(([k, t]) => [k, t[0]]), get: () => o.qu, set: (v) => (o.qu = v) });
+          sl(g, o, 'Q', 'Pumping rate Q', 0, 10000, 0.001, (Physics.seepQUnits(U)[o.qu] || [''])[0]);
+        } else { kSel(g, o); sl(g, o, 'k', 'Coefficient of permeability k', 0, 1000, 1e-6, (Physics.seepKUnits(U)[o.ku] || [''])[0]); }
+        sl(g, o, 'r1', 'Distance to the nearer observation well r₁', 0.01, 2000, 0.01, U.len);
+        sl(g, o, 'r2', 'Distance to the farther observation well r₂', 0.01, 5000, 0.01, U.len);
+        if (o.type === 'confined') sl(g, o, 'b', 'Thickness of the confined aquifer b', 0.01, 500, 0.01, U.len);
+        C.seg(g, { label: 'Water levels given as', options: [['draw', 'Drawdowns'], ['heads', 'Heads above the base']], get: () => o.hBy, set: (v) => (o.hBy = v) });
+        if (o.hBy === 'draw') {
+          sl(g, o, 'H0', o.type === 'confined' ? 'Static head above the base of the aquifer H₀' : 'Static water table above the impervious base H₀ (well depth below it)', 0.01, 1000, 0.01, U.len);
+          sl(g, o, 's1', 'Drawdown at r₁', 0, 200, 0.001, U.len); sl(g, o, 's2', 'Drawdown at r₂', 0, 200, 0.001, U.len);
+          C.note(g, 'For a confined aquifer only the difference of the drawdowns matters, so H₀ can be any value above them.');
+        } else { sl(g, o, 'h1', 'Head at r₁ above the base h₁', 0, 1000, 0.001, U.len); sl(g, o, 'h2', 'Head at r₂ above the base h₂', 0, 1000, 0.001, U.len); }
+        return;
+      }
+      if (S.sub === 'aquifer') {
+        const o = S.aq, g = C.section(el, 'Aquifer or permeable layer');
+        kSel(g, o); sl(g, o, 'k', 'Coefficient of permeability k', 0, 1000, 1e-6, (Physics.seepKUnits(U)[o.ku] || [''])[0]);
+        sl(g, o, 'alpha', 'Slope of the layer α (0 = level)', 0, 60, 0.01, '°');
+        C.seg(g, { label: 'Gradient from', options: [['heads', 'Head difference Δh over L'], ['slope', 'Slope of the layer']], get: () => o.iBy, set: (v) => (o.iBy = v) });
+        if (o.iBy === 'heads') {
+          sl(g, o, 'dh', 'Difference in piezometric level Δh', 0, 500, 0.001, U.len);
+          sl(g, o, 'L', 'Distance between the observation points L', 0.01, 1e5, 0.01, U.len);
+          if (o.alpha > 0) C.toggle(g, { label: 'L is measured along the layer (off = horizontally, L/cos α is used)', get: () => o.Lalong, set: (v) => (o.Lalong = v) });
+        } else C.seg(g, { label: 'Gradient', options: [['sin', 'i = sin α (water table parallel)'], ['tan', 'i = tan α']], get: () => o.iFn, set: (v) => (o.iFn = v) });
+        sl(g, o, 't', 'Thickness of the layer', 0.001, 500, 0.001, U.len);
+        if (o.alpha > 0) C.seg(g, { label: 'Thickness measured', options: [['norm', 'Normal to the layer (area = thickness)'], ['vert', 'Vertically (area = H cos α)']], get: () => o.tBy, set: (v) => (o.tBy = v) });
+        sl(g, o, 'W', 'Width of the flow section (1 = per unit width)', 0.001, 1e5, 0.001, U.len);
+        const v = C.section(el, 'Seepage velocity and travel time');
+        sl(v, o, 'n', 'Porosity n (0 = skip)', 0, 90, 0.01, '%');
+        sl(v, o, 'd', 'Distance travelled (0 = skip)', 0, 1e5, 0.01, U.len);
+        return;
+      }
+      if (S.sub === 'netc') {
+        const o = S.nc, g = C.section(el, 'Flow net (counts from the drawing)');
+        kSel(g, o); sl(g, o, 'k', 'Coefficient of permeability k', 0, 1000, 1e-6, (Physics.seepKUnits(U)[o.ku] || [''])[0]);
+        sl(g, o, 'H', 'Head difference upstream − downstream H', 0.01, 300, 0.01, U.len);
+        sl(g, o, 'Nf', 'Number of flow channels N_f', 0.1, 50, 0.1, '');
+        sl(g, o, 'Nd', 'Number of equipotential drops N_d', 1, 100, 0.1, '');
+        sl(g, o, 'Lw', 'Length of the structure for total seepage (0 = skip)', 0, 5000, 0.1, U.len);
+        const u = C.section(el, 'Uplift on the base of the dam');
+        C.toggle(u, { label: 'Find the uplift', get: () => o.uplift, set: (v) => (o.uplift = v) });
+        if (o.uplift) {
+          sl(u, o, 'nH', 'Drops before the heel', 0, 100, 0.1, '');
+          C.seg(u, { label: 'Toe given by', options: [['between', 'Drops between heel and toe'], ['total', 'Drops before the toe']], get: () => o.toeBy, set: (v) => (o.toeBy = v) });
+          if (o.toeBy === 'between') sl(u, o, 'nB', 'Drops between the heel and the toe', 0, 100, 0.1, ''); else sl(u, o, 'nT', 'Drops before the toe', 0, 100, 0.1, '');
+          sl(u, o, 'dB', 'Depth of the base below the tailwater level d (0 = ignore)', 0, 50, 0.01, U.len);
+          sl(u, o, 'B', 'Base width heel to toe B (0 = skip the force)', 0, 300, 0.01, U.len);
+        }
+        return;
+      }
       if (S.sub === 'const' || S.sub === 'fall') {
         const o = S[S.sub], Ls = U.lenS;
         if (S.sub === 'const') C.seg(el, { label: 'Solve for', options: [['k', 'Permeability k'], ['Q', 'Volume Q']], get: () => o.solve, set: (v) => (o.solve = v) });
@@ -87,7 +154,9 @@
         });
         C.note(g, `Enter k in ${U.kField}; numbers like 1e-4 are accepted.`);
         const w = C.section(el, 'Flow');
-        sl(w, o, 'dh', 'Vertical flow: total head loss Δh', 0, 50, 0.01, U.len);
+        C.seg(w, { label: 'Vertical flow given by', options: [['dh', 'Total head loss Δh'], ['i', 'Gradient i']], get: () => o.vBy || 'dh', set: (v) => (o.vBy = v) });
+        if (o.vBy === 'i') sl(w, o, 'iv', 'Vertical flow: hydraulic gradient i (Δh = i H)', 0, 20, 0.001, '');
+        else sl(w, o, 'dh', 'Vertical flow: total head loss Δh', 0, 50, 0.01, U.len);
         sl(w, o, 'ih', 'Horizontal flow: hydraulic gradient i', 0, 1, 0.001, '');
         return;
       }
@@ -131,7 +200,7 @@
     compute(U) {
       const S = this.state, en = U.id === 'EN';
       const net = Object.assign({}, S.net, { gsat: en ? S.net.gsatEN : S.net.gsat });
-      return Physics.seepage({ sub: S.sub, const: S.const, fall: S.fall, layers: S.layers, net }, U);
+      return Physics.seepage({ sub: S.sub, const: S.const, fall: S.fall, layers: S.layers, net, well: S.well, aq: S.aq, nc: S.nc }, U);
     },
 
     onClick(pt, res) {
@@ -147,12 +216,17 @@
       if (g.kind === 'const') return drawConst(svg, g, U);
       if (g.kind === 'fall') return drawFall(svg, g, U);
       if (g.kind === 'layers') return drawLayers(svg, g, U, this.state.layers);
+      if (g.kind === 'well') return drawWell(svg, g, U);
+      if (g.kind === 'aquifer') return drawAquifer(svg, g, U);
+      if (g.kind === 'netc') return drawNetc(svg, g, U);
       return drawNet(svg, res, U, opts);
     },
     draw3D(V, res, U, opts) {
       const g = res.geo;
       if (g.kind === 'const' || g.kind === 'fall') return draw3DLab(V, g, U);
       if (g.kind === 'layers') return draw3DLayers(V, g, U, this.state.layers);
+      if (g.kind === 'well') return well3D(V, g, U);
+      if (g.kind === 'aquifer' || g.kind === 'netc') return simple3D(V, g, U);
       return draw3DNet(V, res, U, opts);
     },
     plot(svg, res, U) {
@@ -270,6 +344,98 @@
     D2.dim([-D / 2, sb], [D / 2, sb], `D = ${f(D)} ${Ls}`, -2 - 0.24 * L * D2.sc);
     D2.dim([-dd / 2, pipeTop], [dd / 2, pipeTop], `d = ${f(d)}${dd > d ? ' (drawn wider)' : ''}`, 12);
     infoBox(D2, [`a/A = ${f(g.a / g.A)},  t = ${f(g.t)} s`, `k = ${f(g.k)} ${U.kLab}`]);
+  }
+
+  /* ---------- pumping test ---------- */
+  function drawWell(svg, g, U) {
+    const R = g.r2 * 1.25, Ht = Math.max(g.H0, g.h2) * 1.25;
+    const D = root.UI.Draw2D(svg, { xmin: -0.12 * R, xmax: R, ymin: -0.12 * Ht, ymax: Ht }, { pad: 30 });
+    G.soilDefs(svg);
+    const base = 0, top = Ht * 0.92;
+    if (g.conf) {
+      G.soilRect(D, 0, base, R, g.b, 'sand');
+      G.soilRect(D, 0, g.b, R, top, 'clay');
+    } else G.soilRect(D, 0, base, R, top, 'sand');
+    D.line([0, 0], [R, 0], { stroke: '#2c3e50', sw: 2 });
+    D.text([R, 0], 'impervious base', { anchor: 'end', dy: 14, size: 10.5, color: '#5d6b7a' });
+    // drawdown curve h(r) = sqrt(h1² + (h2²−h1²) ln(r/r1)/ln(r2/r1)) (unconfined) or linear in ln r (confined)
+    const rw = 0.02 * R, pts = [];
+    for (let i = 0; i <= 60; i++) {
+      const r = rw + ((R - rw) * i) / 60, t = Math.log(r / g.r1) / Math.log(g.r2 / g.r1);
+      const hh = g.conf ? g.h1 + (g.h2 - g.h1) * t : Math.sqrt(Math.max(0, g.h1 * g.h1 + (g.h2 * g.h2 - g.h1 * g.h1) * t));
+      pts.push([r, hh]);
+    }
+    D.pline(pts, { stroke: '#1f6fa8', sw: 2.2 });
+    D.line([0, g.H0], [R, g.H0], { stroke: '#1f6fa8', sw: 1, dash: '6 4' });
+    D.text([R, g.H0], g.conf ? 'static piezometric level' : 'static water table', { anchor: 'end', dy: -5, size: 10.5, color: '#1f6fa8' });
+    // wells
+    D.poly([[-rw, 0], [rw, 0], [rw, top + 0.05 * Ht], [-rw, top + 0.05 * Ht]], { fill: '#ecf0f1', stroke: '#2c3e50', sw: 1.2 });
+    D.arrow([0, top], [0.06 * R, top + 0.06 * Ht], { color: '#1f6fa8', w: 1.6, head: 7 });
+    D.text([0.06 * R, top + 0.06 * Ht], `Q = ${f(g.Q * 86400)} ${U.len}³/day`, { dx: 4, size: 11.5, color: '#1f6fa8', weight: 700 });
+    [[g.r1, g.h1, '1'], [g.r2, g.h2, '2']].forEach(([r, hh, n]) => {
+      D.poly([[r - 0.4 * rw, 0], [r + 0.4 * rw, 0], [r + 0.4 * rw, top], [r - 0.4 * rw, top]], { fill: 'none', stroke: '#34495e', sw: 1 });
+      D.poly([[r - 0.4 * rw, 0], [r + 0.4 * rw, 0], [r + 0.4 * rw, hh], [r - 0.4 * rw, hh]], { fill: '#4aa3df', fop: 0.7 });
+      D.dim([r, 0], [r, hh], `h${n} = ${f(hh)}`, -12, { anchor: 'start', ldx: 6 });
+      D.dim([0, 0.03 * Ht * (n === '1' ? 1 : 3)], [r, 0.03 * Ht * (n === '1' ? 1 : 3)], `r${n} = ${f(r)}`, 0);
+    });
+    if (g.conf) D.text([0.5 * R, g.b], `b = ${f(g.b)} ${U.len}`, { dy: -4, size: 11, color: '#5b4a35' });
+  }
+  function well3D(V, g, U) {
+    const R = g.r2 * 1.2, Ht = Math.max(g.H0, g.h2) * 1.1;
+    G.soilBlock3D(V, 0, R, 0, 0.5 * R, [{ y0: 0, y1: Ht, soil: g.conf ? 'clay' : 'sand', sat: true }]);
+    [[0, 'pumped well'], [g.r1, 'r₁'], [g.r2, 'r₂']].forEach(([r, t]) => { V.line([[r, 0, 0.25 * R], [r, Ht * 1.15, 0.25 * R]], '#2c3e50', 2); V.label([r, Ht * 1.15, 0.25 * R], t, '#2c3e50'); });
+    V.label([R / 2, Ht, 0.5 * R], `k = ${f(g.k * 86400)} ${U.len}/day`, '#1f6fa8');
+    V.autoBounds();
+  }
+  /* ---------- aquifer / sloping layer ---------- */
+  function drawAquifer(svg, g, U) {
+    const L = 10, a = g.a, t = 1.6;
+    const D = root.UI.Draw2D(svg, { xmin: -1, xmax: L + 1, ymin: -L * Math.tan(a) - 3, ymax: 4 }, { pad: 30 });
+    G.soilDefs(svg);
+    const y = (x) => -x * Math.tan(a);
+    const tl = [[0, y(0)], [L, y(L)]], bl = [[0, y(0) - t / Math.cos(a)], [L, y(L) - t / Math.cos(a)]];
+    D.poly([tl[0], tl[1], bl[1], bl[0]], { fill: '#e8d5a3', fop: 0.85, stroke: '#5b4a35', sw: 1.2 });
+    D.poly([[0, y(0)], [L, y(L)], [L, y(L) + 1.4], [0, y(0) + 1.4]], { fill: '#bdc3c7', fop: 0.5, stroke: '#7f8c8d', sw: 1 });
+    D.poly([bl[0], bl[1], [L, bl[1][1] - 1], [0, bl[0][1] - 1]], { fill: '#bdc3c7', fop: 0.5, stroke: '#7f8c8d', sw: 1 });
+    D.text([L / 2, y(L / 2) + 0.7], 'impervious', { anchor: 'middle', size: 10.5, color: '#5d6b7a' });
+    for (let i = 1; i <= 3; i++) { const x = (L * i) / 4; D.arrow([x - 0.8, y(x - 0.8) - t / 2 / Math.cos(a)], [x + 0.8, y(x + 0.8) - t / 2 / Math.cos(a)], { color: '#1f6fa8', w: 2, head: 8 }); }
+    D.text([L / 2, y(L / 2) - t / Math.cos(a) - 1.4], `i = ${f(g.i)},  q = ${f(g.q * 86400)} ${U.len}³/day${g.vs ? `,  v_s = ${f(g.vs * 86400)} ${U.len}/day` : ''}`, { anchor: 'middle', size: 12, weight: 700, color: '#1f6fa8' });
+    if (g.time) D.text([L / 2, y(L / 2) - t / Math.cos(a) - 2.2], `travel time = ${f(g.time / 86400)} days`, { anchor: 'middle', size: 12, color: '#c0611a' });
+    if (!g.slope) { D.line([0.3, y(0.3)], [0.3, y(0.3) + 2.6], { stroke: '#34495e', sw: 2 }); D.line([L - 0.3, y(L - 0.3)], [L - 0.3, y(L - 0.3) + 2.1], { stroke: '#34495e', sw: 2 }); D.text([0.3, y(0.3) + 2.6], 'piezometer 1', { dy: -4, size: 10, color: '#34495e' }); D.text([L - 0.3, y(L - 0.3) + 2.1], `Δh = ${f(g.dh)}`, { anchor: 'end', dy: -4, size: 10, color: '#34495e' }); }
+  }
+  function simple3D(V, g, U) {
+    const L = 10, Wd = 4, a = g.a || 0;
+    if (g.kind === 'aquifer') {
+      G.soilBlock3D(V, 0, L, 0, Wd, [{ y0: -1.6, y1: 0, soil: 'sand', sat: true }]);
+      V.label([L / 2, 0, Wd], `q = ${f(g.q * 86400)} ${U.len}³/day`, '#1f6fa8');
+    } else {
+      G.soilBlock3D(V, -6, 16, 0, Wd, [{ y0: -6, y1: 0, soil: 'sand', sat: true }]);
+      V.box(0, 0, 0, 10, 6, Wd, '#c9c6bb', 0.95, '#6e6a5e');
+      V.label([5, 0, Wd], `q = ${f(g.q * 86400)} ${U.len}³/day per ${U.len}`, '#1f6fa8');
+    }
+    V.autoBounds();
+  }
+  /* ---------- flow net from counts ---------- */
+  function drawNetc(svg, g, U) {
+    const p = g.p, B = Math.max(p.B || 20, 1), H = p.H, gw = U.gw;
+    const D = root.UI.Draw2D(svg, { xmin: -0.5 * B, xmax: 1.5 * B, ymin: -0.9 * B, ymax: Math.max(H * 1.25, 0.4 * B) }, { pad: 30 });
+    G.soilDefs(svg);
+    G.soilRect(D, -0.5 * B, -0.7 * B, 1.5 * B, 0, 'sand');
+    D.poly([[0, 0], [B, 0], [0.25 * B, H * 1.12], [0, H * 1.12]], { fill: CONC, stroke: CONCD, sw: 1.4 });
+    D.poly([[-0.5 * B, 0], [0, 0], [0, H], [-0.5 * B, H]], { fill: WAT, fop: 0.5 });
+    D.fs([-0.25 * B, H], { label: `H = ${f(H)} ${U.len}` });
+    // flow lines (semi-ellipses) and equipotential ticks
+    const nf = Math.max(1, Math.round(p.Nf));
+    for (let j = 1; j <= nf; j++) { const r = (j / (nf + 0.4)) * 0.62 * B, pts = []; for (let i = 0; i <= 40; i++) { const t = Math.PI - (Math.PI * i) / 40; pts.push([B / 2 + (B / 2 + r) * Math.cos(t), -r * 0.9 * Math.sin(t)]); } D.pline(pts, { stroke: FL, sw: 1.2 }); }
+    const nd = Math.max(1, Math.round(p.Nd));
+    for (let i = 1; i < nd; i++) { const t = Math.PI - (Math.PI * i) / nd; D.line([B / 2 + 0.5 * B * Math.cos(t), 0], [B / 2 + 1.12 * B * Math.cos(t), -0.56 * B * Math.sin(t)], { stroke: EQ, sw: 1, dash: '4 3' }); }
+    if (g.uh !== null) {
+      const k = (0.35 * B) / Math.max(g.uh, g.ut, 1e-9);
+      D.poly([[0, 0], [B, 0], [B, -g.ut * k], [0, -g.uh * k]], { fill: '#8e44ad', fop: 0.18, stroke: '#8e44ad', sw: 1.4 });
+      D.text([0, -g.uh * k], `u_heel = ${f(g.uh)}`, { dx: 4, dy: 12, size: 11, color: '#8e44ad', weight: 700 });
+      D.text([B, -g.ut * k], `u_toe = ${f(g.ut)}`, { anchor: 'end', dx: -4, dy: 12, size: 11, color: '#8e44ad', weight: 700 });
+    }
+    D.text([B / 2, -0.8 * B], `q = k H N_f/N_d = ${f(g.q * 86400)} ${U.len}³/day per ${U.len}  (N_f = ${f(p.Nf)}, N_d = ${f(p.Nd)})`, { anchor: 'middle', size: 12, weight: 700, color: FL });
   }
 
   function draw3DLab(V, g, U) {

@@ -20,7 +20,8 @@
     q: { si: ['m²/s', 1], en: ['ft²/s', 10.7639, 1] }, kPa: { si: ['kPa', 1], en: ['psi', 0.145038, 144] },
     vel: { si: ['m/s', 1], en: ['ft/s', 3.28084, 1] }, GPa: { si: ['GPa', 1e9], en: ['ksi', 145.038, 144000] },
     MPa: { si: ['MPa', 1e6], en: ['ksi', 0.145038, 144000] }, rho: { si: ['kg/m³', 1], en: ['slug/ft³', 0.00194032, 1] },
-    nu: { si: ['mm²/s', 1e-6], en: ['×10⁻⁵ ft²/s', 1.07639, 1e-5] }, s: { si: ['s', 1], en: ['s', 1, 1] }, deg: { si: ['°', 1], en: ['°', 1, 1] }
+    nu: { si: ['mm²/s', 1e-6], en: ['×10⁻⁵ ft²/s', 1.07639, 1e-5] }, s: { si: ['s', 1], en: ['s', 1, 1] }, deg: { si: ['°', 1], en: ['°', 1, 1] },
+    pow: { si: ['kW', 1], en: ['hp', 1 / 0.7457, 550] }, kN: { si: ['kN', 1], en: ['lb', 224.809, 1] }, rpm: { si: ['rpm', 1], en: ['rpm', 1, 1] }
   };
   const S = { mi: 0, units: 'SI', view: '3d', egl: true, playing: true, speed: 1, simT: 0, P: {}, mode: {}, click: null, R: null, I: null, U: HP.units('SI'), A: {} };
   const dimOf = (p) => DIMS[p.dim || 'none'];

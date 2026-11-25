@@ -46,7 +46,7 @@ html.embedded nav.tabs { display: none; }
 .seg button + button { border-left-color: var(--rule); }
 
 /* Inputs */
-select, input[type="number"] { border-radius: 6px; font-family: var(--f-body); }
+select, input[type="number"], input.txt { border-radius: 6px; font-family: var(--f-body); }
 input[type="number"] { font-family: var(--f-mono); }
 
 /* Plain buttons: white with a thin border; hover in the accent. */

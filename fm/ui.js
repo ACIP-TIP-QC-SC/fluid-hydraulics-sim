@@ -76,6 +76,12 @@
       parent.append(h('div', { class: 'ctl-row' }, o.label ? h('label', { class: 'ctl-label' }, o.label) : null, wrap));
       return wrap;
     };
+    C.text = (parent, o) => {
+      const inp = h('input', { type: 'text', class: 'txt', value: o.get(), spellcheck: 'false', autocomplete: 'off', autocapitalize: 'off', 'aria-label': o.label });
+      inp.addEventListener('input', () => { o.set(inp.value); app.update(); });
+      parent.append(h('div', { class: 'ctl-row' }, h('label', { class: 'ctl-label' }, o.label), inp));
+      return inp;
+    };
     C.toggle = (parent, o) => {
       const cb = h('input', { type: 'checkbox', checked: !!o.get(), onchange: () => { o.set(cb.checked); o.rebuild === false ? app.update() : app.rebuild(); } });
       parent.append(h('div', { class: 'ctl-row toggle' }, h('label', null, cb, ' ', o.label)));

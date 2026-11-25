@@ -197,11 +197,17 @@
       { k: 'jang', label: 'Jet angle θ above the horizontal (− = pointing down)', dim: 'deg', min: -89, max: 89, step: 0.1, def: 0, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby !== 'slope' },
       { k: 'zw', label: 'Wall slope z (z H : 1 V)', min: 0, max: 20, step: 0.01, def: 1, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'slope' },
       { k: 'jdir', type: 'select', label: 'Jet points', def: 'up', modes: ['steady', 'drain', 'inflow'], options: [['up', 'Upward (wall leans back)'], ['down', 'Downward (wall overhangs)']], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'slope' },
-      { k: 'jfind', type: 'select', label: 'Jet question', def: 'land', modes: ['steady'], options: [['land', 'Where the jet lands'], ['pt', 'Height of the jet at a distance x_p'], ['cv', 'Coefficients from a measured point on the jet'], ['H', 'Head needed for the jet to pass a point']] },
+      { k: 'jfind', type: 'select', label: 'Jet question', def: 'land', modes: ['steady'], options: [['land', 'Where the jet lands'], ['pt', 'Height of the jet at a distance x_p'], ['cv', 'Coefficients from a measured point on the jet'], ['H', 'Head needed for the jet to pass a point'], ['vm', 'Coefficients from a measured jet velocity'], ['Qdj', 'Coefficients from measured Q and jet diameter'], ['HLv', 'Head and Cv from the head lost and jet velocity'], ['dQ', 'Orifice size for a required Q'], ['HQ', 'Head for a required Q'], ['psQ', 'Surface pressure for a required Q']] },
+      { k: 'vm', label: 'Measured jet velocity v (vena contracta)', dim: 'vel', min: 0.01, max: 200, step: 0.01, def: 8.53, modes: ['steady'], show: (P) => P.jfind === 'vm' || P.jfind === 'HLv' },
+      { k: 'dj', label: 'Measured jet diameter d_j', dim: 'mm', min: 1, max: 500, step: 0.1, def: 40, modes: ['steady'], show: (P) => P.jfind === 'Qdj' },
+      { k: 'HLm', label: 'Head lost in the orifice HL', dim: 'len', min: 0, max: 50, step: 0.001, def: 0.2, modes: ['steady'], show: (P) => P.jfind === 'HLv' },
+      { k: 'Qt', label: 'Required discharge Q', dim: 'Q', min: 0.00001, max: 10, step: 0.00001, def: 0.01, modes: ['steady'], show: (P) => ['dQ', 'HQ', 'psQ'].includes(P.jfind) },
       { k: 'xq', label: 'Horizontal distance x_p', dim: 'len', min: 0, max: 100, step: 0.001, def: 2, modes: ['steady'], show: (P) => P.jfind === 'pt' },
       { k: 'xm', label: 'Measured point: horizontal distance x', dim: 'len', min: 0.001, max: 100, step: 0.001, def: 1.52, modes: ['steady'], show: (P) => P.jfind === 'cv' || P.jfind === 'H' },
       { k: 'ym', label: 'Measured point: drop y below the orifice centre', dim: 'len', min: -50, max: 100, step: 0.001, def: 0.119, modes: ['steady'], show: (P) => P.jfind === 'cv' || P.jfind === 'H' },
-      { k: 'Qm', label: 'Measured discharge Q (0 = not measured)', dim: 'Q', min: 0, max: 10, step: 0.00001, def: 0, modes: ['steady'], show: (P) => P.jfind === 'cv' },
+      { k: 'Qm', label: 'Measured discharge Q (0 = not measured)', dim: 'Q', min: 0, max: 10, step: 0.00001, def: 0, modes: ['steady'], show: (P) => ['cv', 'vm', 'Qdj'].includes(P.jfind) },
+      { k: 'dsolve', type: 'select', label: 'Solve for', def: 't', modes: ['drain', 'twotank'], options: [['t', 'Time (from Cd and d)'], ['Cd', 'Cd from a measured time'], ['d', 'Orifice size for a given time']] },
+      { k: 'tm', label: 'Measured / required time t', dim: 's', min: 1, max: 1000000, step: 1, def: 600, modes: ['drain', 'twotank'], show: (P) => P.dsolve === 'Cd' || P.dsolve === 'd' },
       { k: 'shape', type: 'select', label: 'Tank shape', def: 'vcyl', modes: ['drain', 'twotank', 'inflow'], options: [['vcyl', 'Vertical cylinder'], ['rect', 'Rectangular'], ['cone', 'Cone (apex down)'], ['sphere', 'Sphere'], ['hcyl', 'Horizontal cylinder'], ['frustum', 'Frustum']] },
       { k: 'D', label: 'Tank diameter D', dim: 'len', min: 0.1, max: 20, step: 0.01, def: 2, show: (P, m) => m !== 'steady' && P.shape === 'vcyl' },
       { k: 'Lt', label: 'Tank length L', dim: 'len', min: 0.1, max: 20, step: 0.01, def: 2, show: (P, m) => m !== 'steady' && P.shape === 'rect' },
@@ -233,6 +239,12 @@
       { name: 'Schaum 12.56 — 1 in orifice, Cv 0.98, Cc 0.62, jet drops 3.08 ft in 8.19 ft (H 5.66 ft, 0.0632 cfs)', units: 'EN', mode: 'steady', set: { d: 1, Cd: 0.6076, Cv: 0.98, Cc: 0.62, ps: 0, y: 4, jang: 0, jfind: 'H', xm: 8.19, ym: 3.08 } },
       { name: 'Hibbeler 5-58 — 60 psi air over 4 ft of water, hole 2 ft above the ground (95.8 ft/s, 33.8 ft)', units: 'EN', mode: 'steady', set: { H: 4, d: 1, Cd: 1, Cv: 1, Cc: 1, ps: 60, y: 2, jang: 0, jfind: 'land' } },
       { name: 'CE Board 6-16 — side sloping 1H:1V, H 3 m, orifice 3.7 + 1.2 m above the ground, Cv 1 (7.672 m/s, 1.5 m rise, x 9.20 m; book 9.18 after rounding 0.1667 to 0.167)', mode: 'steady', set: { H: 3, d: 50, Cd: 1, Cv: 1, Cc: 1, ps: 0, y: 4.9, jby: 'slope', zw: 1, jdir: 'up', jfind: 'land' } },
+      { name: 'Schaum 12.10 — 50 mm orifice, H 4.57 m, jet 8.53 m/s, Q 0.0114 m³/s (Cv 0.901, Cd 0.613, Cc 0.680)', mode: 'steady', set: { H: 4.57, d: 50, Sg: 1, ps: 0, jang: 0, jfind: 'vm', vm: 8.53, Qm: 0.0114 } },
+      { name: 'Schaum 12.12 — 100 mm orifice, H 6.1 m, Cd 0.593: air pressure for Q 0.075 m³/s (p/γ 7.12 m)', mode: 'steady', set: { H: 6.1, d: 100, Sg: 1, ps: 0, Cd: 0.593, Cv: 0.98, Cc: 0.6051, jang: 0, jfind: 'psQ', Qt: 0.075 } },
+      { name: 'Schaum 12.54 — 2 in orifice, HL 0.540 ft, jet 22.5 ft/s, Cd 0.61 (H 8.39 ft, jet 1.59 in, Cv 0.97)', units: 'EN', mode: 'steady', set: { d: 2, Cd: 0.61, Cv: 0.97, Cc: 0.6289, ps: 0, jang: 0, jfind: 'HLv', HLm: 0.54, vm: 22.5 } },
+      { name: 'Schaum 12.55 — standard orifice for 0.016 m³/s under 8.69 m (50 mm)', mode: 'steady', set: { H: 8.69, Sg: 1, ps: 0, Cd: 0.61, Cv: 0.98, Cc: 0.6224, jang: 0, jfind: 'dQ', Qt: 0.016 } },
+      { name: 'Schaum 12.57 — oil Sg 0.8, 75 mm orifice, Q 0.026, jet 58.5 mm, H 7.47 m, air −152 mm Hg (Cd 0.601, Cc 0.608, Cv 0.988; book prints 0.580, 0.590, 0.982, which the printed data do not give)', mode: 'steady', set: { H: 7.47, d: 75, Sg: 0.8, ps: -20.27, jang: 0, jfind: 'Qdj', Qm: 0.026, dj: 58.5 } },
+      { name: 'Schaum 12.82 — tank 4.88 × 1.22 m, 1.22 m of oil empties in 10 min 10 s through 100 mm (Cd 0.620; book rounds to 0.60, and its 12.83 answer 0.314 m needs 0.62)', mode: 'drain', set: { H: 1.22, H2: 0, d: 100, Sg: 0.75, ps: 0, shape: 'rect', Lt: 4.88, Bt: 1.22, dsolve: 'Cd', tm: 610, tq: 0 } },
       { name: 'Slanted nozzle 30° up, H 4 m, 1.5 m above the ground', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 1.5, jang: 30, jfind: 'land' } },
       { name: 'Slanted jet 20° down: height where it meets a wall 2 m away', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 3, jang: -20, jfind: 'pt', xq: 2 } }
     ]
@@ -962,16 +974,18 @@
     modes: [['rect', 'Rectangular weir'], ['vnotch', 'Triangular (V-notch)'], ['trap', 'Trapezoidal / Cipolletti'], ['broad', 'Broad-crested weir'], ['unsteady', 'Lowering a reservoir over a weir']],
     speed: { unsteady: 100 }, stopAtEnd: true,
     params: [
-      { k: 'L', label: 'Crest length L', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, modes: ['rect', 'trap', 'broad', 'unsteady'] },
-      { k: 'solveFor', type: 'select', label: 'Solve for', def: 'Q', options: [['Q', 'Discharge Q (head H given)'], ['H', 'Head H (discharge Q given)']], modes: ['rect', 'vnotch', 'trap', 'broad'] },
-      { k: 'H', label: 'Head over the crest H', dim: 'len', min: 0.01, max: 3, step: 0.001, def: 0.4, modes: ['rect', 'vnotch', 'trap', 'broad'], show: (P) => P.solveFor !== 'H' },
-      { k: 'Qw', label: 'Discharge Q', dim: 'Q', min: 0.0001, max: 100, step: 0.0001, def: 1.396, log: true, modes: ['rect', 'vnotch', 'trap', 'broad'], show: (P) => P.solveFor === 'H' },
+      { k: 'L', label: 'Crest length L', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, modes: ['rect', 'trap', 'broad', 'unsteady'], show: (P, m) => m === 'unsteady' || P.solveFor !== 'L' },
+      { k: 'solveFor', type: 'select', label: 'Solve for', def: 'Q', options: [['Q', 'Discharge Q (head H given)'], ['H', 'Head H (discharge Q given)'], ['L', 'Crest length L (Q and H given)'], ['P', 'Crest height P (Q and the allowed upstream depth)'], ['C', 'Coefficient from a test (Q and H measured)']], modes: ['rect', 'vnotch', 'trap', 'broad'] },
+      { k: 'H', label: 'Head over the crest H', dim: 'len', min: 0.01, max: 3, step: 0.001, def: 0.4, modes: ['rect', 'vnotch', 'trap', 'broad'], show: (P) => P.solveFor !== 'H' && P.solveFor !== 'P' },
+      { k: 'Qw', label: 'Discharge Q', labelFn: (P) => (P.solveFor === 'C' ? 'Measured discharge Q' : 'Discharge Q'), dim: 'Q', min: 0.0001, max: 100, step: 0.0001, def: 1.396, log: true, modes: ['rect', 'vnotch', 'trap', 'broad'], show: (P) => P.solveFor && P.solveFor !== 'Q' },
+      { k: 'Ymax', label: 'Allowed upstream depth P + H', dim: 'len', min: 0.01, max: 20, step: 0.01, def: 1.5, modes: ['rect', 'vnotch', 'trap', 'broad'], show: (P) => P.solveFor === 'P' },
       { k: 'n', type: 'select', label: 'End contractions n', def: '0', options: [['0', 'n = 0 (suppressed)'], ['1', 'n = 1'], ['2', 'n = 2']], modes: ['rect'] },
-      { k: 'P', label: 'Weir height P', dim: 'len', min: 0, max: 10, step: 0.01, def: 1 },
+      { k: 'P', label: 'Weir height P', dim: 'len', min: 0, max: 10, step: 0.01, def: 1, show: (P, m) => m === 'unsteady' || P.solveFor !== 'P' },
       { k: 'b', label: 'Channel width b (≥ L)', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, modes: ['rect', 'vnotch', 'trap', 'broad'] },
       { k: 'approach', type: 'check', label: 'Include velocity of approach', def: false, modes: ['rect'] },
       { k: 'useCd', type: 'check', label: 'Use Cd instead of the formula constant', def: false, modes: ['rect', 'vnotch', 'trap', 'unsteady'] },
-      { k: 'Cd', label: 'Coefficient of discharge Cd', min: 0.55, max: 0.7, step: 0.001, def: 0.62, show: (P, m) => P.useCd || (m === 'trap' && Math.abs(P.zs - 0.25) > 1e-9) },
+      { k: 'Cd', label: 'Coefficient of discharge Cd', min: 0.55, max: 0.7, step: 0.001, def: 0.62, show: (P, m) => P.solveFor !== 'C' && (P.useCd || (m === 'trap' && Math.abs(P.zs - 0.25) > 1e-9)) },
+      { k: 'Cw', label: 'Weir factor C (m) in Q = C·L·H^(3/2) (0 = Francis 1.84 / 3.33)', min: 0, max: 5, step: 0.001, def: 0, modes: ['rect', 'trap', 'unsteady'], show: (P, m) => !P.useCd && P.solveFor !== 'C' && (m !== 'trap' || Math.abs(P.zs - 0.25) > 1e-9) },
       { k: 'theta', label: 'Notch angle θ', dim: 'deg', min: 10, max: 120, step: 0.5, def: 90, modes: ['vnotch'] },
       { k: 'zs', label: 'Side slope z (Cipolletti = 0.25)', dim: 'hv', min: 0, max: 2, step: 0.01, def: 0.25, modes: ['trap'] },
       { k: 'As', label: 'Reservoir surface area A_s', dim: 'area', min: 1, max: 1000000, step: 1, def: 10000, log: true, modes: ['unsteady'] },
@@ -996,13 +1010,19 @@
       { name: 'Find H — trapezoid z = 0.5, Q = 1.5 m³/s', mode: 'trap', set: { solveFor: 'H', L: 3, Qw: 1.5, zs: 0.5 } },
       { name: 'Find H — broad-crested, L = 3 m, Q = 1.3 m³/s', mode: 'broad', set: { solveFor: 'H', L: 3, Qw: 1.3 } },
       { name: 'Find H — submerged, tailwater 0.15 m, Q = 1.2 m³/s', mode: 'rect', set: { solveFor: 'H', L: 3, Qw: 1.2, ht: 0.15 } },
+      { name: 'Schaum 12.31 — test on an 8 ft suppressed weir 3 ft high, H 1.000 ft, Q 26.7 cfs (m 3.29 with approach, 3.34 without)', units: 'EN', mode: 'rect', set: { solveFor: 'C', L: 8, b: 8, P: 3, H: 1, Qw: 26.7, n: '0', approach: true, useCd: false, ht: -1 } },
+      { name: 'Schaum 12.33 — suppressed weir 25 ft, Q 375 cfs, m 3.42, water ≤ 6 ft deep (Z 3.41 ft)', units: 'EN', mode: 'rect', set: { solveFor: 'P', L: 25, b: 25, Qw: 375, Cw: 3.42, Ymax: 6, n: '0', approach: true, useCd: false, ht: -2 } },
+      { name: 'Schaum 12.34 — contracted weir 1.25 m high in a 2.5 m channel, Q 1.70, depth 2.00 m, m 1.88 (L 1.54 m)', mode: 'rect', set: { solveFor: 'L', b: 2.5, P: 1.25, H: 0.75, Qw: 1.7, Cw: 1.88, n: '2', approach: false, useCd: false, ht: -0.5 } },
+      { name: 'Schaum 12.39 — Cipolletti weir for H 1.54 ft at 122 cfs (L 19.0 ft)', units: 'EN', mode: 'trap', set: { solveFor: 'L', zs: 0.25, H: 1.54, Qw: 122, b: 30, useCd: false, ht: -1 } },
+      { name: 'Schaum 12.74 — 30 cfs in a flume 4 ft deep, 6 ft wide, m 3.33: crest height (2.71 ft; book 2.72)', units: 'EN', mode: 'rect', set: { solveFor: 'P', L: 6, b: 6, Qw: 30, Cw: 0, Ymax: 4, n: '0', approach: true, useCd: false, ht: -1 } },
+      { name: 'Schaum 12.75 — 10.9 m³/s over a 4.88 m suppressed weir, depth ≤ 2.44 m, m 1.85 (P 1.34 m)', mode: 'rect', set: { solveFor: 'P', L: 4.88, b: 4.88, Qw: 10.9, Cw: 1.85, Ymax: 2.44, n: '0', approach: true, useCd: false, ht: -0.5 } },
       { name: 'Lower a 10,000 m² reservoir 0.8 → 0.4 m', mode: 'unsteady', set: { As: 10000, H1: 0.8, H2: 0.4, L: 3 } }
     ]
   };
   MODS.push(M5);
   M5.tEnd = (R) => (R.data.mode === 'unsteady' ? R.data.tEnd : Infinity);
   M5.draw = function (ctx, W, H, R, A, T) {
-    const d = R.data, I = S.I, U = S.U, L = U.L, g = U.g, mode = d.mode;
+    const d = R.data, I = R.data.Iover ? Object.assign({}, S.I, R.data.Iover) : S.I, U = S.U, L = U.L, g = U.g, mode = d.mode;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     const Hh = sm(A, 'H', mode === 'unsteady' ? d.hAt(S.simT) : d.H, T.rdt, 10);
     const P = sm(A, 'P', I.P, T.rdt, 6), ht = mode === 'unsteady' ? -0.5 * Math.max(P, 0.2) : sm(A, 'ht', I.ht, T.rdt, 6);
@@ -1069,7 +1089,7 @@
     if (mode === 'unsteady' && S.simT >= d.tEnd - 1e-9) txt(ctx, 'H₂ reached — press Reset to run again', W / 2, 36, { align: 'center', bold: true, color: C.egl });
   };
   M5.drawAux = function (ctx, W, H, R, A) {
-    const d = R.data, I = S.I, U = S.U, L = U.L, mode = d.mode;
+    const d = R.data, I = R.data.Iover ? Object.assign({}, S.I, R.data.Iover) : S.I, U = S.U, L = U.L, mode = d.mode;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     const fw = mode === 'unsteady' ? W * 0.34 : W;
     const Hh = A.H || d.H, P = I.P, bch = mode === 'vnotch' ? Math.max(2 * Math.tan((I.theta * PI) / 360) * Hh * 1.6, 0.3) : Math.max(d.b || I.L, I.L);
@@ -1106,18 +1126,29 @@
   const N_CHIPS = [['Smooth concrete', 0.012], ['Finished concrete', 0.013], ['Brick', 0.015], ['Earth, clean', 0.022], ['Earth, weeds', 0.03], ['Natural stream', 0.035]];
   const M6 = {
     id: 'manning', tab: 'Open Channels', title: 'Open Channel Uniform Flow (Manning)', fn: 'manning',
-    modes: [['solveQ', 'Solve for Q (given depth)'], ['solveY', 'Solve for normal depth y_n'], ['solveSn', 'Solve for slope S or roughness n'], ['efficient', 'Most efficient section'], ['circular', 'Circular conduit, partly full']], speed: {},
+    modes: [['solveQ', 'Solve for Q (given depth)'], ['solveY', 'Solve for normal depth y_n'], ['solveSn', 'Solve for slope S or roughness n'], ['design', 'Design: width, size, diameter or depth'], ['efficient', 'Most efficient section'], ['circular', 'Circular conduit, partly full']], speed: {},
     modeDefaults: { circular: { y: 0.6, D: 1 } },
     params: [
       { k: 'section', type: 'select', label: 'Section', def: 'rect', options: [['rect', 'Rectangular'], ['trap', 'Trapezoidal'], ['tri', 'Triangular'], ['circ', 'Circular'], ['semi', 'Semicircular']], show: (P, m) => m !== 'circular', onSet: (P) => { if ((P.section === 'tri' || P.section === 'trap') && !(P.z > 0)) P.z = 1; if (P.section === 'circ' && P.y > P.D) P.y = +(0.6 * P.D).toFixed(3); if (P.section === 'semi' && P.y > P.D / 2) P.y = +(0.35 * P.D).toFixed(3); } },
-      { k: 'b', label: 'Bottom width b', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, show: (P, m) => m !== 'circular' && (P.section === 'rect' || P.section === 'trap') },
+      { k: 'unk', type: 'select', label: 'Find', def: 'b', modes: ['design'], options: [['b', 'Bottom width b (depth known)'], ['size', 'Size with fixed proportions'], ['D', 'Diameter D (pipe or semicircle)'], ['y', 'Depth y']] },
+      { k: 'given', type: 'select', label: 'Known', def: 'QS', modes: ['design'], options: [['QS', 'Discharge Q and slope S'], ['QV', 'Discharge Q and velocity V (finds S too)'], ['VS', 'Velocity V and slope S']] },
+      { k: 'b', label: 'Bottom width b', dim: 'len', min: 0.1, max: 50, step: 0.01, def: 3, show: (P, m) => m !== 'circular' && (P.section === 'rect' || P.section === 'trap') && !(m === 'design' && (P.unk === 'b' || P.unk === 'size')) },
       { k: 'z', label: 'Side slope z (H:V)', dim: 'hv', min: 0, max: 4, step: 0.01, def: 0, show: (P, m) => m !== 'circular' && (P.section === 'trap' || P.section === 'tri') },
-      { k: 'D', label: 'Diameter D', labelFn: (P, m) => (m !== 'circular' && P.section === 'semi' ? 'Diameter D (= 2r, top width when full)' : 'Diameter D'), dim: 'len', min: 0.1, max: 10, step: 0.01, def: 1, show: (P, m) => m === 'circular' || P.section === 'circ' || P.section === 'semi' },
-      { k: 'y', label: 'Depth y', dim: 'len', min: 0.01, max: 10, step: 0.001, def: 1.5, modes: ['solveQ', 'solveSn', 'circular'], maxFn: (P, m) => (m === 'circular' || P.section === 'circ' ? P.D : P.section === 'semi' ? P.D / 2 : 10) },
-      { k: 'n', label: 'Manning n', min: 0.009, max: 0.06, step: 0.0001, def: 0.013, chips: N_CHIPS, show: (P, m) => !(m === 'solveSn' && P.solveFor === 'n') },
-      { k: 'S', label: 'Bed slope S', min: 0.00001, max: 0.1, step: 0.00001, def: 0.001, log: true, show: (P, m) => !(m === 'solveSn' && P.solveFor === 'S') },
-      { k: 'Q', label: 'Discharge Q', dim: 'Q', min: 0.01, max: 500, step: 0.01, def: 10, log: true, modes: ['solveY', 'solveSn', 'efficient'] },
-      { k: 'solveFor', type: 'select', label: 'Solve for', def: 'S', options: [['S', 'Slope S'], ['n', 'Roughness n']], modes: ['solveSn'] }
+      { k: 'D', label: 'Diameter D', labelFn: (P, m) => (m !== 'circular' && P.section === 'semi' ? 'Diameter D (= 2r, top width when full)' : 'Diameter D'), dim: 'len', min: 0.1, max: 10, step: 0.01, def: 1, show: (P, m) => (m === 'circular' || P.section === 'circ' || P.section === 'semi') && !(m === 'design' && (P.unk === 'D' || P.unk === 'size')) },
+      { k: 'ry', label: 'Depth / width ratio y/b', min: 0.05, max: 5, step: 0.01, def: 0.5, modes: ['design'], show: (P) => P.unk === 'size' && P.section === 'rect' },
+      { k: 'best', type: 'check', label: 'Most efficient proportions b = 2y(√(1+z²) − z)', def: false, modes: ['design'], show: (P) => P.unk === 'size' && P.section === 'trap' },
+      { k: 'rb', label: 'Bottom width / depth ratio b/y', min: 0, max: 20, step: 0.01, def: 1, modes: ['design'], show: (P) => P.unk === 'size' && P.section === 'trap' && !P.best },
+      { k: 'fy', label: 'Fill ratio (y/D for a pipe, y/r for a semicircle)', min: 0.01, max: 1, step: 0.001, def: 1, modes: ['design'], show: (P) => (P.unk === 'size' || P.unk === 'D') && (P.section === 'circ' || P.section === 'semi') },
+      { k: 'y', label: 'Depth y', dim: 'len', min: 0.01, max: 10, step: 0.001, def: 1.5, modes: ['solveQ', 'solveSn', 'circular', 'design'], show: (P, m) => m !== 'design' || P.unk === 'b', maxFn: (P, m) => (m === 'circular' || P.section === 'circ' ? P.D : P.section === 'semi' ? P.D / 2 : 10) },
+      { k: 'nPar', label: 'Number of identical conduits', min: 1, max: 20, step: 1, def: 1, modes: ['design'] },
+      { k: 'form', type: 'select', label: 'Resistance formula', def: 'manning', modes: ['solveQ', 'solveY', 'solveSn', 'design'], options: [['manning', 'Manning n'], ['chezy', 'Chezy C']] },
+      { k: 'Cz', label: 'Chezy C', labelFn: () => (S.units === 'SI' ? 'Chezy C (m^½/s)' : 'Chezy C (ft^½/s)'), min: 1, max: 200, step: 0.1, def: 50, modes: ['solveQ', 'solveY', 'solveSn', 'design'], show: (P, m) => P.form === 'chezy' && !(m === 'solveSn' && P.solveFor === 'n') },
+      { k: 'n', label: 'Manning n', min: 0.009, max: 0.06, step: 0.0001, def: 0.013, chips: N_CHIPS, show: (P, m) => !(m === 'solveSn' && P.solveFor === 'n') && !(P.form === 'chezy' && m !== 'efficient' && m !== 'circular') },
+      { k: 'S', label: 'Bed slope S', min: 0.00001, max: 0.1, step: 0.00001, def: 0.001, log: true, show: (P, m) => !(m === 'solveSn' && P.solveFor === 'S') && !(m === 'design' && P.given === 'QV') },
+      { k: 'snBy', type: 'select', label: 'Flow given as', def: 'Q', modes: ['solveSn'], options: [['Q', 'Discharge Q'], ['V', 'Mean velocity V']] },
+      { k: 'Q', label: 'Discharge Q', labelFn: (P, m) => (m === 'design' && +P.nPar > 1 ? 'Total discharge Q' : 'Discharge Q'), dim: 'Q', min: 0.01, max: 500, step: 0.01, def: 10, log: true, modes: ['solveY', 'solveSn', 'efficient', 'design'], show: (P, m) => !(m === 'design' && P.given === 'VS') && !(m === 'solveSn' && P.snBy === 'V') },
+      { k: 'V', label: 'Mean velocity V', dim: 'vel', min: 0.01, max: 20, step: 0.001, def: 1, modes: ['solveSn', 'design'], show: (P, m) => (m === 'design' && P.given !== 'QS') || (m === 'solveSn' && P.snBy === 'V') },
+      { k: 'solveFor', type: 'select', label: 'Solve for', def: 'S', options: [['S', 'Slope S'], ['n', 'Roughness n or Chezy C']], modes: ['solveSn'] }
     ],
     presets: [
       { name: 'Test 10 — rectangle b = 3, y = 1.5, n = 0.013, S = 0.001', mode: 'solveQ', set: { section: 'rect', b: 3, y: 1.5, n: 0.013, S: 0.001 } },
@@ -1131,12 +1162,22 @@
       { name: 'Semicircular channel D = 2 m, depth 0.6 m', mode: 'solveQ', set: { section: 'semi', D: 2, y: 0.6, n: 0.013, S: 0.001 } },
       { name: 'Normal depth in a semicircular flume D = 1.5 m, Q = 1 m³/s', mode: 'solveY', set: { section: 'semi', D: 1.5, Q: 1, n: 0.012, S: 0.002 } },
       { name: 'Slope for a semicircular channel D = 3 m, y = 1.2 m, Q = 5 m³/s', mode: 'solveSn', set: { section: 'semi', D: 3, y: 1.2, Q: 5, n: 0.013, solveFor: 'S' } },
-      { name: 'Best section: semicircle flowing full for Q = 10 m³/s (vs D = 4 m)', mode: 'efficient', set: { section: 'semi', D: 4, Q: 10 } }
+      { name: 'Best section: semicircle flowing full for Q = 10 m³/s (vs D = 4 m)', mode: 'efficient', set: { section: 'semi', D: 4, Q: 10 } },
+      { name: 'Schaum 10.23 — width of a rectangle for 14 m³/s at 1.8 m deep, S 0.0004, n 0.010 (4.02 m)', mode: 'design', set: { section: 'rect', unk: 'b', given: 'QS', Q: 14, y: 1.8, S: 0.0004, n: 0.01, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.66(a) — rectangle y = b/2 for 2.1 m³/s at 1.3 m/s, n 0.020 (0.90 × 1.80 m, S 0.00196)', mode: 'design', set: { section: 'rect', unk: 'size', given: 'QV', ry: 0.5, Q: 2.1, V: 1.3, n: 0.02, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.66(b) — semicircle for 2.1 m³/s at 1.3 m/s, n 0.020 (r 1.014 m, S 0.00167)', mode: 'design', set: { section: 'semi', unk: 'size', given: 'QV', fy: 1, Q: 2.1, V: 1.3, n: 0.02, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.66(c) — trapezoid b = y, 1:1 sides, 2.1 m³/s at 1.3 m/s (0.90 m, S 0.00185)', mode: 'design', set: { section: 'trap', z: 1, unk: 'size', given: 'QV', rb: 1, best: false, Q: 2.1, V: 1.3, n: 0.02, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.86/10.87 — most efficient trapezoid, z = 2, 600 cfs at 3 ft/s, n 0.025 (b 4.22 ft, y 9 ft, S 0.000345)', units: 'EN', mode: 'design', set: { section: 'trap', z: 2, unk: 'size', given: 'QV', best: true, Q: 600, V: 3, n: 0.025, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.92 — sewer 80 % full, n 0.014, S 0.00018, 2.76 m³/s (D 2.32 m)', mode: 'design', set: { section: 'circ', unk: 'D', given: 'QS', fy: 0.8, Q: 2.76, S: 0.00018, n: 0.014, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.94 — 1.0 m pipe, 0.40 m³/s at 0.80 m/s (S 0.00059; y 0.61 m, book 0.63 from Fig. 10-1)', mode: 'design', set: { section: 'circ', D: 1, unk: 'y', given: 'QV', Q: 0.4, V: 0.8, n: 0.013, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.71 — rock trapezoid b 6.10 m, 1:1, n 0.030, 5.66 m³/s at 0.76 m/s (S 0.000675)', mode: 'design', set: { section: 'trap', b: 6.1, z: 1, unk: 'y', given: 'QV', Q: 5.66, V: 0.76, n: 0.03, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.75 — 60° V flume at 1.2 m/s, S 0.0020, n 0.014 (y 0.921 m)', mode: 'design', set: { section: 'tri', z: 0.57735, unk: 'y', given: 'VS', V: 1.2, S: 0.002, n: 0.014, form: 'manning', nPar: 1 } },
+      { name: 'Schaum 10.70 — rectangle 2.44 m, y 1.90 m, V 0.579 m/s, Chezy C = 100 fps units = 55.2 SI (S 0.000148)', mode: 'solveSn', set: { section: 'rect', b: 2.44, y: 1.9, snBy: 'V', V: 0.579, form: 'chezy', Cz: 55.21, solveFor: 'S' } }
     ]
   };
   MODS.push(M6);
   M6.draw = function (ctx, W, H, R, A, T) {
-    const d = R.data, U = S.U, L = U.L, I = S.I;
+    const d = R.data, U = S.U, L = U.L, I = d.Iover ? Object.assign({}, S.I, d.Iover) : S.I;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     const y = d.y, v = sm(A, 'v', d.v, T.rdt, 4);
     const ang = ((2 + (10 * (Math.log10(Math.max(d.S || I.S, 1e-5)) + 5)) / 4) * PI) / 180;
@@ -1216,7 +1257,7 @@
     if (o.sub) txt(ctx, o.sub, r.x + 12, r.y + 30, { size: 11, mono: true, color: C.muted });
   }
   M6.drawAux = function (ctx, W, H, R, A, T) {
-    const d = R.data, U = S.U, I = S.I; ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+    const d = R.data, U = S.U, I = d.Iover ? Object.assign({}, S.I, d.Iover) : S.I; ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     if (d.mode === 'efficient') {
       A.mt = (A.mt || 0) + T.rdt; const cyc = 7, ph = A.mt % cyc, f = ph < 1.5 ? 0 : ph < 3.5 ? sstep((ph - 1.5) / 2) : ph < 5 ? 1 : 1 - sstep((ph - 5) / 2);
       const from = d.morphFrom, to = d.morphTo;
@@ -1526,7 +1567,7 @@
 
   /* ---------------- Module 5: weir in a channel, 3D ---------------- */
   M5.drawIso = function (ctx, W, H, R, A, T) {
-    const d = R.data, I = S.I, U = S.U, L = U.L, g = U.g, mode = d.mode;
+    const d = R.data, I = R.data.Iover ? Object.assign({}, S.I, R.data.Iover) : S.I, U = S.U, L = U.L, g = U.g, mode = d.mode;
     const Hh = sm(A, 'H', mode === 'unsteady' ? d.hAt(S.simT) : d.H, T.rdt, 10);
     const Pw = sm(A, 'P', I.P, T.rdt, 6), ht = mode === 'unsteady' ? -0.5 * Math.max(Pw, 0.2) : sm(A, 'ht', I.ht, T.rdt, 6);
     const Q = mode === 'unsteady' ? d.m * d.Lw * Math.pow(Hh, 1.5) : d.Q;
@@ -1660,7 +1701,7 @@
     return { shape: d.shape, G: chanG(d.shape, I), y: d.y };
   }
   M6.drawIso = function (ctx, W, H, R, A, T) {
-    const d = R.data, U = S.U, L = U.L, I = S.I;
+    const d = R.data, U = S.U, L = U.L, I = d.Iover ? Object.assign({}, S.I, d.Iover) : S.I;
     const st = m6State(R, A), shape = st.shape, y = sm(A, 'iy', st.y, T.rdt, 6), v = sm(A, 'v', d.v, T.rdt, 4);
     const Sbed = d.S || I.S, ang = ((2 + (10 * (Math.log10(Math.max(Sbed, 1e-5)) + 5)) / 4) * PI) / 180, Sv = Math.tan(ang) * 0.8;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);

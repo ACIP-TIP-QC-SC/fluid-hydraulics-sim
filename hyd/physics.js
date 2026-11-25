@@ -218,9 +218,27 @@
     return o;
   }
 
+  // drain / two-tank: back-solve Cd or the orifice size from a measured time (time ∝ 1/(Cd·A_o))
+  function solveDrainCoef(o, I, U, CA, f, sub) {
+    S(o, 'Cd·A_o from the measured time', f + '  →  solve for Cd·A_o', sub, `Cd·A_o = ${fmt(CA)} ${U.A}`, 'Time is inversely proportional to Cd·A_o, so a measured time fixes their product.');
+    if (I.dsolve === 'Cd') {
+      const Ao = (PI * I.d * I.d) / 4, Cd = CA / Ao;
+      S(o, 'Coefficient of discharge', 'Cd = (Cd·A_o) / A_o', `Cd = ${fmt(CA)} / ${fmt(Ao)}`, fmt(Cd), 'Average value over the drain.');
+      if (Cd > 1) W(o, 'Cd comes out above 1, which is not possible. Check the time and dimensions.');
+      R(o, 'Coefficient of discharge Cd', Cd, '', true);
+      Object.assign(o.data, { Cd, Ao });
+    } else {
+      const Ao = CA / I.Cd, d = sqrt((4 * Ao) / PI), mm = U.sys === 'SI' ? 1000 : 12;
+      S(o, 'Orifice diameter', 'A_o = (Cd·A_o)/Cd,  d = √(4A_o/π)', `A_o = ${fmt(CA)} / ${fmt(I.Cd)} = ${fmt(Ao)}`, `d = ${fmt(d * mm)} ${U.sys === 'SI' ? 'mm' : 'in'}`, '');
+      R(o, 'Orifice diameter d', d * mm, U.sys === 'SI' ? 'mm' : 'in', true);
+      Object.assign(o.data, { Cd: I.Cd, Ao, d, Iover: { d } });
+    }
+  }
+
   HP.orifice = function (I, U) {
     const o = Out(), g = U.g, L = U.L, mode = I.mode;
-    const gam = I.Sg * U.gw, Ao = (PI * I.d * I.d) / 4, hp = I.ps / gam, s2g = sqrt(2 * g);
+    const gam = I.Sg * U.gw, s2g = sqrt(2 * g);
+    let Ao = (PI * I.d * I.d) / 4, hp = I.ps / gam;
     let Cd = I.Cd, Cv = I.Cv, Cc = I.Cc, K = Cd * Ao * s2g;
     // liquid layers (steady and draining only): layer 1 is the bottom liquid at the orifice
     const nL = mode === 'steady' || mode === 'drain' ? Math.max(1, Math.min(4, Math.round(+I.nLay || 1))) : 1;
@@ -229,7 +247,8 @@
     if (nL > 1) lay[0].t = I.H - lay.slice(1).reduce((a, l) => a + l.t, 0);
     let H1 = I.H;
     o.data = { mode, Ao, hp, K, Cv, Cd, Cc, d: I.d, y: I.y, g, H1, shape: I.shape };
-    if (!(mode === 'steady' && I.jfind === 'cv') && abs(Cc * Cv - Cd) > 0.005) W(o, `Cd should equal Cc × Cv (${fmt(Cc)} × ${fmt(Cv)} = ${fmt(Cc * Cv)}). Q uses Cd = ${fmt(Cd)}.`);
+    const jf0 = mode === 'steady' ? I.jfind || 'land' : 'land', ds0 = mode === 'drain' || mode === 'twotank' ? I.dsolve || 't' : 't';
+    if (!['cv', 'vm', 'Qdj', 'HLv'].includes(jf0) && ds0 !== 'Cd' && abs(Cc * Cv - Cd) > 0.005) W(o, `Cd should equal Cc × Cv (${fmt(Cc)} × ${fmt(Cv)} = ${fmt(Cc * Cv)}). Q uses Cd = ${fmt(Cd)}.`);
 
     S(o, nL > 1 ? 'Unit weight of the bottom liquid (layer 1)' : 'Unit weight of the liquid', nL > 1 ? 'γ₁ = Sg₁·γw' : 'γ = Sg·γw', `γ${nL > 1 ? '₁' : ''} = ${fmt(I.Sg)} × ${fmt(U.gw)}`, `${fmt(gam)} ${U.gam}`, nL > 1 ? 'The orifice discharges the bottom liquid first.' : 'Unit weight used for pressure head and jet power.');
     S(o, 'Orifice area', 'A_o = πd²/4', `A_o = π(${fmt(I.d)})²/4`, `${fmt(Ao)} ${U.A}`, 'Area of the orifice opening.');
@@ -291,6 +310,100 @@
         o.data.H1 = H1; o.data.Iover = { H: H1 };
       }
       K = Cd * Ao * s2g; Object.assign(o.data, { K, Cv, Cd, Cc });
+    }
+
+    // inverse problems from a measured or required discharge / velocity
+    if (['vm', 'Qdj', 'HLv', 'dQ', 'HQ', 'psQ'].includes(jf)) {
+      if (nL > 1 && ['HLv', 'HQ', 'psQ'].includes(jf)) return fail(o, 'This question works with one liquid in the tank. Set the layers to one liquid.');
+      const Hs0 = hp !== 0 ? 'H_T' : nL > 1 ? 'H_eq' : 'H';
+      if (jf === 'vm' || jf === 'Qdj') {
+        const vt0 = sqrt(2 * g * HT);
+        S(o, 'Theoretical velocity', `v_t = √(2g${Hs0})`, `v_t = √(2 × ${fmt(g)} × ${fmt(HT)})`, `${fmt(vt0)} ${U.v}`, 'Torricelli speed for the total head.');
+        if (!(I.Qm > 0) && jf === 'Qdj') return fail(o, 'Enter the measured discharge Q.');
+        if (I.Qm > 0) {
+          Cd = I.Qm / (Ao * vt0);
+          S(o, 'Coefficient of discharge', 'Cd = Q / (A_o·√(2gH))', `Cd = ${fmt(I.Qm)} / (${fmt(Ao)} × ${fmt(vt0)})`, fmt(Cd), 'Measured discharge over the ideal discharge.');
+        }
+        if (jf === 'vm') {
+          if (!(I.vm > 0)) return fail(o, 'Enter the measured jet velocity.');
+          Cv = I.vm / vt0;
+          S(o, 'Coefficient of velocity', 'Cv = v / √(2gH)', `Cv = ${fmt(I.vm)} / ${fmt(vt0)}`, fmt(Cv), 'Measured jet speed at the vena contracta over the ideal speed.');
+          if (I.Qm > 0) { Cc = Cd / Cv; S(o, 'Coefficient of contraction', 'Cc = Cd / Cv', `Cc = ${fmt(Cd)} / ${fmt(Cv)}`, fmt(Cc), ''); }
+          else { Cd = Cc * Cv; S(o, 'Coefficient of discharge', 'Cd = Cc·Cv', `Cd = ${fmt(Cc)} × ${fmt(Cv)}`, fmt(Cd), 'No discharge was measured, so Cc is taken as entered.'); }
+        } else {
+          if (!(I.dj > 0)) return fail(o, 'Enter the diameter of the jet at the vena contracta.');
+          Cc = (I.dj / I.d) ** 2;
+          S(o, 'Coefficient of contraction', 'Cc = a/A_o = (d_j/d)²', `Cc = (${fmt(I.dj)} / ${fmt(I.d)})²`, fmt(Cc), 'Jet area at the vena contracta over the orifice area.');
+          Cv = Cd / Cc;
+          S(o, 'Coefficient of velocity', 'Cv = Cd / Cc', `Cv = ${fmt(Cd)} / ${fmt(Cc)}`, fmt(Cv), '');
+        }
+        if (Cv > 1) W(o, 'Cv comes out above 1, which is not possible for a real jet. Check the measurements.');
+        R(o, 'Coefficient of velocity Cv', Cv, '', true); R(o, 'Coefficient of discharge Cd', Cd, '', I.Qm > 0 || jf === 'Qdj'); R(o, 'Coefficient of contraction Cc', Cc, '', I.Qm > 0 || jf === 'Qdj');
+      } else if (jf === 'HLv') {
+        if (!(I.vm > 0) || !(I.HLm >= 0)) return fail(o, 'Enter the jet velocity and the head lost.');
+        HT = I.HLm + (I.vm * I.vm) / (2 * g);
+        S(o, 'Total head from energy', 'H = HL + v²/(2g)', `H = ${fmt(I.HLm)} + ${fmt(I.vm)}²/(2 × ${fmt(g)})`, `${fmt(HT)} ${L}`, 'The head is either lost in the orifice or left as velocity head in the jet.');
+        const vt0 = sqrt(2 * g * HT);
+        Cv = I.vm / vt0;
+        S(o, 'Coefficient of velocity', 'Cv = v / √(2gH)', `Cv = ${fmt(I.vm)} / ${fmt(vt0)}`, fmt(Cv), '');
+        Cc = Cd / Cv;
+        S(o, 'Coefficient of contraction', 'Cc = Cd / Cv', `Cc = ${fmt(Cd)} / ${fmt(Cv)}`, fmt(Cc), '');
+        const dj = I.d * sqrt(Cc);
+        S(o, 'Diameter of the jet', 'd_j = d·√Cc', `d_j = ${fmt(I.d)} × √${fmt(Cc)}`, `${fmt(U.sys === 'SI' ? dj * 1000 : dj * 12)} ${U.sys === 'SI' ? 'mm' : 'in'}`, 'At the vena contracta.');
+        H1 = HT - hp;
+        if (hp !== 0) S(o, 'Liquid depth above the orifice', 'H = H_T − p_s/γ', `H = ${fmt(HT)} − ${P(I.ps)}/${fmt(gam)}`, `${fmt(H1)} ${L}`, '');
+        R(o, hp !== 0 ? 'Liquid depth above the orifice H' : 'Head causing flow H', H1, L, true); R(o, 'Coefficient of velocity Cv', Cv, '', true); R(o, 'Jet diameter d_j', U.sys === 'SI' ? dj * 1000 : dj * 12, U.sys === 'SI' ? 'mm' : 'in', true); R(o, 'Coefficient of contraction Cc', Cc, '');
+        o.data.H1 = H1; o.data.Iover = { H: H1 };
+      } else {
+        const Qt = I.Qt;
+        if (!(Qt > 0)) return fail(o, 'Enter the required discharge Q.');
+        if (jf === 'dQ') {
+          Ao = Qt / (Cd * sqrt(2 * g * HT));
+          const dn = sqrt((4 * Ao) / PI);
+          S(o, 'Orifice area needed', `A_o = Q / (Cd·√(2g${Hs0}))`, `A_o = ${fmt(Qt)} / (${fmt(Cd)} × √(2 × ${fmt(g)} × ${fmt(HT)}))`, `${fmt(Ao)} ${U.A}`, 'From Q = Cd·A_o·√(2gH).');
+          S(o, 'Orifice diameter', 'd = √(4A_o/π)', `d = √(4 × ${fmt(Ao)}/π)`, `${fmt(U.sys === 'SI' ? dn * 1000 : dn * 12)} ${U.sys === 'SI' ? 'mm' : 'in'}`, '');
+          R(o, 'Orifice diameter d', U.sys === 'SI' ? dn * 1000 : dn * 12, U.sys === 'SI' ? 'mm' : 'in', true);
+          o.data.Ao = Ao; o.data.d = dn; o.data.Iover = { d: dn };
+        } else {
+          const HTn = (Qt / (Cd * Ao)) ** 2 / (2 * g);
+          S(o, 'Total head needed', 'H_T = [Q / (Cd·A_o)]² / (2g)', `H_T = [${fmt(Qt)} / (${fmt(Cd)} × ${fmt(Ao)})]² / (2 × ${fmt(g)})`, `${fmt(HTn)} ${L}`, 'From Q = Cd·A_o·√(2gH_T).');
+          if (jf === 'HQ') {
+            H1 = HTn - hp;
+            if (hp !== 0) S(o, 'Liquid depth above the orifice', 'H = H_T − p_s/γ', `H = ${fmt(HTn)} − ${P(I.ps)}/${fmt(gam)}`, `${fmt(H1)} ${L}`, '');
+            if (!(H1 > 0)) return fail(o, 'The surface pressure alone gives more than this discharge, so no liquid depth is needed.');
+            R(o, 'Head on the orifice H', H1, L, true);
+            o.data.Iover = { H: H1 };
+          } else {
+            hp = HTn - H1;
+            const psn = hp * gam;
+            S(o, 'Pressure needed on the surface', 'p_s = γ(H_T − H)', `p_s = ${fmt(gam)} × (${fmt(HTn)} − ${fmt(H1)})`, `${fmt(psn)} ${U.p}`, `Pressure head ${fmt(hp)} ${L} of the liquid${psn < 0 ? ' (a vacuum)' : ''}.`);
+            R(o, 'Surface pressure p_s', psn, U.p, true);
+            R(o, 'Surface pressure p_s', U.sys === 'SI' ? psn / 6.894757 : psn / 144, 'psi');
+            o.data.hp = hp; o.data.Iover = { ps: psn };
+          }
+          HT = HTn; o.data.H1 = H1;
+        }
+      }
+      K = Cd * Ao * s2g; Object.assign(o.data, { K, Cv, Cd, Cc });
+    }
+
+    if (ds0 !== 't') {
+      if (!(I.tm > 0)) return fail(o, 'Enter the measured time.');
+      if (nL > 1) return fail(o, 'Back-solving from a measured time works with one liquid in the tank. Set the layers to one liquid.');
+      if (!(I.H2 < I.H)) return fail(o, 'The final level must be below the starting level.');
+      const shp = HP.tankShape(I), Hb = I.H2;
+      if (mode === 'twotank') {
+        if (!shp.constA) return fail(o, 'Choose a vertical cylinder or rectangular tank for the two-tank mode (constant surface areas).');
+        const A1 = shp.constA, A2 = I.A2;
+        solveDrainCoef(o, I, U, (2 * A1 * A2 * (sqrt(H1) - sqrt(Hb))) / (s2g * (A1 + A2) * I.tm), 't = 2A₁A₂(√H₁ − √H₂) / [Cd·A_o·√(2g)·(A₁ + A₂)]', `Cd·A_o = 2(${fmt(A1)})(${fmt(A2)})(√${fmt(H1)} − √${fmt(Hb)}) / [${fmt(s2g)} × ${fmt(A1 + A2)} × ${fmt(I.tm)}]`);
+      } else {
+        if (Hb + hp < 0) return fail(o, `With the vacuum on the surface, flow stops when h = ${fmt(-hp)} ${L}; H₂ is never reached.`);
+        const J = simpson((u) => 2 * shp.As(u * u - hp), sqrt(Hb + hp), sqrt(H1 + hp), 400);
+        const simple = shp.constA && !hp;
+        solveDrainCoef(o, I, U, J / (s2g * I.tm), simple ? 't = 2A_s(√H₁ − √H₂) / (Cd·A_o·√(2g))' : 't = ∫ A_s(h) dh / (Cd·A_o·√(2g(h + p/γ)))',
+          simple ? `Cd·A_o = 2(${fmt(shp.constA)})(√${fmt(H1)} − √${fmt(Hb)}) / (${fmt(s2g)} × ${fmt(I.tm)})` : `Cd·A_o = [∫ 2A_s du, u = √(h + p/γ)] / (√(2g)·t) = ${fmt(J)} / (${fmt(s2g)} × ${fmt(I.tm)})`);
+      }
+      ({ Cd, Ao } = o.data); Cc = Cd / Cv; K = Cd * Ao * s2g; Object.assign(o.data, { K, Cc });
     }
 
     const at = mode === 'steady' ? '' : ' (at H₁)';
@@ -941,8 +1054,8 @@
     const o = Out(), g = U.g, L = U.L, mode = I.mode, s2g = sqrt(2 * g);
     o.data = { mode };
     const H = mode === 'unsteady' ? I.H1 : I.H;
-    const Crect = I.useCd ? (2 / 3) * I.Cd * s2g : U.weir;
-    const CrectTxt = I.useCd ? `(2/3)Cd√(2g) = (2/3)(${fmt(I.Cd)})(${fmt(s2g)}) = ${fmt(Crect)}` : `${U.weir} (Francis, ${U.sys})`;
+    const Crect = I.useCd ? (2 / 3) * I.Cd * s2g : I.Cw > 0 ? I.Cw : U.weir;
+    const CrectTxt = I.useCd ? `(2/3)Cd√(2g) = (2/3)(${fmt(I.Cd)})(${fmt(s2g)}) = ${fmt(Crect)}` : I.Cw > 0 ? `${fmt(I.Cw)} (given)` : `${U.weir} (Francis, ${U.sys})`;
     let Q = 0, expo = 1.5;
     if (I.b < I.L && mode !== 'vnotch') W(o, 'The channel is narrower than the crest; the channel width is taken equal to L.');
     const b = Math.max(I.b, I.L);
@@ -1033,14 +1146,67 @@
   }
 
   /** Weirs: find Q from H (default), or H from a given Q by inverting the same equations. */
+  // weir back-solving: crest length, crest height (max upstream depth) or coefficient from a test
+  function weirInv(I, U) {
+    const mode = I.mode, L = U.L, g = U.g, s2g = sqrt(2 * g), Qt = I.Qw, sf = I.solveFor;
+    const bad = (t) => { const o = Out(); o.data = { mode }; return fail(o, t); };
+    if (!(Qt > 0)) return bad('Enter the discharge Q.');
+    const qOf = (J) => { const r = weirQ(Object.assign({}, I, J), U); return r.invalid ? NaN : r.data.Q; };
+    const root = (f, lo, hi) => { let it = 0; while (!(f(hi) > 0) && it < 80) { lo = hi; hi *= 2; it++; } if (!(f(hi) > 0)) return NaN; return bisect(f, lo, hi, 1e-12); };
+    let J, st, res;
+    if (sf === 'L') {
+      if (mode === 'vnotch') return bad('A V-notch has no crest length. Solve for the head or the coefficient instead.');
+      const Lx = root((x) => (qOf({ L: x, b: Math.max(I.b, x) }) || -1) - Qt, 0.1 * (+I.n || 0) * I.H + 1e-9, Math.max(I.L, 1));
+      if (!isFinite(Lx)) return bad('No crest length carries this discharge at this head.');
+      J = { L: Lx, b: Math.max(I.b, Lx) };
+      st = { t: 'Solve for the crest length L', f: 'find L such that Q(L, H) = Q', s: `Q = ${fmt(Qt)} ${U.Q}, H = ${fmt(I.H)} ${L}`, r: `L = ${fmt(Lx)} ${L}`, n: mode === 'rect' && (+I.n > 0 || I.approach) ? 'Solved by trial because the end contractions or the velocity of approach also depend on L.' : 'Q is proportional to L, so this is the weir equation rearranged.' };
+      res = { label: 'Crest length L', value: Lx, unit: L, em: true };
+    } else if (sf === 'P') {
+      const Y = I.Ymax;
+      if (!(Y > 0)) return bad('Enter the allowed upstream depth.');
+      const f = (h) => (qOf({ H: h, P: Y - h }) || 0) - Qt;
+      if (!(f(Y * (1 - 1e-9)) > 0)) return bad(`Even with the crest at the channel floor, a depth of ${fmt(Y)} ${L} cannot pass Q = ${fmt(Qt)} ${U.Q} over this weir.`);
+      const h = bisect(f, 1e-9, Y * (1 - 1e-9), 1e-12), Pc = Y - h;
+      J = { H: h, P: Pc };
+      st = { t: 'Solve for the crest height P', f: 'P + H = upstream depth;  find H with Q(H, P) = Q', s: `Q = ${fmt(Qt)} ${U.Q}, P + H = ${fmt(Y)} ${L}${I.approach && mode === 'rect' ? ', v_a = Q/[b(P + H)]' : ''}`, r: `H = ${fmt(h)} ${L},  P = ${fmt(Y)} − ${fmt(h)} = ${fmt(Pc)} ${L}`, n: 'The highest crest that keeps the upstream water at or below the allowed depth.' };
+      res = { label: 'Crest height P', value: Pc, unit: L, em: true };
+    } else {
+      if (mode === 'broad' || (mode === 'trap' && abs(I.zs - 0.25) < 1e-9 && !I.useCd)) {
+        const C = Qt / (I.L * pow(I.H, 1.5));
+        const o = weirQ(I, U); if (o.invalid) return o;
+        o.steps.unshift({ t: 'Weir coefficient from the test', f: 'C = Q / (L·H^(3/2))', s: `C = ${fmt(Qt)} / (${fmt(I.L)} × ${fmt(I.H)}^(3/2))`, r: fmt(C), n: 'Measured discharge over L·H^(3/2).' });
+        o.results.forEach((r) => { r.em = false; }); o.results.unshift({ label: 'Weir coefficient C', value: C, unit: '', em: true });
+        o.data.solveFor = sf; return o;
+      }
+      const Cd = root((c) => (qOf({ useCd: true, Cd: c }) || 0) - Qt, 1e-6, 1);
+      if (!isFinite(Cd)) return bad('No coefficient matches this test.');
+      J = { useCd: true, Cd };
+      const C = mode === 'vnotch' ? (8 / 15) * Cd * s2g : (2 / 3) * Cd * s2g;
+      st = { t: 'Coefficient from the test', f: mode === 'vnotch' ? 'find Cd with Q = (8/15)Cd√(2g)·tan(θ/2)·H^(5/2)' : `find Cd with Q = (2/3)Cd√(2g)·L′·${I.approach && mode === 'rect' ? '[(H + h_v)^(3/2) − h_v^(3/2)]' : 'H^(3/2)'}`, s: `Q = ${fmt(Qt)} ${U.Q}, H = ${fmt(I.H)} ${L}`, r: `Cd = ${fmt(Cd)},  ${mode === 'vnotch' ? 'C = (8/15)Cd√(2g)' : 'C (or m) = (2/3)Cd√(2g)'} = ${fmt(C)}`, n: mode === 'vnotch' ? 'C is the constant in Q = C·tan(θ/2)·H^(5/2).' : 'C is the weir factor in Q = C·L·H^(3/2).' };
+      res = [{ label: 'Coefficient of discharge Cd', value: Cd, unit: '', em: true }, { label: mode === 'vnotch' ? 'Notch constant C' : 'Weir factor C (m)', value: C, unit: '', em: true }];
+      if (mode === 'rect' && I.approach) {
+        const C0 = Qt / ((I.L - 0.1 * (+I.n || 0) * I.H) * pow(I.H, 1.5));
+        res.push({ label: 'Weir factor ignoring approach velocity', value: C0, unit: '', em: true });
+      }
+    }
+    const o = weirQ(Object.assign({}, I, J), U);
+    if (o.invalid) return o;
+    o.steps.unshift(st);
+    o.results.forEach((r) => { r.em = false; });
+    [].concat(res).reverse().forEach((r) => o.results.unshift(r));
+    o.data.solveFor = sf; o.data.Iover = J;
+    return o;
+  }
+
   HP.weir = function (I, U) {
+    if (['L', 'P', 'C'].includes(I.solveFor) && I.mode !== 'unsteady') return weirInv(I, U);
     if (I.solveFor !== 'H' || I.mode === 'unsteady') return weirQ(I, U);
     const mode = I.mode, L = U.L, g = U.g, s2g = sqrt(2 * g), Qt = I.Qw;
     const bad = (t) => { const o = Out(); o.data = { mode }; return fail(o, t); };
     if (!(Qt > 0)) return bad('Enter a discharge Q greater than zero to solve for the head.');
     const qAt = (h) => { const r = weirQ(Object.assign({}, I, { H: h }), U); return r.invalid ? NaN : r.data.Q; };
     const ht = I.ht > 0 ? I.ht : 0, n = mode === 'rect' ? +I.n : 0;
-    const Crect = I.useCd ? (2 / 3) * I.Cd * s2g : U.weir;
+    const Crect = I.useCd ? (2 / 3) * I.Cd * s2g : I.Cw > 0 ? I.Cw : U.weir;
     const tn = Math.tan((I.theta * PI) / 360);
     const Cv = I.useCd ? (8 / 15) * I.Cd * s2g * tn : U.vn * tn;
     const cip = mode === 'trap' && abs(I.zs - 0.25) < 1e-9 && !I.useCd;
@@ -1096,12 +1262,67 @@
     const shape = mode === 'circular' ? 'circ' : I.section;
     const G = { b: shape === 'tri' ? 0 : I.b, z: shape === 'rect' ? 0 : I.z, D: I.D };
     if (shape === 'tri' && !(I.z > 0)) return fail(o, 'A triangular channel needs a side slope z > 0.');
-    const semi = shape === 'semi', r0 = I.D / 2;
+    const semi = shape === 'semi'; let r0 = I.D / 2;
     const k = U.man;
-    const Qof = (y, n, S0, GG) => { const s = HP.section(shape, GG || G, y); return (k / n) * s.A * pow(s.R, 2 / 3) * sqrt(S0); };
-    const manTxt = `Q = (${U.manT})·A·R^(2/3)·S^(1/2)`;
+    const chz = I.form === 'chezy' && mode !== 'efficient' && mode !== 'circular', Cz = I.Cz;
+    if (chz && !(Cz > 0)) return fail(o, 'Give a Chezy coefficient C greater than zero.');
+    const Qof = (y, n, S0, GG) => { const s = HP.section(shape, GG || G, y); return chz ? Cz * s.A * sqrt(s.R * S0) : (k / n) * s.A * pow(s.R, 2 / 3) * sqrt(S0); };
+    const manTxt = chz ? 'Q = C·A·√(R·S)' : `Q = (${U.manT})·A·R^(2/3)·S^(1/2)`;
     o.data = { mode, shape, G };
     let y = I.y, n = I.n, S0 = I.S, Q;
+
+    if (mode === 'design') {
+      // find one unknown dimension from (Q, S), (Q, V) or (V, S); nPar identical conduits share Q
+      const unk = I.unk, giv = I.given, Np = Math.max(1, Math.round(+I.nPar || 1));
+      const fy = I.fy, best = I.best;
+      const geom = (u) => {
+        const Gg = { b: G.b, z: G.z, D: G.D }; let yy = I.y;
+        if (unk === 'y') yy = u;
+        else if (unk === 'b') Gg.b = u;
+        else if (unk === 'D') { Gg.D = u; yy = shape === 'semi' ? (fy * u) / 2 : fy * u; }
+        else {
+          if (shape === 'rect') { Gg.b = u; yy = I.ry * u; }
+          else if (shape === 'trap') { yy = u; Gg.b = best ? 2 * u * (sqrt(1 + G.z * G.z) - G.z) : I.rb * u; }
+          else if (shape === 'tri') yy = u;
+          else { Gg.D = u; yy = shape === 'semi' ? (fy * u) / 2 : fy * u; }
+        }
+        return { Gg, yy };
+      };
+      if (unk === 'b' && !(shape === 'rect' || shape === 'trap')) return fail(o, 'Solving for the bottom width needs a rectangular or trapezoidal section.');
+      if (unk === 'D' && !(shape === 'circ' || shape === 'semi')) return fail(o, 'Solving for the diameter needs a circular or semicircular section.');
+      if (unk === 'y' && shape === 'circ' && giv === 'QS') return fail(o, 'For the depth from Q and S, use "Solve for normal depth".');
+      if ((unk === 'D' || (unk === 'size' && (shape === 'circ' || shape === 'semi'))) && !(fy > 0 && fy <= 1)) return fail(o, 'The fill ratio must be between 0 and 1.');
+      const Qc = I.Q / Np;
+      const sec = (u) => { const q = geom(u); return HP.section(shape, q.Gg, q.yy); };
+      const Kof = (u) => { const sc = sec(u); return chz ? Cz * sc.A * sqrt(sc.R) : (k / n) * sc.A * pow(sc.R, 2 / 3); };
+      if (Np > 1) S(o, 'Flow in each conduit', 'Q₁ = Q / N', `Q₁ = ${fmt(I.Q)} / ${Np}`, `${fmt(Qc)} ${U.Q}`, `${Np} identical conduits share the flow.`);
+      let fun, txt;
+      if (giv === 'QS') { fun = (u) => Kof(u) * sqrt(I.S) - Qc; txt = manTxt + ` = ${fmt(Qc)}`; }
+      else if (giv === 'QV') { fun = (u) => sec(u).A - Qc / I.V; txt = `A = Q/V = ${fmt(Qc)} / ${fmt(I.V)} = ${fmt(Qc / I.V)} ${U.A}`; }
+      else { fun = (u) => (Kof(u) / sec(u).A) * sqrt(I.S) - I.V; txt = (chz ? 'V = C·√(R·S)' : `V = (${U.manT})·R^(2/3)·S^(1/2)`) + ` = ${fmt(I.V)}`; }
+      if (giv !== 'QS' && !(I.V > 0)) return fail(o, 'Give a velocity greater than zero.');
+      let lo = 1e-6, hi = unk === 'y' && shape === 'circ' ? G.D : unk === 'y' && shape === 'semi' ? G.D / 2 : 1;
+      if (!(unk === 'y' && (shape === 'circ' || shape === 'semi'))) { let it = 0; while (!(fun(hi) > 0) && it < 60) { hi *= 2; it++; } }
+      if (!(fun(lo) < 0 && fun(hi) > 0)) return fail(o, unk === 'y' && (shape === 'circ' || shape === 'semi') ? 'The conduit is too small for this flow even when full.' : 'No size satisfies these conditions; check the numbers.');
+      const u = bisect(fun, lo, hi);
+      const q = geom(u);
+      Object.assign(G, q.Gg); y = q.yy; r0 = G.D / 2;
+      const nm = { y: 'Depth y', b: 'Bottom width b', D: 'Diameter D', size: shape === 'rect' ? 'Width b' : shape === 'circ' || shape === 'semi' ? 'Diameter D' : 'Depth y' }[unk];
+      const rel = unk === 'size' ? (shape === 'rect' ? `with y = ${fmt(I.ry)}·b` : shape === 'trap' ? (best ? 'with the most efficient b = 2y(√(1+z²) − z)' : `with b = ${fmt(I.rb)}·y`) : shape === 'tri' ? '' : `flowing at y/${shape === 'semi' ? 'r' : 'D'} = ${fmt(fy)}`) : unk === 'D' ? `flowing at y/${shape === 'semi' ? 'r' : 'D'} = ${fmt(fy)}` : '';
+      S(o, `${nm} by trial`, txt, `bisection on ${nm.split(' ').pop()}${rel ? ' ' + rel : ''}`, `${nm.split(' ').pop()} = ${fmt(u)} ${L}`, giv === 'QV' ? 'The area must carry Q at the given velocity.' : giv === 'VS' ? 'Find the size whose hydraulic radius gives that velocity.' : 'Size that carries Q in uniform flow.');
+      if (giv === 'QV') {
+        const sc = sec(u), K = Kof(u); S0 = pow(Qc / K, 2);
+        S(o, 'Required slope', chz ? 'S = [Q / (C·A·√R)]²' : `S = [Q·n / (${k === 1 ? '' : '1.486·'}A·R^(2/3))]²`, chz ? `S = [${fmt(Qc)} / (${fmt(Cz)}·${fmt(sc.A)}·√${fmt(sc.R)})]²` : `S = [${fmt(Qc)}·${fmt(n)} / (${k === 1 ? '' : '1.486·'}${fmt(sc.A)}·${fmt(sc.R)}^(2/3))]²`, `S = ${fmt(S0)}`, '');
+        R(o, 'Required slope S', S0, '', true);
+      }
+      R(o, nm, u, L, true);
+      if (unk === 'size' && shape === 'rect') R(o, 'Depth y', y, L, true);
+      if (unk === 'size' && shape === 'trap') R(o, 'Bottom width b', G.b, L, true);
+      if ((unk === 'size' || unk === 'D') && shape === 'semi') R(o, 'Radius r', G.D / 2, L, true);
+      if ((unk === 'size' || unk === 'D') && (shape === 'circ' || shape === 'semi')) R(o, 'Depth y', y, L);
+      o.data.Iover = { b: G.b, z: G.z, D: G.D, y, S: S0 };
+      o.data.G = G;
+    }
 
     if (mode === 'efficient') {
       Q = I.Q;
@@ -1155,18 +1376,24 @@
       const rows = hist.filter((_, i) => i < 12 || i === hist.length - 1).map((r, i) => { const s = HP.section(shape, G, r[2]); return [i < 12 ? String(i + 1) : String(hist.length), fmt(r[2]), fmt(s.A), fmt(s.R), fmt(Qof(r[2], n, S0))]; });
       S(o, 'Normal depth by trial', `${manTxt} = ${fmt(Q)}`, 'bisection on y', `y_n = ${fmt(y)} ${L}`, 'Depth at which uniform flow carries Q.', { head: ['#', `y (${L})`, 'A', 'R', 'Q'], rows });
     } else if (mode === 'solveSn') {
-      Q = I.Q; const s = HP.section(shape, G, y);
-      if (I.solveFor === 'S') { S0 = pow((Q * n) / (k * s.A * pow(s.R, 2 / 3)), 2); S(o, 'Required slope', `S = [Q·n / (${k === 1 ? '' : '1.486·'}A·R^(2/3))]²`, `S = [${fmt(Q)}·${fmt(n)} / (${k === 1 ? '' : '1.486·'}${fmt(s.A)}·${fmt(s.R)}^(2/3))]²`, fmt(S0), 'Manning solved for S.'); }
+      const s = HP.section(shape, G, y); Q = I.snBy === 'V' ? I.V * s.A : I.Q;
+      if (I.snBy === 'V') S(o, 'Discharge from the velocity', 'Q = V·A', `Q = ${fmt(I.V)} × ${fmt(s.A)}`, `${fmt(Q)} ${U.Q}`, '');
+      if (chz && I.solveFor === 'S') { S0 = pow(Q / (Cz * s.A * sqrt(s.R)), 2); S(o, 'Required slope', 'S = [Q / (C·A·√R)]²', `S = [${fmt(Q)} / (${fmt(Cz)}·${fmt(s.A)}·√${fmt(s.R)})]²`, `S = ${fmt(S0)}`, 'Chezy formula.'); }
+      else if (chz) { const Cn = Q / (s.A * sqrt(s.R * S0)); o.data.Cneed = Cn; S(o, 'Required Chezy C', 'C = Q / (A·√(R·S))', `C = ${fmt(Q)} / (${fmt(s.A)}·√(${fmt(s.R)}·${fmt(S0)}))`, fmt(Cn), ''); }
+      else if (I.solveFor === 'S') { S0 = pow((Q * n) / (k * s.A * pow(s.R, 2 / 3)), 2); S(o, 'Required slope', `S = [Q·n / (${k === 1 ? '' : '1.486·'}A·R^(2/3))]²`, `S = [${fmt(Q)}·${fmt(n)} / (${k === 1 ? '' : '1.486·'}${fmt(s.A)}·${fmt(s.R)}^(2/3))]²`, fmt(S0), 'Manning solved for S.'); }
       else { n = (k * s.A * pow(s.R, 2 / 3) * sqrt(S0)) / Q; S(o, 'Required roughness', `n = ${k === 1 ? '' : '1.486·'}A·R^(2/3)·S^(1/2) / Q`, `n = ${k === 1 ? '' : '1.486·'}${fmt(s.A)}·${fmt(s.R)}^(2/3)·${fmt(S0)}^(1/2) / ${fmt(Q)}`, fmt(n), 'Manning solved for n.'); }
     }
     const s = HP.section(shape, G, y);
-    if (shape === 'circ' && y > I.D) return fail(o, 'Depth exceeds the pipe diameter.');
+    if (shape === 'circ' && y > G.D * (1 + 1e-9)) return fail(o, 'Depth exceeds the pipe diameter.');
     if (semi && y > r0 + 1e-12) return fail(o, `Depth y = ${fmt(y)} ${L} exceeds the radius r = ${fmt(r0)} ${L}: a semicircular channel is full at y = r.`);
     S(o, 'Section properties', secText[shape], (semi ? `r = ${fmt(r0)} ${L}, ` : '') + `y = ${fmt(y)} ${L}` + (shape === 'circ' || semi ? `, θ = ${fmt(s.theta)} rad` : ''), `A = ${fmt(s.A)} ${U.A}, P = ${fmt(s.P)} ${L}, T = ${fmt(s.T)} ${L}`, 'Area, wetted perimeter and top width.');
     S(o, 'Hydraulic radius', 'R = A/P', `R = ${fmt(s.A)}/${fmt(s.P)}`, `${fmt(s.R)} ${L}`, 'Area per unit of wetted boundary.');
-    const v = (k / n) * pow(s.R, 2 / 3) * sqrt(S0);
+    const CzUse = chz && mode === 'solveSn' && I.solveFor === 'n' ? o.data.Cneed : Cz;
+    if (chz) n = (k * pow(s.R, 1 / 6)) / CzUse;
+    const v = chz ? CzUse * sqrt(s.R * S0) : (k / n) * pow(s.R, 2 / 3) * sqrt(S0);
     Q = v * s.A;
-    S(o, 'Velocity (Manning)', `v = (${U.manT})·R^(2/3)·S^(1/2)`, `v = (${k === 1 ? '1' : '1.486'}/${fmt(n)})(${fmt(s.R)})^(2/3)(${fmt(S0)})^(1/2)`, `${fmt(v)} ${U.v}`, U.sys === 'EN' ? 'English units use 1.486/n.' : 'SI units use 1/n.');
+    if (chz) S(o, 'Velocity (Chezy)', 'v = C·√(R·S)', `v = ${fmt(CzUse)}·√(${fmt(s.R)}·${fmt(S0)})`, `${fmt(v)} ${U.v}`, `Equivalent Manning n = ${U.man === 1 ? '' : '1.486·'}R^(1/6)/C = ${fmt(n)}.`);
+    else S(o, 'Velocity (Manning)', `v = (${U.manT})·R^(2/3)·S^(1/2)`, `v = (${k === 1 ? '1' : '1.486'}/${fmt(n)})(${fmt(s.R)})^(2/3)(${fmt(S0)})^(1/2)`, `${fmt(v)} ${U.v}`, U.sys === 'EN' ? 'English units use 1.486/n.' : 'SI units use 1/n.');
     S(o, 'Discharge', manTxt, `Q = ${fmt(s.A)} × ${fmt(v)}`, `${fmt(Q)} ${U.Q}`, 'Q = A·v.');
     const C = (k * pow(s.R, 1 / 6)) / n;
     S(o, 'Chezy coefficient', `C = (${U.manT})·R^(1/6),  v = C√(RS)`, `C = ${k === 1 ? '' : '1.486·'}${fmt(s.R)}^(1/6)/${fmt(n)}`, `${fmt(C)} ${U.sys === 'SI' ? 'm^½/s' : 'ft^½/s'}`, `Check: C√(RS) = ${fmt(C * sqrt(s.R * S0))} ${U.v}.`);
@@ -1178,7 +1405,8 @@
     else S(o, 'Froude number and critical depth', 'F = v/√(gD_h);  Q²T/(gA³) = 1', `F = ${fmt(v)}/√(${fmt(g)}·${fmt(s.Dh)});  Q²T/(gA³) > 1 even at y = r`, `F = ${fmt(Fr)}, no y_c below the rim`, 'At this Q the flow would be supercritical at every depth up to the rim.');
     R(o, 'Area A', s.A, U.A); R(o, 'Wetted perimeter P', s.P, L); R(o, 'Hydraulic radius R', s.R, L, true); R(o, 'Top width T', s.T, L);
     if (mode === 'solveY') R(o, 'Normal depth y_n', y, L, true);
-    if (mode === 'solveSn') { if (I.solveFor === 'S') R(o, 'Required slope S', S0, '', true); else R(o, 'Required Manning n', n, '', true); }
+    if (mode === 'solveSn') { if (I.solveFor === 'S') R(o, 'Required slope S', S0, '', true); else if (chz) R(o, 'Required Chezy C', CzUse, '', true); else R(o, 'Required Manning n', n, '', true); }
+    if (mode === 'design' && Math.max(1, Math.round(+I.nPar || 1)) > 1) R(o, 'Total discharge (all conduits)', Q * Math.max(1, Math.round(+I.nPar || 1)), U.Q);
     R(o, 'Velocity v', v, U.v, true); R(o, 'Discharge Q', Q, U.Q, true); R(o, 'Chezy C', C, ''); R(o, 'Froude number F', Fr, ''); R(o, 'Critical depth y_c', isFinite(yc) ? yc : 'above the rim', isFinite(yc) ? L : ''); if (isFinite(yc)) R(o, 'Critical slope S_c', Sc, ''); R(o, 'Slope class', cls, '');
     if (Fr > 1) W(o, `Uniform flow here is supercritical (F = ${fmt(Fr)}).`, 'info');
     if (semi) {
@@ -1188,7 +1416,7 @@
       Object.assign(o.data, { Qf });
     }
     if (mode === 'circular') {
-      const sf = HP.section('circ', G, I.D), Qf = (k / n) * sf.A * pow(sf.R, 2 / 3) * sqrt(S0), vf = Qf / sf.A;
+      const sf = HP.section('circ', G, G.D), Qf = (k / n) * sf.A * pow(sf.R, 2 / 3) * sqrt(S0), vf = Qf / sf.A;
       S(o, 'Pipe flowing full', 'A_f = πD²/4,  R_f = D/4', `Q_f = (${U.manT})(${fmt(sf.A)})(${fmt(sf.R)})^(2/3)(${fmt(S0)})^(1/2)`, `Q_f = ${fmt(Qf)} ${U.Q}, v_f = ${fmt(vf)} ${U.v}`, `Q/Q_f = ${fmt(Q / Qf)}, v/v_f = ${fmt(v / vf)}.`);
       R(o, 'Q/Q_full', Q / Qf, '', true); R(o, 'v/v_full', v / vf, ''); R(o, 'Q full', Qf, U.Q);
       Object.assign(o.data, { Qf, vf });

@@ -496,6 +496,167 @@
     },
   };
 
+  /* ---------------- Hydrostatic forces: gate equilibrium ---------------- */
+  X.gate = {
+    mod: 'm1', label: 'Gate equilibrium (hinge, strut, weight)',
+    def: { gk: 'plate', gs: 'P', sgG: 1, gwG: 0, bG: 1, psG: 0, Lg: 3, thG: 90, lean: 'above', hB: 3, sH: 0, supK: 'horiz', sP: 3, phiP: 180, Wg: 0, Wc: 0, xC: 1, sg2G: 1, h2G: 0, ptxt: '0, 4\n2, 4\n5, 0', xH: 0, yH: 4, hS: 5, xP: 5, yP: 0, yC: 0, mu: 0.3, eCP: 0.1, cpShape: 'rect', Dcp: 2 },
+    controls(x, el, C, U, sl) {
+      C.select(el, { label: 'Find', options: [['P', 'Support force and hinge reactions'], ['h', 'Liquid depth at which the gate opens'], ['Wc', 'Counterweight that holds it'], ['Wg', 'Gate weight that holds it'], ['lift', 'Force to lift a gate in guides (friction)'], ['cpe', 'Depth for a given CP below the centroid']], get: () => x.gs, set: (v) => (x.gs = v) });
+      C.sg(el, { get: () => x.sgG, set: (v) => (x.sgG = v) });
+      sl(el, 'gwG', 'γ of water if the book uses another value (0 = standard)', 0, 70, 0.01, U.gamma);
+      if (x.gs === 'cpe') {
+        const g = C.section(el, 'Plate');
+        C.seg(g, { label: 'Shape', options: [['rect', 'Rectangle'], ['circ', 'Circle']], get: () => x.cpShape, set: (v) => (x.cpShape = v) });
+        if (x.cpShape === 'circ') sl(g, 'Dcp', 'Diameter D', 0.01, 50, 0.001, U.len);
+        else { sl(g, 'Lg', 'Height L (down the plate)', 0.01, 50, 0.001, U.len); sl(g, 'bG', 'Width b', 0.01, 50, 0.001, U.len); }
+        sl(g, 'thG', 'Plate angle θ from horizontal (90 = vertical)', 5, 90, 0.1, '°');
+        sl(g, 'eCP', 'CP below the centroid, along the plate (or pivot below the centroid)', 0.0001, 10, 0.0001, U.len);
+        return;
+      }
+      if (x.gs !== 'lift') C.seg(el, { label: 'Gate shape', options: [['plate', 'Straight plate'], ['poly', 'Bent / any shape (corners)']], get: () => x.gk, set: (v) => (x.gk = v) });
+      const g = C.section(el, 'Gate');
+      sl(g, 'bG', 'Width b (perpendicular to the page)', 0.01, 100, 0.001, U.len);
+      const plate = x.gk !== 'poly' || x.gs === 'lift';
+      if (plate) {
+        sl(g, 'Lg', 'Length L', 0.01, 100, 0.001, U.len);
+        sl(g, 'thG', 'Angle θ from horizontal (90 = vertical)', 1, 90, 0.1, '°');
+        if (x.thG < 90) C.seg(g, { label: 'Liquid is', options: [['above', 'On top of the plate'], ['under', 'Under the plate (it leans over the liquid)']], get: () => x.lean, set: (v) => (x.lean = v) });
+        if (x.gs !== 'h') sl(g, 'hB', 'Liquid depth above the bottom edge', 0, 200, 0.001, U.len);
+        if (x.gs !== 'lift') sl(g, 'sH', 'Hinge / pivot: distance down the gate from its top edge (0 = top, L = bottom)', 0, 100, 0.001, U.len);
+      } else {
+        C.note(g, 'One corner per line as "x, y" (y up). List them so the liquid is on your LEFT as you walk along the gate.');
+        const ta = root.UI.h('textarea', { rows: 5, class: 'num', style: { width: '100%', fontFamily: 'IBM Plex Mono, monospace', fontSize: '13px' } });
+        ta.value = x.ptxt; ta.addEventListener('input', () => { x.ptxt = ta.value; root.App.update(); }); g.append(ta);
+        sl(g, 'xH', 'Hinge x', -100, 100, 0.001, U.len); sl(g, 'yH', 'Hinge y', -100, 100, 0.001, U.len);
+        if (x.gs !== 'h') sl(g, 'hS', 'Liquid surface elevation y = h', -100, 200, 0.001, U.len);
+      }
+      const ld = C.section(el, 'Loads');
+      if (x.gs !== 'Wg') sl(ld, 'Wg', 'Gate weight W (uniform along the gate)', 0, 1e7, 0.01, U.force);
+      if (x.gs === 'lift') { sl(ld, 'mu', 'Friction coefficient in the guides μ', 0, 1, 0.001, ''); }
+      else {
+        if (x.gs !== 'Wc') sl(ld, 'Wc', 'Counterweight (0 = none)', 0, 1e7, 0.01, U.force);
+        if (plate) sl(ld, 'xC', 'Counterweight: horizontal distance right of the hinge (− = left)', -100, 100, 0.001, U.len);
+        else { sl(ld, 'xC', 'Counterweight x', -100, 100, 0.001, U.len); sl(ld, 'yC', 'Counterweight y', -100, 100, 0.001, U.len); }
+        sl(ld, 'psG', 'Gas pressure on the liquid surface (gauge)', 0, 1000, 0.01, U.press);
+        sl(ld, 'h2G', plate ? 'Liquid 2 on the right: surface height above the bottom edge (0 = none)' : 'Liquid 2 on the right: surface elevation (0 = none)', 0, 200, 0.001, U.len);
+        if (x.h2G > 0) sl(ld, 'sg2G', 'Liquid 2 specific gravity', 0.5, 13.6, 0.001, '');
+        if (x.gs === 'P') {
+          const sp = C.section(el, 'Support (stop, strut, cable or applied force)');
+          C.select(sp, { label: 'Support', options: [['none', 'None (unbalanced moment only)']].concat(plate ? [['normal', 'Normal to the gate (smooth stop)']] : []).concat([['horiz', 'Horizontal'], ['vert', 'Vertical'], ['ang', 'At an angle φ (strut or cable)']]), get: () => x.supK, set: (v) => (x.supK = v) });
+          if (x.supK !== 'none') {
+            if (plate) sl(sp, 'sP', 'Support: distance down the gate from its top edge', 0, 100, 0.001, U.len);
+            else { sl(sp, 'xP', 'Support x', -100, 100, 0.001, U.len); sl(sp, 'yP', 'Support y', -100, 100, 0.001, U.len); }
+            if (x.supK === 'ang') sl(sp, 'phiP', 'Direction φ of the support force, from +x (counter-clockwise)', -180, 360, 0.1, '°');
+            C.note(sp, 'A positive answer means the support pushes in the direction drawn; negative means it pulls.');
+          }
+        }
+      }
+    },
+    compute(x, U) { return Physics.gateEq(x, U); },
+    scene(x, res, U) {
+      const g = res.geo, sc = Scene.Scene();
+      if (g.cpe) {
+        const sbar = g.sbar, top = (res.out[0] || {}).v || 0, span = Math.max(sbar, 1);
+        sc.line([-span * 0.8, 0], [span * 0.8, 0], { stroke: WATERD, sw: 2 });
+        sc.rect(-span * 0.8, -(top + span * 0.6), span * 0.8, 0, { fill: WATER, stroke: 'none', fop: 0.18 }, false);
+        const L = x.cpShape === 'circ' ? x.Dcp : x.Lg, sn = Math.sin(x.thG * DEG);
+        const yT = -top, yB = -top - L * sn;
+        sc.line([0, yT], [0, yB], { stroke: GATE, sw: 8 });
+        sc.dot([0, -(sbar * sn)], '#16a085', 'G'); sc.dot([0, -((sbar + x.eCP) * sn)], '#c0392b', 'CP');
+        sc.dim([span * 0.3, 0], [span * 0.3, yT], `top ${f(top)} ${U.len}`, 20);
+        sc.depth = span * 0.3; return sc;
+      }
+      const pts = g.pts, xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]).concat([g.yS]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys, 0), y1 = Math.max(...ys);
+      const span = Math.max(x1 - x0, y1 - y0, 1e-6), pad = span * 0.6;
+      // free surfaces
+      sc.line([x0 - pad, g.yS], [x1 + pad * 0.2, g.yS], { stroke: WATERD, sw: 2 });
+      sc.text([x0 - pad, g.yS + span * 0.04], `liquid 1 surface (h = ${f(g.yS)} ${U.len})`, { color: WATERD, size: 11 });
+      if (g.y2 !== null && g.y2 !== undefined) { sc.line([x0 - pad * 0.2, g.y2], [x1 + pad, g.y2], { stroke: '#1e8449', sw: 2 }); sc.text([x1 + pad * 0.1, g.y2 + span * 0.04], 'liquid 2', { color: '#1e8449', size: 11 }); }
+      // pressure prisms (drawn on the liquid side)
+      const pmax = Math.max(1e-9, ...g.loads.filter((l) => !l.w).map((l) => Math.max(l.p0 || 0, l.p1 || 0)));
+      const ks = (span * 0.35) / pmax;
+      for (let i = 0; i < pts.length - 1; i++) {
+        g.loads.filter((l) => !l.w && l.seg === i).forEach((l) => {
+          const A = pts[i], B = pts[i + 1], n = l.dir, N = 24, poly = [];
+          const pAt = (t) => { const y = A[1] + (B[1] - A[1]) * t, yS = l.liq === 1 ? g.yS : g.y2, gg = l.liq === 1 ? (l.F > 0 ? 1 : 1) : 1; return Math.max(0, (l.liq === 1 ? (x.psG || 0) : 0) + (yS - y) * (l.liq === 1 ? x.sgG : x.sg2G) * (x.gwG > 0 ? x.gwG : U.gw) * gg); };
+          for (let k = 0; k <= N; k++) { const t = k / N; poly.push([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]); }
+          for (let k = N; k >= 0; k--) { const t = k / N, pr = pAt(t) * ks; poly.push([A[0] + (B[0] - A[0]) * t - n[0] * pr, A[1] + (B[1] - A[1]) * t - n[1] * pr]); }
+          sc.poly(poly, { fill: l.liq === 1 ? WATER : '#7fc6a4', stroke: 'none', fop: 0.35 }, false);
+        });
+      }
+      sc.pline(pts, { stroke: GATE, sw: 8 });
+      // loads
+      const aL = span * 0.3;
+      g.loads.forEach((l) => {
+        const a = [l.pt[0] - l.dir[0] * aL, l.pt[1] - l.dir[1] * aL];
+        sc.arrow(a, l.pt, { color: l.w ? '#6c3483' : l.liq === 2 ? '#1e8449' : '#c0392b', sw: 2.5 });
+        sc.text([a[0], a[1] + span * 0.03], `${l.w ? (l.name === 'Counterweight' ? 'W_c' : 'W') : 'F'} = ${f(l.F)} ${U.force}`, { color: l.w ? '#6c3483' : '#c0392b', size: 11, in3: true });
+      });
+      if (g.hinge) { sc.dot(g.hinge, '#2c3e50', 'hinge'); }
+      if (g.sup) {
+        const d = g.sup.dir, P = g.sup.P, a = [g.sup.pt[0] - d[0] * aL, g.sup.pt[1] - d[1] * aL];
+        sc.arrow(a, g.sup.pt, { color: '#2471a3', sw: 3 });
+        sc.text([a[0], a[1] - span * 0.05], `P = ${f(P)} ${U.force}`, { color: '#2471a3', size: 12, in3: true });
+      }
+      if (g.cw) sc.line(g.hinge, g.cw, { stroke: '#6c3483', dash: '4 3' });
+      sc.depth = span * 0.3;
+      return sc;
+    },
+  };
+
+  /* ---------------- Hydrostatic forces: cylinder / log on contacts -------- */
+  X.cyl = {
+    mod: 'm1', label: 'Cylinder / log equilibrium',
+    def: { Dc: 2, Lc: 1, gwC: 0, sg1C: 1, sg2C: 1, h1C: 2, h2C: 0, w1a: 90, w1b: 270, w2a: -90, w2b: 90, c1: 0, c2: 270, WbyC: 'W', WC: 10, sgC: 2, cs: 'R', zeroC: '2', same2C: false },
+    controls(x, el, C, U, sl) {
+      C.select(el, { label: 'Find', options: [['R', 'Liquid forces and contact reactions'], ['W', 'Weight (or Sg) at which a contact unloads'], ['h', 'Liquid depth at which a contact unloads']], get: () => x.cs, set: (v) => (x.cs = v) });
+      sl(el, 'gwC', 'γ of water if the book uses another value (0 = standard)', 0, 70, 0.01, U.gamma);
+      const g = C.section(el, 'Cylinder');
+      sl(g, 'Dc', 'Diameter D', 0.01, 50, 0.001, U.len); sl(g, 'Lc', 'Length L', 0.01, 100, 0.001, U.len);
+      if (x.cs !== 'W') {
+        C.seg(g, { label: 'Weight from', options: [['W', 'Weight W'], ['sg', 'Specific gravity']], get: () => x.WbyC, set: (v) => (x.WbyC = v) });
+        if (x.WbyC === 'sg') sl(g, 'sgC', 'Cylinder specific gravity', 0, 20, 0.001, ''); else sl(g, 'WC', 'Weight W', 0, 1e7, 0.01, U.force);
+      }
+      const l1 = C.section(el, 'Liquid 1 (left)');
+      sl(l1, 'sg1C', 'Specific gravity', 0, 13.6, 0.001, '');
+      if (x.cs !== 'h') sl(l1, 'h1C', 'Surface height above the floor (bottom of the cylinder)', 0, 200, 0.001, U.len);
+      sl(l1, 'w1a', 'Wetted arc from (°, CCW from +x at the centre)', -360, 360, 1, '°'); sl(l1, 'w1b', 'Wetted arc to', -360, 450, 1, '°');
+      const l2 = C.section(el, 'Liquid 2 (right)');
+      sl(l2, 'sg2C', 'Specific gravity (0 = none)', 0, 13.6, 0.001, '');
+      if (x.cs === 'h') C.toggle(l2, { label: 'Same level as liquid 1', get: () => x.same2C, set: (v) => (x.same2C = v) });
+      if (!(x.cs === 'h' && x.same2C)) sl(l2, 'h2C', 'Surface height above the floor (0 = none)', 0, 200, 0.001, U.len);
+      sl(l2, 'w2a', 'Wetted arc from (°)', -360, 360, 1, '°'); sl(l2, 'w2b', 'Wetted arc to', -360, 450, 1, '°');
+      const c = C.section(el, 'Smooth contacts (reactions point to the centre)');
+      sl(c, 'c1', 'Contact 1 angle (0 = wall on the right at mid-height, 270 = floor)', -360, 360, 0.1, '°');
+      sl(c, 'c2', 'Contact 2 angle', -360, 360, 0.1, '°');
+      if (x.cs !== 'R') C.seg(c, { label: 'Contact that unloads', options: [['1', 'Contact 1'], ['2', 'Contact 2']], get: () => x.zeroC, set: (v) => (x.zeroC = v) });
+    },
+    compute(x, U) { return Physics.cylEq(x, U); },
+    scene(x, res, U) {
+      const g = res.geo, sc = Scene.Scene(), R = g.R, span = 2 * R;
+      const xl = -2.4 * R, xr = 2.4 * R;
+      if (g.h1 > 0) sc.rect(xl, 0, 0, g.h1, { fill: liqCol(x.sg1C), stroke: 'none', fop: 0.5 }, { fill: liqCol(x.sg1C), alpha: 0.3 });
+      if (g.h2 > 0) sc.rect(0, 0, xr, g.h2, { fill: liqCol(x.sg2C), stroke: 'none', fop: 0.5 }, { fill: liqCol(x.sg2C), alpha: 0.3 });
+      sc.line([xl, 0], [xr, 0], { stroke: '#2c3e50', sw: 3 });
+      sc.circle([0, R], R, { fill: STEEL, stroke: '#2c3e50', sw: 2 }, true, STEEL);
+      [[g.a1, g.N1, '1'], [g.a2, g.N2, '2']].forEach(([a, N, k]) => {
+        const c = [R * Math.cos(a), R + R * Math.sin(a)], t = [-Math.sin(a), Math.cos(a)], o = [Math.cos(a), Math.sin(a)];
+        sc.line([c[0] - t[0] * R * 0.5 + o[0] * 0.02 * R, c[1] - t[1] * R * 0.5 + o[1] * 0.02 * R], [c[0] + t[0] * R * 0.5, c[1] + t[1] * R * 0.5], { stroke: '#2c3e50', sw: 4 });
+        const a0 = [c[0] + o[0] * R * 0.7, c[1] + o[1] * R * 0.7];
+        sc.arrow(a0, c, { color: '#2471a3', sw: 3 });
+        sc.text([a0[0], a0[1] + R * 0.12], `N${k === '1' ? '₁' : '₂'} = ${f(N)} ${U.force}`, { color: '#2471a3', size: 12, in3: true });
+      });
+      sc.arrow([0, R], [0, R - R * 0.8], { color: '#6c3483', sw: 2.5 });
+      sc.text([R * 0.08, R * 0.35], `W = ${f(g.W)}`, { color: '#6c3483', size: 11, in3: true });
+      sc.dot([0, R], '#2c3e50', 'O');
+      if (g.h1 > 0) sc.dim([xl + R * 0.2, 0], [xl + R * 0.2, g.h1], `h₁ = ${f(g.h1)} ${U.len}`, 20);
+      if (g.h2 > 0) sc.dim([xr - R * 0.2, 0], [xr - R * 0.2, g.h2], `h₂ = ${f(g.h2)} ${U.len}`, -20);
+      sc.depth = Math.max(x.Lc, span * 0.3);
+      return sc;
+    },
+  };
+
   /* ------------------------------------------------------------------ */
   function st(s, k) {
     s.x = s.x || {};
@@ -567,6 +728,18 @@
       P('Hibbeler 2-95 — triangular plate 0.75 × 0.75 m, base 2 m deep (4.83 kN, 1.77 m)', 'any', { sgA: 1, pshape: 'rtri', porient: 'up', pb: 0.75, ph: 0.75, pd: 1.25 }),
       P('Schaum 3.9 — 4 × 8 ft rectangle over a 6 ft triangle (15 480 lb; x 1.65 ft, y 7.69 ft)', 'any', { sgA: 1, pshape: 'poly', ptxt: '0, 0\n4, 0\n4, 8\n0, 14' }, 'EN'),
       P('Schaum 3.31 — isosceles triangle 18 ft base, 24 ft altitude, axis horizontal 13 ft deep, oil 0.80 (140 400 lb, 14.04 ft)', 'any', { sgA: 0.8, pshape: 'poly', ptxt: '0, 4\n0, 22\n24, 13' }, 'EN'),
+      P('Schaum 3.8 — gate ABC hinged at B, 4 m long: AB 9.24 m at 60°, BC 3 m flat at 8 m depth (3047 kN·m clockwise)', 'gate', { gk: 'poly', gs: 'P', gwG: 9.79, bG: 4, ptxt: '1.62, 0\n4.62, 0\n0, 8', xH: 4.62, yH: 0, hS: 8, supK: 'none', Wg: 0, Wc: 0 }),
+      P('Hibbeler 2-105 — bent plate 1.5 m wide pinned at A, smooth support at B (N_B 194 kN, A_x 177 kN, A_y 31.9 kN down)', 'gate', { gk: 'poly', gs: 'P', bG: 1.5, ptxt: '0, 4\n2, 4\n5, 0', xH: 0, yH: 4, hS: 5, supK: 'vert', xP: 5, yP: 0, Wg: 0, Wc: 0 }),
+      P('Hibbeler 2-65 — 8000 lb relief gate, 6 ft at 30°, 4 ft wide, pinned at the top: depth to open (5.63 ft)', 'gate', { gk: 'plate', gs: 'h', Lg: 6, thG: 30, lean: 'under', sH: 0, bG: 4, Wg: 8000, Wc: 0, h2G: 0 }, 'EN'),
+      P('Hibbeler 2-67 — 3 Mg swamp gate 2 m long at 60°, 1.5 m wide, pinned at the bottom: water depth (1.65 m)', 'gate', { gk: 'plate', gs: 'h', Lg: 2, thG: 60, lean: 'under', sH: 2, bG: 1.5, Wg: 29.43, Wc: 0, h2G: 0 }),
+      P('Vertical 3 m gate hinged at the top, held by a horizontal force at the bottom, water 3 m deep', 'gate', { gk: 'plate', gs: 'P', Lg: 3, thG: 90, hB: 3, sH: 0, supK: 'horiz', sP: 3, bG: 1, Wg: 0, Wc: 0, h2G: 0 }),
+      P('Inclined 60° gate 2.5 m, hinged at the top, strut at 45° to the bottom, water 4 m above the bottom, both sides (tail 1 m)', 'gate', { gk: 'plate', gs: 'P', Lg: 2.5, thG: 60, lean: 'above', hB: 4, sH: 0, supK: 'ang', sP: 2.5, phiP: 135, bG: 2, Wg: 5, Wc: 0, h2G: 1, sg2G: 1 }),
+      P('Vertical lift gate 2 m × 2 m in guides, 10 kN, μ 0.3, water 3 m deep: force to raise it', 'gate', { gk: 'plate', gs: 'lift', Lg: 2, thG: 90, hB: 3, bG: 2, Wg: 10, mu: 0.3, h2G: 0 }),
+      P('Schaum 3.32 — 1.22 m square, CP 76 mm below the centroid (top 1.01 m deep, 23.7 kN)', 'gate', { gs: 'cpe', cpShape: 'rect', Lg: 1.22, bG: 1.22, thG: 90, eCP: 0.076, gwG: 9.79 }),
+      P('Schaum 3.10 — 2 m circular gate, pivot 40 mm below the centroid: depth before it turns (5.25 m above the top)', 'gate', { gs: 'cpe', cpShape: 'circ', Dcp: 2, thG: 90, eCP: 0.04, gwG: 9.79 }),
+      P('Schaum 3.12 — 6 ft cylinder, 5 ft long, 5000 lb, oil 0.80 to its top on the left (A 4490 lb, B 1470 lb)', 'cyl', { cs: 'R', Dc: 6, Lc: 5, sg1C: 0.8, h1C: 6, sg2C: 0, h2C: 0, w1a: 90, w1b: 270, c1: 0, c2: 270, WbyC: 'W', WC: 5000 }, 'EN'),
+      P('Schaum 3.15 — 8 ft cylinder, 3 ft long, 500 lb: oil 0.75 4 ft deep one side, water 2 ft the other (749 lb, 2680 lb up; the negative floor reaction is the 2180 lb hold-down force)', 'cyl', { cs: 'R', Dc: 8, Lc: 3, sg1C: 0.75, h1C: 4, sg2C: 1, h2C: 2, w1a: 90, w1b: 270, w2a: -90, w2b: 90, c1: 0, c2: 270, WbyC: 'W', WC: 500 }, 'EN'),
+      P('Log 1 m in diameter against a wall, water to its top: lightest Sg that keeps it on the floor', 'cyl', { cs: 'W', Dc: 1, Lc: 1, sg1C: 1, h1C: 1, sg2C: 0, h2C: 0, w1a: 90, w1b: 270, c1: 0, c2: 270, zeroC: '2' }),
       P('Schaum 3.17(a) — 1.2 m steel pipe, 6 mm wall, 120 m head of oil Sg 0.822 (≈ 96.6 MPa)', 'hoop', { vessel: 'cyl', Dh: 1.2, pBy: 'head', sgH: 0.822, hH: 120, hsolve: 's', tH: 6 }),
       P('Schaum 3.17(b) — thickness for 1.72 MPa with 124 MPa allowable (8.3 mm)', 'hoop', { vessel: 'cyl', Dh: 1.2, pBy: 'p', pH: 1720, hsolve: 't', sAllow: 124 }),
       P('Schaum 3.18 — 20 ft vat, 24 ft of brine Sg 1.06, 2 × ¼ in bands at 16 000 psi (6.05 in)', 'hoop', { vessel: 'band', Dh: 20, pBy: 'head', sgH: 1.06, hH: 24, bandA: 0.5, sAllow: 16000 }, 'EN'),

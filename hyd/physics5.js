@@ -113,11 +113,14 @@
     if (mode === 'Q') {
       if (!(n > 0 && I.Lr !== 0)) return fail(o, 'Give the roughness and the distance between the sections.');
       const f = (Q) => { const tb = table(I.y1, I.y2, Q, n); return tb.bad ? NaN : tb.L - I.Lr; };
-      // scan for a bracket
-      let lo = 1e-9, hi = 1, k = 0; const fl = f(lo);
-      while (k < 80 && !(f(hi) * fl < 0)) { hi *= 1.6; k++; }
-      if (!(f(hi) * fl < 0)) return fail(o, 'No flow makes the step method give this distance; check the depths, slope and length.');
-      const Q = bis(f, lo, hi);
+      // fine log scan for a sign change that is a true root (not the pole where y_n passes the mean depth)
+      let Q = NaN, qa = 1e-6, fa = f(qa);
+      for (let i = 1; i <= 1200 && !isFinite(Q); i++) {
+        const qb = 1e-6 * Math.pow(10, i / 100), fb = f(qb);
+        if (isFinite(fa) && isFinite(fb) && fa * fb < 0) { const r = bis(f, qa, qb); if (abs(f(r)) < 1e-4 * Math.max(1, abs(I.Lr))) Q = r; }
+        qa = qb; fa = fb;
+      }
+      if (!isFinite(Q)) return fail(o, 'No flow makes the step method give this distance; check the depths, slope and length.');
       const tb = table(I.y1, I.y2, Q, n);
       S(o, 'Discharge by trial', 'find Q so that ΣΔL = L', `L = ${fmt(I.Lr)} ${L}`, `Q = ${fmt(Q)} ${U.Q}`, 'Bisection on Q with the step method below.');
       stepTable(o, tb, Q);

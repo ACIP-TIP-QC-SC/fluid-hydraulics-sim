@@ -47,6 +47,7 @@
         { name: 'S2 drawdown on a steep chute, from critical depth downstream', mode: 'profile', set: { shape: 'rect', b: 4, Q: 20, n: 0.014, S0: 0.02, y1: 1.36, y2: 0, nst: 15, avg: 'VR' } },
         { name: 'Schaum 10.48 — 40 ft channel, 900 cfs, 4.50 ft and 5.00 ft 300 ft apart: n (0.0288)', mode: 'n', units: 'EN', set: { shape: 'rect', b: 40, Q: 900, S0: 0.00283, y1: 4.5, y2: 5, Lr: 300, avg: 'VR' } },
         { name: 'Schaum 10.49 — 20 ft channel, n 0.011, 8.50 ft and 10.25 ft 2000 ft apart: Q (≈ 1050 cfs)', mode: 'Q', units: 'EN', set: { shape: 'rect', b: 20, n: 0.011, S0: 0.001, y1: 8.5, y2: 10.25, Lr: 2000, nst: 1, avg: 'VR' } },
+        { name: 'Schaum 10.110 — 12 m channel, S₀ 0.0028, n 0.026, 1.5 m and 1.8 m 500 m apart: Q (43.8 m³/s in one step; book 44.1)', mode: 'Q', set: { shape: 'rect', b: 12, n: 0.026, S0: 0.0028, y1: 1.5, y2: 1.8, Lr: 500, nst: 1, avg: 'VR' } },
         { name: 'Schaum 10.51 — reservoir-fed 15 ft flume, 800 ft, 4.12 ft at the weir (566 cfs)', mode: 'res', units: 'EN', set: { shape: 'rect', b: 15, n: 0.015, S0: 0.0009, Hr: 6.22, ke: 0.25, Lr: 800, y2: 4.12, nst: 1, avg: 'VR' } }
       ],
       hint: 'The bed slope is exaggerated. Blue: water surface from the step method; dashed lines: normal depth y_n (green) and critical depth y_c (red), drawn parallel to the bed.'

@@ -193,7 +193,10 @@
       { k: 't4', label: 'Layer 4 thickness t₄ (top)', dim: 'len', min: 0.01, max: 20, step: 0.01, def: 0.3, show: (P, m) => nLayOf(P, m) >= 4 },
       { k: 'sg4', label: 'Layer 4 specific gravity Sg₄', min: 0.5, max: 13.6, step: 0.01, def: 0.6, chips: LSG_CHIPS, show: (P, m) => nLayOf(P, m) >= 4 },
       { k: 'y', label: 'Orifice height above ground y', dim: 'len', min: 0, max: 20, step: 0.01, def: 1.5, modes: ['steady', 'drain', 'inflow'] },
-      { k: 'jang', label: 'Jet angle θ above the horizontal (− = pointing down)', dim: 'deg', min: -89, max: 89, step: 0.1, def: 0, modes: ['steady', 'drain', 'inflow'], show: (P, m) => m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect' },
+      { k: 'jby', type: 'select', label: 'Jet direction given by', def: 'ang', modes: ['steady', 'drain', 'inflow'], options: [['ang', 'Angle θ'], ['slope', 'Slope of the tank wall (jet normal to it)']], show: (P, m) => m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect' },
+      { k: 'jang', label: 'Jet angle θ above the horizontal (− = pointing down)', dim: 'deg', min: -89, max: 89, step: 0.1, def: 0, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby !== 'slope' },
+      { k: 'zw', label: 'Wall slope z (z H : 1 V)', min: 0, max: 20, step: 0.01, def: 1, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'slope' },
+      { k: 'jdir', type: 'select', label: 'Jet points', def: 'up', modes: ['steady', 'drain', 'inflow'], options: [['up', 'Upward (wall leans back)'], ['down', 'Downward (wall overhangs)']], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'slope' },
       { k: 'jfind', type: 'select', label: 'Jet question', def: 'land', modes: ['steady'], options: [['land', 'Where the jet lands'], ['pt', 'Height of the jet at a distance x_p'], ['cv', 'Coefficients from a measured point on the jet'], ['H', 'Head needed for the jet to pass a point']] },
       { k: 'xq', label: 'Horizontal distance x_p', dim: 'len', min: 0, max: 100, step: 0.001, def: 2, modes: ['steady'], show: (P) => P.jfind === 'pt' },
       { k: 'xm', label: 'Measured point: horizontal distance x', dim: 'len', min: 0.001, max: 100, step: 0.001, def: 1.52, modes: ['steady'], show: (P) => P.jfind === 'cv' || P.jfind === 'H' },
@@ -229,6 +232,7 @@
       { name: 'Schaum 12.11 — oil, 25 mm orifice, H 5.49 m, Q 3.14 L/s, jet drops 0.119 m in 1.52 m (Cv 0.940, Cd 0.616, Cc 0.655)', mode: 'steady', set: { H: 5.49, d: 25, Sg: 0.8, ps: 0, y: 1.5, jang: 0, jfind: 'cv', xm: 1.52, ym: 0.119, Qm: 0.00314, Cc: 0.62 } },
       { name: 'Schaum 12.56 — 1 in orifice, Cv 0.98, Cc 0.62, jet drops 3.08 ft in 8.19 ft (H 5.66 ft, 0.0632 cfs)', units: 'EN', mode: 'steady', set: { d: 1, Cd: 0.6076, Cv: 0.98, Cc: 0.62, ps: 0, y: 4, jang: 0, jfind: 'H', xm: 8.19, ym: 3.08 } },
       { name: 'Hibbeler 5-58 — 60 psi air over 4 ft of water, hole 2 ft above the ground (95.8 ft/s, 33.8 ft)', units: 'EN', mode: 'steady', set: { H: 4, d: 1, Cd: 1, Cv: 1, Cc: 1, ps: 60, y: 2, jang: 0, jfind: 'land' } },
+      { name: 'CE Board 6-16 — side sloping 1H:1V, H 3 m, orifice 3.7 + 1.2 m above the ground, Cv 1 (7.672 m/s, 1.5 m rise, x 9.20 m; book 9.18 after rounding 0.1667 to 0.167)', mode: 'steady', set: { H: 3, d: 50, Cd: 1, Cv: 1, Cc: 1, ps: 0, y: 4.9, jby: 'slope', zw: 1, jdir: 'up', jfind: 'land' } },
       { name: 'Slanted nozzle 30° up, H 4 m, 1.5 m above the ground', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 1.5, jang: 30, jfind: 'land' } },
       { name: 'Slanted jet 20° down: height where it meets a wall 2 m away', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 3, jang: -20, jfind: 'pt', xq: 2 } }
     ]

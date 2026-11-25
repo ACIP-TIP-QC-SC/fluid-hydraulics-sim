@@ -254,7 +254,9 @@
     if (mode !== 'twotank' && HT <= 0) return fail(o, 'Total head is zero or negative: the vacuum on the surface is strong enough that no liquid flows out (air is drawn in instead).');
 
     // slanted jet and measured-point problems (side orifice / nozzle)
-    const th = (mode === 'twotank' ? 0 : Math.max(-89, Math.min(89, +I.jang || 0))) * PI / 180, cth = Math.cos(th), tth = Math.tan(th);
+    const angDeg = I.jby === 'slope' ? (I.jdir === 'down' ? -1 : 1) * (Math.atan(Math.max(0, +I.zw || 0)) * 180) / PI : +I.jang || 0;
+    const th = (mode === 'twotank' ? 0 : Math.max(-89, Math.min(89, angDeg))) * PI / 180, cth = Math.cos(th), tth = Math.tan(th);
+    if (mode !== 'twotank' && I.jby === 'slope') S(o, 'Jet angle from the slope of the tank wall', 'θ = tan⁻¹(z)  (jet leaves normal to a wall sloping z H : 1 V)', `θ = tan⁻¹(${fmt(+I.zw || 0)})`, `θ = ${fmt((th * 180) / PI)}° ${th < 0 ? 'below' : 'above'} the horizontal`, 'The wall makes tan⁻¹(1/z) with the horizontal, so its normal makes tan⁻¹(z).');
     const jf = mode === 'steady' ? I.jfind || 'land' : 'land';
     o.data.th = th;
     if (jf === 'cv' || jf === 'H') {
@@ -321,7 +323,7 @@
       } else if (side) {
         const vx = v * cth, vy = v * Math.sin(th), aa = g / (2 * v * v * cth * cth);
         x = (tth + sqrt(tth * tth + 4 * aa * I.y)) / (2 * aa);
-        S(o, 'Jet components' + at, 'v_x = v·cosθ,  v_y = v·sinθ', `v_x = ${fmt(v)} cos ${fmt(I.jang)}°,  v_y = ${fmt(v)} sin ${fmt(I.jang)}°`, `v_x = ${fmt(vx)}, v_y = ${fmt(vy)} ${U.v}`, 'θ is measured up from the horizontal (negative = pointing down).');
+        S(o, 'Jet components' + at, 'v_x = v·cosθ,  v_y = v·sinθ', `v_x = ${fmt(v)} cos ${fmt((th * 180) / PI)}°,  v_y = ${fmt(v)} sin ${fmt((th * 180) / PI)}°`, `v_x = ${fmt(vx)}, v_y = ${fmt(vy)} ${U.v}`, 'θ is measured up from the horizontal (negative = pointing down).');
         S(o, 'Path of the jet', 'z = x·tanθ − g·x² / (2v²cos²θ)', `z = ${P(tth)}·x − ${fmt(aa)}·x²`, 'z = height above the orifice centre', 'A projectile path: steady horizontal speed, gravity acting down.');
         S(o, 'Where the jet lands', '−y = x·tanθ − g·x²/(2v²cos²θ)', `${fmt(aa)}x² − ${P(tth)}x − ${fmt(I.y)} = 0`, `x = ${fmt(x)} ${L}`, 'The ground is y below the orifice; take the positive root.');
         const tf = x / vx;

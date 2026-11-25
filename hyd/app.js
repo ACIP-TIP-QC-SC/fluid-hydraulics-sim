@@ -1714,6 +1714,14 @@
     velScale(ctx, W - 210, 74, 45, U.v);
   };
 
+  /* ------------------------------------------------------------------
+     Extension modules (modsB.js …): each registers itself through
+     window.HYD_EXT and may splice its module in after an existing one.
+     ------------------------------------------------------------------ */
+  (window.HYD_EXT || []).forEach((fn) => {
+    try { fn({ MODS, S, C, fmt, clamp, lerp, sstep, txt, poly, stroke, head, arrow, dimV, dimH, surfSym, ground, datum, velScale, plot, view, sm, smB, pipe3, pipePath, flange, gauge, valveSym, flowDots, reservoir, shade, niceStep, niceTicks, SG_CHIPS, LSG_CHIPS, SUB, FONT, MONO }); } catch (e) { console.error(e); }
+  });
+
   /* ==================================================================
      UI
      ================================================================== */
@@ -1872,8 +1880,12 @@
   $('#uSI').onclick = () => setUnits('SI'); $('#uEN').onclick = () => setUnits('EN');
   $('#presetSel').onchange = (e) => {
     const v = e.target.value; if (v === '') return; const m = cur(), pr = m.presets[+v];
-    S.P[m.id] = Object.assign(defaults(m), pr.set); S.mode[m.id] = pr.mode; S.click = null; S.clickInfo = null;
-    if (S.units !== 'SI') { S.units = 'SI'; $('#uSI').setAttribute('aria-pressed', 'true'); $('#uEN').setAttribute('aria-pressed', 'false'); }
+    const set = Object.assign({}, pr.set);
+    // English-unit presets give their numbers in English display units; inputs are stored in SI display units
+    if (pr.units === 'EN') m.params.forEach((p) => { if (!p.type && typeof set[p.k] === 'number') set[p.k] = set[p.k] / dimOf(p).en[1]; });
+    S.P[m.id] = Object.assign(defaults(m), set); S.mode[m.id] = pr.mode; S.click = null; S.clickInfo = null;
+    const pu = pr.units === 'EN' ? 'EN' : 'SI';
+    if (S.units !== pu) { S.units = pu; $('#uSI').setAttribute('aria-pressed', String(pu === 'SI')); $('#uEN').setAttribute('aria-pressed', String(pu === 'EN')); }
     setSpeed(m.speed[pr.mode] || 1); resetSim(); renderControls(); recompute(); e.target.value = '';
   };
   $('#copyBtn').onclick = () => {

@@ -193,6 +193,12 @@
       { k: 't4', label: 'Layer 4 thickness t₄ (top)', dim: 'len', min: 0.01, max: 20, step: 0.01, def: 0.3, show: (P, m) => nLayOf(P, m) >= 4 },
       { k: 'sg4', label: 'Layer 4 specific gravity Sg₄', min: 0.5, max: 13.6, step: 0.01, def: 0.6, chips: LSG_CHIPS, show: (P, m) => nLayOf(P, m) >= 4 },
       { k: 'y', label: 'Orifice height above ground y', dim: 'len', min: 0, max: 20, step: 0.01, def: 1.5, modes: ['steady', 'drain', 'inflow'] },
+      { k: 'jang', label: 'Jet angle θ above the horizontal (− = pointing down)', dim: 'deg', min: -89, max: 89, step: 0.1, def: 0, modes: ['steady', 'drain', 'inflow'], show: (P, m) => m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect' },
+      { k: 'jfind', type: 'select', label: 'Jet question', def: 'land', modes: ['steady'], options: [['land', 'Where the jet lands'], ['pt', 'Height of the jet at a distance x_p'], ['cv', 'Coefficients from a measured point on the jet'], ['H', 'Head needed for the jet to pass a point']] },
+      { k: 'xq', label: 'Horizontal distance x_p', dim: 'len', min: 0, max: 100, step: 0.001, def: 2, modes: ['steady'], show: (P) => P.jfind === 'pt' },
+      { k: 'xm', label: 'Measured point: horizontal distance x', dim: 'len', min: 0.001, max: 100, step: 0.001, def: 1.52, modes: ['steady'], show: (P) => P.jfind === 'cv' || P.jfind === 'H' },
+      { k: 'ym', label: 'Measured point: drop y below the orifice centre', dim: 'len', min: -50, max: 100, step: 0.001, def: 0.119, modes: ['steady'], show: (P) => P.jfind === 'cv' || P.jfind === 'H' },
+      { k: 'Qm', label: 'Measured discharge Q (0 = not measured)', dim: 'Q', min: 0, max: 10, step: 0.00001, def: 0, modes: ['steady'], show: (P) => P.jfind === 'cv' },
       { k: 'shape', type: 'select', label: 'Tank shape', def: 'vcyl', modes: ['drain', 'twotank', 'inflow'], options: [['vcyl', 'Vertical cylinder'], ['rect', 'Rectangular'], ['cone', 'Cone (apex down)'], ['sphere', 'Sphere'], ['hcyl', 'Horizontal cylinder'], ['frustum', 'Frustum']] },
       { k: 'D', label: 'Tank diameter D', dim: 'len', min: 0.1, max: 20, step: 0.01, def: 2, show: (P, m) => m !== 'steady' && P.shape === 'vcyl' },
       { k: 'Lt', label: 'Tank length L', dim: 'len', min: 0.1, max: 20, step: 0.01, def: 2, show: (P, m) => m !== 'steady' && P.shape === 'rect' },
@@ -219,11 +225,19 @@
       { name: 'Closed tank, 50 kPa on the surface', mode: 'steady', set: { H: 2, ps: 50 } },
       { name: 'Steady orifice under 1 m of oil (Sg 0.8) on 3 m of water', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, nLay: '2', t2: 1, sg2: 0.8 } },
       { name: 'Oil over water: cylinder D = 2 m drains 4 m → 0', mode: 'drain', set: { H: 4, H2: 0, d: 50, Cd: 0.6, shape: 'vcyl', D: 2, nLay: '2', t2: 1, sg2: 0.8 } },
-      { name: 'Three liquids in a spherical tank, 4 m → 0.5 m', mode: 'drain', set: { H: 4, H2: 0.5, d: 75, shape: 'sphere', Ds: 5, nLay: '3', t2: 1, sg2: 0.8, t3: 0.5, sg3: 0.68 } }
+      { name: 'Three liquids in a spherical tank, 4 m → 0.5 m', mode: 'drain', set: { H: 4, H2: 0.5, d: 75, shape: 'sphere', Ds: 5, nLay: '3', t2: 1, sg2: 0.8, t3: 0.5, sg3: 0.68 } },
+      { name: 'Schaum 12.11 — oil, 25 mm orifice, H 5.49 m, Q 3.14 L/s, jet drops 0.119 m in 1.52 m (Cv 0.940, Cd 0.616, Cc 0.655)', mode: 'steady', set: { H: 5.49, d: 25, Sg: 0.8, ps: 0, y: 1.5, jang: 0, jfind: 'cv', xm: 1.52, ym: 0.119, Qm: 0.00314, Cc: 0.62 } },
+      { name: 'Schaum 12.56 — 1 in orifice, Cv 0.98, Cc 0.62, jet drops 3.08 ft in 8.19 ft (H 5.66 ft, 0.0632 cfs)', units: 'EN', mode: 'steady', set: { d: 1, Cd: 0.6076, Cv: 0.98, Cc: 0.62, ps: 0, y: 4, jang: 0, jfind: 'H', xm: 8.19, ym: 3.08 } },
+      { name: 'Hibbeler 5-58 — 60 psi air over 4 ft of water, hole 2 ft above the ground (95.8 ft/s, 33.8 ft)', units: 'EN', mode: 'steady', set: { H: 4, d: 1, Cd: 1, Cv: 1, Cc: 1, ps: 60, y: 2, jang: 0, jfind: 'land' } },
+      { name: 'Slanted nozzle 30° up, H 4 m, 1.5 m above the ground', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 1.5, jang: 30, jfind: 'land' } },
+      { name: 'Slanted jet 20° down: height where it meets a wall 2 m away', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 3, jang: -20, jfind: 'pt', xq: 2 } }
     ]
   };
   MODS.push(M1);
 
+  // free jet leaving a side orifice at θ above the horizontal (world units, origin at the orifice x)
+  const jetT = (v, th, yo, g) => { const vy = v * Math.sin(th); return (vy + Math.sqrt(vy * vy + 2 * g * Math.max(yo, 1e-4))) / g; };
+  const jetPt = (v, th, yo, g, t) => [v * Math.cos(th) * t, yo + v * Math.sin(th) * t - (g * t * t) / 2];
   // tank geometry used for drawing (world units, h measured up from the orifice)
   function tankGeom(I, mode) {
     const sh = mode === 'steady' ? 'vcyl' : I.shape;
@@ -246,7 +260,7 @@
     else { const rb = G.hw(0), rt = G.hw(G.Ht); ctx.moveTo(X(cx - rt), Y(top)); ctx.lineTo(X(cx - rb), Y(yo)); ctx.lineTo(X(cx + rb), Y(yo)); ctx.lineTo(X(cx + rt), Y(top)); ctx.closePath(); }
   }
   M1.draw = function (ctx, W, H, R, A, T) {
-    const d = R.data, I = S.I, mode = d.mode, g = S.U.g, L = S.U.L;
+    const d = R.data, I = d.Iover ? Object.assign({}, S.I, d.Iover) : S.I, mode = d.mode, g = S.U.g, L = S.U.L, th = d.th || 0;
     if (mode === 'twotank') return drawTwoTank(ctx, W, H, R, A, T);
     const G = tankGeom(I, mode);
     let hT = mode === 'steady' ? I.H : d.hAt ? d.hAt(S.simT) : I.H;
@@ -255,9 +269,9 @@
     const jetCol = d.layers ? layCol(d.layerAt ? d.layerAt(Math.max(0, h)) : 0) : C.water;
     const yo = I.y, fl = Math.max((I.d / 2) * 1.6, 0.03 * G.Ht);
     const cx = G.side ? -G.Wt / 2 : 0;
-    const xLand0 = G.side ? 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo) : 0;
-    const span = Math.max(G.Wt + xLand0, yo + G.Ht, 1);
-    const b = smB(A, 'b', { x0: (G.side ? -G.Wt : -G.Wt / 2) - 0.22 * span, x1: Math.max(xLand0, G.side ? 0.3 * G.Wt : G.Wt / 2) + 0.12 * span + (d.layers && !G.side ? 0.65 * span : 0), y0: -0.07 * span, y1: yo + G.Ht + 0.08 * span }, T.rdt);
+    const xLand0 = G.side ? (th ? d.x || 0 : 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo)) : 0;
+    const span = Math.max(G.Wt + xLand0, yo + G.Ht, 1), ztop = Math.max(yo + G.Ht, G.side && d.zmax ? yo + d.zmax : 0);
+    const b = smB(A, 'b', { x0: (G.side ? -G.Wt : -G.Wt / 2) - 0.22 * span, x1: Math.max(xLand0, G.side ? 0.3 * G.Wt : G.Wt / 2) + 0.12 * span + (d.layers && !G.side ? 0.65 * span : 0), y0: -0.07 * span, y1: ztop + 0.08 * span }, T.rdt);
     const V = view(b, W, H, { l: 20, r: 20, t: 26, b: 26 }, true);
     const X = V.X, Y = V.Y;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
@@ -293,14 +307,19 @@
     const dj = Math.sqrt(d.Cc) * I.d;
     const jet = [];
     if (v > 1e-6) {
-      if (G.side) { const tL = Math.sqrt((2 * Math.max(yo, 1e-4)) / g); for (let i = 0; i <= 40; i++) { const t = (tL * i) / 40; jet.push([v * t, yo - (g * t * t) / 2]); } }
+      if (G.side) { const tL = jetT(v, th, yo, g); for (let i = 0; i <= 40; i++) jet.push(jetPt(v, th, yo, g, (tL * i) / 40)); }
       else { const tL = (-v + Math.sqrt(v * v + 2 * g * Math.max(yo, 1e-4))) / g; for (let i = 0; i <= 20; i++) { const t = (tL * i) / 20; jet.push([0, yo - v * t - (g * t * t) / 2]); } }
       const wpx = Math.max(2.5, dj * V.sx);
       ctx.strokeStyle = jetCol; ctx.globalAlpha = 0.55; ctx.lineCap = 'round'; ctx.lineWidth = wpx; poly(ctx, jet.map((p) => [X(p[0]), Y(p[1])])); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
       // vena contracta (narrowing just outside the opening)
-      if (G.side) { const x0 = X(0), r0 = Math.max(2, (I.d / 2) * V.sy), r1 = Math.max(1.3, (dj / 2) * V.sy), lx = Math.max(8, I.d * 0.6 * V.sx); ctx.beginPath(); ctx.moveTo(x0, Y(yo) - r0); ctx.quadraticCurveTo(x0 + lx * 0.4, Y(yo) - r1, x0 + lx, Y(yo) - r1); ctx.lineTo(x0 + lx, Y(yo) + r1); ctx.quadraticCurveTo(x0 + lx * 0.4, Y(yo) + r1, x0, Y(yo) + r0); ctx.closePath(); ctx.fillStyle = C.water_deep; ctx.globalAlpha = 0.6; ctx.fill(); ctx.globalAlpha = 1; txt(ctx, 'vena contracta', x0 + lx + 4, Y(yo) - r0 - 8, { size: 10, color: C.muted }); }
+      if (G.side) { ctx.save(); ctx.translate(X(0), Y(yo)); ctx.rotate(-th); ctx.translate(-X(0), -Y(yo)); const x0 = X(0), r0 = Math.max(2, (I.d / 2) * V.sy), r1 = Math.max(1.3, (dj / 2) * V.sy), lx = Math.max(8, I.d * 0.6 * V.sx); ctx.beginPath(); ctx.moveTo(x0, Y(yo) - r0); ctx.quadraticCurveTo(x0 + lx * 0.4, Y(yo) - r1, x0 + lx, Y(yo) - r1); ctx.lineTo(x0 + lx, Y(yo) + r1); ctx.quadraticCurveTo(x0 + lx * 0.4, Y(yo) + r1, x0, Y(yo) + r0); ctx.closePath(); ctx.fillStyle = C.water_deep; ctx.globalAlpha = 0.6; ctx.fill(); ctx.globalAlpha = 1; txt(ctx, 'vena contracta', x0 + lx + 4, Y(yo) - r0 - 8, { size: 10, color: C.muted }); ctx.restore(); }
       const end = jet[jet.length - 1];
       if (G.side) { ctx.beginPath(); ctx.arc(X(end[0]), Y(0), 4, 0, 2 * PI); ctx.fillStyle = C.egl; ctx.fill(); dimH(ctx, X(0), X(end[0]), Y(0) + 18, `x = ${fmt(end[0])} ${L}`); }
+      if (G.side && th) txt(ctx, `θ = ${fmt(th * 180 / PI)}°`, X(0) + 14, Y(yo) + (th > 0 ? 32 : -16), { size: 11, mono: true, color: C.egl, bg: C.bg });
+      if (G.side && d.zmax) { const zt = Y(yo + d.zmax), xt = X(d.xz); stroke(ctx, [[X(0), zt], [xt + 30, zt]], C.muted, 1, [3, 3]); dimV(ctx, X(d.xz), Y(yo), zt, `z_max = ${fmt(d.zmax)} ${L}`, null, 'right'); }
+      const mk = (wx, wy, lab) => { ctx.beginPath(); ctx.arc(X(wx), Y(wy), 5, 0, 2 * PI); ctx.strokeStyle = C.egl; ctx.lineWidth = 2; ctx.stroke(); txt(ctx, lab, X(wx) + 8, Y(wy) - 10, { size: 11, mono: true, color: C.egl, bg: C.bg }); };
+      if (G.side && mode === 'steady' && I.jfind === 'pt' && isFinite(d.zq)) { stroke(ctx, [[X(d.xq), Y(0)], [X(d.xq), Y(Math.max(yo, yo + d.zq) + 0.3 * span * 0.3)]], C.wall, 3); mk(d.xq, yo + d.zq, `z = ${fmt(d.zq)} ${L} at x_p`); }
+      if (G.side && mode === 'steady' && (I.jfind === 'cv' || I.jfind === 'H')) mk(I.xm, yo - I.ym, `measured (${fmt(I.xm)}, −${fmt(I.ym)})`);
     }
     // particles
     A.parts = A.parts || [];
@@ -313,7 +332,7 @@
     for (const p of A.parts) {
       if (p.k === 'j') {
         p.t += dt; let x, y;
-        if (G.side) { x = p.v * p.t; y = yo - (g * p.t * p.t) / 2 + p.o; } else { x = p.o; y = yo - p.v * p.t - (g * p.t * p.t) / 2; }
+        if (G.side) { const q = jetPt(p.v, th, yo, g, p.t); x = q[0]; y = q[1] + p.o; } else { x = p.o; y = yo - p.v * p.t - (g * p.t * p.t) / 2; }
         if (y < 0) continue; keep.push(p); ctx.fillRect(X(x) - 1.5, Y(y) - 1.5, 3, 3);
       } else {
         const ox = G.side ? 0 : 0, dx = ox - p.x, dy = yo - p.y, r = Math.hypot(dx, dy) + 1e-9;
@@ -367,7 +386,7 @@
     const d = R.data, U = S.U;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     if (d.mode === 'steady') {
-      const hs = [], qs = [], xh = d.layers ? d.H1 : S.I.H; const Hm = Math.max(xh * 2, 1);
+      const hs = [], qs = [], xh = d.layers || d.Iover ? d.H1 : S.I.H; const Hm = Math.max(xh * 2, 1);
       for (let i = 0; i <= 80; i++) { const h = (Hm * i) / 80; hs.push(h); qs.push(d.K * Math.sqrt(Math.max(0, h + d.hp))); }
       plot(ctx, { x: 0, y: 0, w: W, h: H }, { title: d.layers ? 'Discharge vs equivalent head of layer 1 (Q = Cd·A_o·√(2g·H_eq))' : 'Discharge vs head (Q = Cd·A_o·√(2gH))', xs: hs, series: [{ ys: qs, color: C.water_deep, fill: true }], xlab: `${d.layers ? 'H_eq' : 'H'} (${U.L})`, ylab: '', ymin: 0, pts: [{ x: xh, y: d.Q0, color: C.egl, label: `Q = ${fmt(d.Q0)} ${U.Q}` }] });
       return;
@@ -1391,7 +1410,7 @@
     return circleRing(0, 0, G.side ? G.Wt / 2 : G.hw(zr));
   }
   M1.drawIso = function (ctx, W, H, R, A, T) {
-    const d = R.data, I = S.I, mode = d.mode, g = S.U.g, U = S.U, L = U.L;
+    const d = R.data, I = d.Iover ? Object.assign({}, S.I, d.Iover) : S.I, th = d.th || 0, mode = d.mode, g = S.U.g, U = S.U, L = U.L;
     if (mode === 'twotank') return drawTwoTankIso(ctx, W, H, R, A, T);
     const G = tankGeom(I, mode);
     const h = sm(A, 'h', mode === 'steady' ? I.H : d.hAt(S.simT), T.rdt, 14);
@@ -1402,10 +1421,10 @@
     const zs = (a, b) => { if (G.side) return [a, b]; const o = []; for (let i = 0; i <= 24; i++) o.push(a + ((b - a) * i) / 24); return o; };
     const ring = (zr) => tankRing(G, I, mode, zr);
     const ringW = (zw) => ring(zw - yo);
-    const xL0 = G.side ? 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo) : 0;
+    const xL0 = G.side ? (th ? d.x || 0 : 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo)) : 0;
     const Rt = Math.max(G.Wt / 2, G.sh === 'rect' && mode !== 'steady' ? I.Bt / 2 : 0, G.sh === 'hcyl' ? I.Lh / 2 : 0);
     const gx0 = -Rt * 1.5, gx1 = xo + xL0 + Math.max(0.4, Rt * 0.6), gy0 = -Rt * 1.5, gy1 = Rt * 1.5;
-    const { P, s } = isoFit(A, 'ib', [[gx0, gy0, 0], [gx1, gy0, 0], [gx1, gy1, 0], [gx0, gy1, 0], [-Rt, Rt, yo + G.Ht], [Rt, -Rt, yo + G.Ht], [-Rt, -Rt, yo + G.Ht]].concat(d.layers && !G.side ? [[Rt * 3.2, -Rt * 1.5, yo + G.Ht]] : []), W, H, 34, T.rdt);
+    const { P, s } = isoFit(A, 'ib', [[gx0, gy0, 0], [gx1, gy0, 0], [gx1, gy1, 0], [gx0, gy1, 0], [-Rt, Rt, yo + G.Ht], [Rt, -Rt, yo + G.Ht], [-Rt, -Rt, yo + G.Ht]].concat(d.layers && !G.side ? [[Rt * 3.2, -Rt * 1.5, yo + G.Ht]] : []).concat(G.side && d.zmax ? [[xo + d.xz, 0, yo + d.zmax]] : []), W, H, 34, T.rdt);
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     groundGrid(ctx, P, gx0, gx1, gy0, gy1);
     // shadows
@@ -1442,17 +1461,21 @@
     // jet tube + shadow
     if (v > 1e-6) {
       const jet = [], shd = [];
-      if (G.side) { const tL = Math.sqrt((2 * Math.max(yo, 1e-4)) / g); for (let i = 0; i <= 40; i++) { const t = (tL * i) / 40; jet.push(P(xo + v * t, 0, yo - (g * t * t) / 2)); shd.push(P(xo + v * t, 0, 0)); } }
+      if (G.side) { const tL = jetT(v, th, yo, g); for (let i = 0; i <= 40; i++) { const q = jetPt(v, th, yo, g, (tL * i) / 40); jet.push(P(xo + q[0], 0, q[1])); shd.push(P(xo + q[0], 0, 0)); } }
       else { const tL = (-v + Math.sqrt(v * v + 2 * g * Math.max(yo, 1e-4))) / g; for (let i = 0; i <= 20; i++) { const t = (tL * i) / 20; jet.push(P(0, 0, yo - v * t - (g * t * t) / 2)); } }
       if (shd.length) stroke(ctx, shd, C.wall, 2, [4, 4]);
       ctx.lineCap = 'round'; ctx.globalAlpha = 0.55; poly(ctx, jet); ctx.strokeStyle = jetCol; ctx.lineWidth = Math.max(2.5, dj * s); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
       const end = jet[jet.length - 1]; ctx.beginPath(); ctx.ellipse(end[0], end[1], 9, 4.5, 0, 0, 2 * PI); ctx.fillStyle = C.egl; ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1;
-      if (G.side) { const xl = v * Math.sqrt((2 * Math.max(yo, 1e-4)) / g); dim3(ctx, P(xo, Rt * 0.9, 0), P(xo + xl, Rt * 0.9, 0), `x = ${fmt(xl)} ${L}`); }
+      if (G.side) { const xl = jetPt(v, th, yo, g, jetT(v, th, yo, g))[0]; dim3(ctx, P(xo, Rt * 0.9, 0), P(xo + xl, Rt * 0.9, 0), `x = ${fmt(xl)} ${L}`); }
+      const mk3 = (wx, wz, lab) => { const q = P(xo + wx, 0, wz); ctx.beginPath(); ctx.arc(q[0], q[1], 5, 0, 2 * PI); ctx.strokeStyle = C.egl; ctx.lineWidth = 2; ctx.stroke(); txt(ctx, lab, q[0] + 8, q[1] - 10, { size: 11, mono: true, color: C.egl, bg: C.bg }); };
+      if (G.side && mode === 'steady' && I.jfind === 'pt' && isFinite(d.zq)) mk3(d.xq, yo + d.zq, `z = ${fmt(d.zq)} ${L} at x_p`);
+      if (G.side && mode === 'steady' && (I.jfind === 'cv' || I.jfind === 'H')) mk3(I.xm, yo - I.ym, `measured (${fmt(I.xm)}, −${fmt(I.ym)})`);
+      if (G.side && th) { const q = P(xo, 0, yo); txt(ctx, `θ = ${fmt(th * 180 / PI)}°`, q[0] + 14, q[1] + 18, { size: 11, mono: true, color: C.egl, bg: C.bg }); }
     }
     for (const p of A.ip) {
       if (p.k !== 'j') continue;
       p.t += dt; let x, y, z;
-      if (G.side) { x = xo + p.v * p.t; y = p.o; z = yo - (g * p.t * p.t) / 2 + p.oz; } else { x = p.o; y = p.oz; z = yo - p.v * p.t - (g * p.t * p.t) / 2; }
+      if (G.side) { const q = jetPt(p.v, th, yo, g, p.t); x = xo + q[0]; y = p.o; z = q[1] + p.oz; } else { x = p.o; y = p.oz; z = yo - p.v * p.t - (g * p.t * p.t) / 2; }
       if (z < 0) continue; keep.push(p); const q = P(x, y, z); ctx.fillStyle = C.part; ctx.fillRect(q[0] - 1.5, q[1] - 1.5, 3, 3);
     }
     A.ip = keep;

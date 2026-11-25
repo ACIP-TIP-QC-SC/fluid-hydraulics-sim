@@ -374,5 +374,137 @@
     return ok(st, out, warn, { cls: warn.length ? 'warn' : 'ok', text: p.usolve === 'dh' ? `Δh = ${f(dh)} ${U.len}` : `ω = ${f(w)} rad/s (${f((w * 60) / (2 * PI))} rpm)` }, { r1, r2, h1, h2, zv, w });
   }
 
-  Object.assign(P0, { compress, inclined, hoop, planeAny, polyProps, hydrometer, balloon, rotUtube });
+  /* =================================================================== */
+  /* Buoyancy when only the volume (or weighings) is known — any shape.   */
+  /* Forces in N / lb, γ input in kN/m³ / lb/ft³, volumes in m³ / ft³.    */
+  /* Apparent weight W' = W − γ_L V (negative = force to hold it under).  */
+  /* =================================================================== */
+  function buoyVol(p, U) {
+    const st = Steps(), out = [], warn = [];
+    const SI = U.id === 'SI', Fu = SI ? 'N' : 'lb', gu = SI ? 'N/m³' : 'lb/ft³', Vu = U.vol, Lu = U.len;
+    const gw = p.gwV > 0 ? p.gwV * (SI ? 1000 : 1) : U.gw * (SI ? 1000 : 1);
+    const gIn = (v) => v * (SI ? 1000 : 1);                     // kN/m³ → N/m³
+    const g1 = p.sg1 * gw;
+    st.add('Unit weight of the liquid', 'γ_L = S_L γ_w', `γ_L = ${f(p.sg1)} × ${f(gw)}`, `γ_L = ${f(g1)} ${gu}`, p.gwV > 0 ? 'Using the γ_w you entered.' : '');
+    if (!(g1 > 0)) return fail(['The liquid needs a specific gravity greater than zero.'], [], st.list);
+    const volOf = () => {
+      if (p.Vby === 'sph') { const V = (PI * p.Dv ** 3) / 6; st.add('Volume of the sphere', 'V = πD³/6', `V = π × ${f(p.Dv)}³ / 6`, `V = ${f(V)} ${Vu}`, ''); return V; }
+      if (p.Vby === 'cube') { const V = p.av ** 3; st.add('Volume of the cube', 'V = a³', `V = ${f(p.av)}³`, `V = ${f(V)} ${Vu}`, ''); return V; }
+      st.add('Volume of the body (given)', 'V', '', `V = ${f(p.Vv)} ${Vu}`, 'The shape does not matter: buoyancy depends only on the displaced volume.');
+      return p.Vv;
+    };
+    let V, W, g2 = p.sg2 * gw, sg2 = p.sg2;
+    const vc = p.vc;
+    if (vc === 'body') {
+      V = volOf();
+      if (p.matBy === 'W') { W = p.WB; st.add('Weight of the body (given)', 'W', '', `W = ${f(W)} ${Fu}`, ''); }
+      else {
+        const gB = p.matBy === 'gam' ? gIn(p.gB) : p.sgB * gw;
+        W = gB * V;
+        st.add('Weight of the body', p.matBy === 'gam' ? 'W = γ_B V' : 'W = S_B γ_w V', p.matBy === 'gam' ? `W = ${f(gB)} × ${f(V)}` : `W = ${f(p.sgB)} × ${f(gw)} × ${f(V)}`, `W = ${f(W)} ${Fu}`, '');
+      }
+    } else if (vc === 'weigh') {
+      const wk = p.wk;
+      if (wk === 'air1') {
+        W = p.Wair; const B = W - p.Wl1;
+        st.add('Buoyant force = loss of weight', "F_B = W − W'₁", `F_B = ${f(W)} − ${f(p.Wl1)}`, `F_B = ${f(B)} ${Fu}`, 'The scale reads less in the liquid by exactly the buoyant force.');
+        if (!(B > 0)) return fail(['The weight in the liquid must be less than the weight in air.'], [], st.list);
+        V = B / g1;
+        st.add('Volume of the body', 'V = F_B / γ_L', `V = ${f(B)} / ${f(g1)}`, `V = ${f(V)} ${Vu}`, 'F_B is the weight of the displaced liquid, and the body displaces its whole volume.');
+      } else if (wk === 'v1') {
+        V = volOf();
+        W = p.Wl1 + g1 * V;
+        st.add('Weight in air', "W = W'₁ + γ_L V", `W = ${f(p.Wl1)} + ${f(g1)} × ${f(V)}`, `W = ${f(W)} ${Fu}`, "ΣF_y = 0 on the hanging body: W = W'₁ + F_B.");
+      } else if (wk === 'two') {
+        if (Math.abs(g2 - g1) < 1e-12) return fail(['The two liquids must have different specific gravities.'], [], st.list);
+        st.add('Unit weight of liquid 2', 'γ₂ = S₂ γ_w', `γ₂ = ${f(p.sg2)} × ${f(gw)}`, `γ₂ = ${f(g2)} ${gu}`, '');
+        V = (p.Wl1 - p.Wl2) / (g2 - g1);
+        st.add('Volume from the two weighings', "W'₁ = W − γ₁V,  W'₂ = W − γ₂V  →  V = (W'₁ − W'₂)/(γ₂ − γ₁)", `V = (${f(p.Wl1)} − ${f(p.Wl2)}) / (${f(g2)} − ${f(g1)})`, `V = ${f(V)} ${Vu}`, 'Subtract the two equilibrium equations to remove W.');
+        if (!(V > 0)) return fail(['These weighings give a zero or negative volume. The body should weigh less in the denser liquid.'], [], st.list);
+        W = p.Wl1 + g1 * V;
+        st.add('Weight in air', "W = W'₁ + γ₁V", `W = ${f(p.Wl1)} + ${f(g1)} × ${f(V)}`, `W = ${f(W)} ${Fu}`, '');
+      } else {
+        V = volOf();
+        W = p.Wl1 + g1 * V;
+        st.add('Weight in air', "W = W'₁ + γ₁V", `W = ${f(p.Wl1)} + ${f(g1)} × ${f(V)}`, `W = ${f(W)} ${Fu}`, "A negative W' is a force needed to hold the body under.");
+        g2 = (W - p.Wl2) / V; sg2 = g2 / gw;
+        st.add('Unit weight of liquid 2', "γ₂ = (W − W'₂)/V", `γ₂ = (${f(W)} − ${f(p.Wl2)}) / ${f(V)}`, `γ₂ = ${f(g2)} ${gu},  S₂ = ${f(sg2)}`, '');
+      }
+    } else {
+      // floating body: find volumes from S_B, or S_B from the volumes
+      if (p.fsolve === 'vol') {
+        const gB = p.matBy === 'gam' ? gIn(p.gB) : p.sgB * gw;
+        const r = gB / g1;
+        st.add('Fraction submerged', 'V_sub / V = γ_B / γ_L', `= ${f(gB)} / ${f(g1)}`, `= ${f(r)}`, 'Floating: W = F_B, so γ_B V = γ_L V_sub.');
+        if (!(r < 1)) return fail(['The body is not lighter than the liquid, so it does not float.'], [], st.list);
+        const gv = p.Vg;
+        V = p.fby === 'Vt' ? gv : p.fby === 'Vab' ? gv / (1 - r) : gv / r;
+        st.add('Total volume', p.fby === 'Vt' ? 'V (given)' : p.fby === 'Vab' ? 'V = V_above / (1 − V_sub/V)' : 'V = V_sub / (V_sub/V)', p.fby === 'Vt' ? '' : `V = ${f(gv)} / ${f(p.fby === 'Vab' ? 1 - r : r)}`, `V = ${f(V)} ${Vu}`, '');
+        W = gB * V;
+      } else {
+        V = volOf();
+        const Vs = p.subBy === 'pct' ? (p.subV / 100) * V : p.subBy === 'Vab' ? V - p.subV : p.subV;
+        if (!(Vs > 0 && Vs <= V)) return fail(['The submerged volume must be between zero and the total volume.'], [], st.list);
+        st.add('Submerged volume', p.subBy === 'pct' ? 'V_sub = (% / 100) V' : p.subBy === 'Vab' ? 'V_sub = V − V_above' : 'V_sub (given)', p.subBy === 'Vsub' ? '' : p.subBy === 'pct' ? `V_sub = ${f(p.subV)}/100 × ${f(V)}` : `V_sub = ${f(V)} − ${f(p.subV)}`, `V_sub = ${f(Vs)} ${Vu}`, '');
+        W = g1 * Vs;
+        st.add('Weight = buoyant force (floating)', 'W = γ_L V_sub', `W = ${f(g1)} × ${f(Vs)}`, `W = ${f(W)} ${Fu}`, '');
+      }
+    }
+    if (!(V > 0)) return fail(['The volume must be greater than zero.'], [], st.list);
+    if (!(W >= 0)) warn.push('The weight in air comes out negative: check the signs of the apparent weights.');
+    const gB = W / V, SB = gB / gw, rho = gB / U.g;
+    if (vc !== 'body' || p.matBy === 'W') st.add('Unit weight and specific gravity of the body', 'γ_B = W/V,  S_B = γ_B/γ_w', `γ_B = ${f(W)} / ${f(V)}`, `γ_B = ${f(gB)} ${gu},  S_B = ${f(SB)}`, `Density ρ = γ/g = ${f(rho)} ${SI ? 'kg/m³' : 'slug/ft³'}.`);
+    const BF = g1 * V, Wa1 = W - BF;
+    st.add('Buoyant force when fully submerged in liquid 1', 'F_B = γ_L V', `F_B = ${f(g1)} × ${f(V)}`, `F_B = ${f(BF)} ${Fu}`, '');
+    const floats = W < BF - 1e-12;
+    let fsub = 1;
+    if (vc !== 'weigh' || p.wk !== 'air1') st.add('Apparent weight in liquid 1', "W'₁ = W − F_B", `W'₁ = ${f(W)} − ${f(BF)}`, `W'₁ = ${f(Wa1)} ${Fu}`, Wa1 >= 0 ? 'Tension in a string that holds it submerged (scale reading).' : `Negative: a downward force of ${f(-Wa1)} ${Fu} is needed to hold it under.`);
+    if (floats) {
+      fsub = W / BF;
+      st.add('Left free, it floats', 'V_sub = W / γ_L', `V_sub = ${f(W)} / ${f(g1)}`, `V_sub = ${f(fsub * V)} ${Vu} (${f(100 * fsub)} % submerged, ${f(100 * (1 - fsub))} % above)`, '');
+    }
+    // mixture of two materials (Archimedes' crown)
+    let alpha = null;
+    if (p.mix) {
+      const Sa = p.sga, Sb = p.sgb;
+      if (Math.abs(Sa - Sb) < 1e-12) warn.push('The two materials need different specific gravities.');
+      else {
+        alpha = (SB - Sb) / (Sa - Sb);
+        st.add('Share of material A by volume', 'S = α S_A + (1 − α) S_B', `α = (${f(SB)} − ${f(Sb)}) / (${f(Sa)} − ${f(Sb)})`, `α = ${f(alpha)}  (by weight ${f((alpha * Sa) / SB)})`, 'Volumes add, so the mixture S is the volume-weighted average.');
+        if (alpha < -1e-9 || alpha > 1 + 1e-9) warn.push('The body’s specific gravity is outside the range of the two materials, so it cannot be a mixture of only these two.');
+      }
+    }
+    // second liquid
+    let Wa2 = null, T = null;
+    if (vc === 'weigh' && (p.wk === 'two' || p.wk === 'liq')) Wa2 = W - g2 * V;
+    else if (p.liq2) {
+      if (p.l2m === 'split') {
+        const f1 = Math.max(0, Math.min(1, p.fr1));
+        T = W - g1 * f1 * V - g2 * (1 - f1) * V;
+        st.add('Body across two liquids', "T = W − γ₁(f V) − γ₂((1 − f)V)", `T = ${f(W)} − ${f(g1)}(${f(f1 * V)}) − ${f(g2)}(${f((1 - f1) * V)})`, `T = ${f(T)} ${Fu}`, 'Each liquid buoys the part of the volume it surrounds (S₂ = 0 for air).');
+      } else {
+        Wa2 = W - g2 * V;
+        st.add('Apparent weight in liquid 2', "W'₂ = W − γ₂V", `W'₂ = ${f(W)} − ${f(g2)} × ${f(V)}`, `W'₂ = ${f(Wa2)} ${Fu}`, Wa2 < 0 ? 'Negative: it would float in liquid 2.' : '');
+      }
+    }
+    // rise of the liquid in a tank
+    let dh = null;
+    if (p.tank && p.Atk > 0) {
+      const Vd = floats && !(vc === 'weigh') ? fsub * V : V;
+      dh = Vd / p.Atk;
+      st.add('Rise of the liquid in the tank', 'Δh = V_displaced / A_tank', `Δh = ${f(Vd)} / ${f(p.Atk)}`, `Δh = ${f(dh * (SI ? 1000 : 12))} ${SI ? 'mm' : 'in'}`, floats && vc !== 'weigh' ? 'The floating body displaces only its submerged volume.' : 'The body is held fully submerged.');
+    }
+    const hlV = vc !== 'body' && !(vc === 'weigh' && (p.wk === 'v1' || p.wk === 'liq')) && !(vc === 'float' && p.fsolve === 'sg');
+    out.push({ k: 'Volume V', v: V, u: Vu, hl: hlV }, { k: 'Weight in air W', v: W, u: Fu, hl: vc !== 'body' }, { k: 'Specific gravity S_B', v: SB, u: '', hl: vc !== 'body' }, { k: 'Unit weight γ_B', v: gB, u: gu }, { k: 'Density ρ', v: rho, u: SI ? 'kg/m³' : 'slug/ft³' }, { k: 'Buoyant force (submerged) F_B', v: BF, u: Fu, hl: vc === 'body' }, { k: Wa1 >= 0 ? "Apparent weight in liquid 1 W'₁" : 'Force to hold it under', v: Math.abs(Wa1), u: Fu, hl: vc === 'body' });
+    if (floats) out.push({ k: '% submerged when floating', v: 100 * fsub, u: '%', hl: vc === 'float' }, { k: 'Volume above the surface', v: (1 - fsub) * V, u: Vu });
+    if (Wa2 !== null) out.push({ k: Wa2 >= 0 ? "Apparent weight in liquid 2 W'₂" : 'Force to hold it under liquid 2', v: Math.abs(Wa2), u: Fu, hl: vc === 'body' || (vc === 'weigh' && p.wk === 'v1') });
+    if (vc === 'weigh' && p.wk === 'liq') out.push({ k: 'Specific gravity of liquid 2', v: sg2, u: '', hl: true });
+    if (T !== null) out.push({ k: 'String tension across the two liquids T', v: T, u: Fu, hl: true });
+    if (alpha !== null) out.push({ k: 'Fraction of material A by volume α', v: alpha, u: '', hl: true });
+    if (dh !== null) out.push({ k: 'Rise of liquid in the tank Δh', v: dh * (SI ? 1000 : 12), u: SI ? 'mm' : 'in', hl: true });
+    const text = floats && vc === 'float' ? `Floats ${f(100 * fsub)} % submerged, V = ${f(V)} ${Vu}` : `V = ${f(V)} ${Vu},  W = ${f(W)} ${Fu},  S_B = ${f(SB)}`;
+    return ok(st, out, warn, { cls: warn.length ? 'warn' : 'ok', text }, { V, W, BF, Wa1, Wa2, T, floats: floats && !(vc === 'weigh' && p.wk === 'air1'), fsub, S1: p.sg1, S2: sg2, SB, split: T !== null, fr1: p.fr1, two: Wa2 !== null, dh });
+  }
+
+  Object.assign(P0, { compress, inclined, hoop, planeAny, polyProps, hydrometer, balloon, rotUtube, buoyVol });
 })(window);

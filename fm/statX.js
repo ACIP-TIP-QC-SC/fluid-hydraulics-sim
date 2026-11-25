@@ -5,7 +5,7 @@
  *   Pressure        → comp (air & compressible fluids, barometer, bubbles),
  *                     incl (inclined-tube gauge with reservoir)
  *   Hydrostatic F.  → any (plane area of any shape, lateral CP), hoop
- *   Buoyancy        → hydro (hydrometer), balloon
+ *   Buoyancy        → hydro (hydrometer), balloon, volb (volume / weighings only)
  *   Rel. equilibrium→ rotu (rotating U-tube)
  * Each extension keeps its own inputs in state.x[key]; the host module
  * stores the choice in state.sub and hands control here when StatX.is(sub).
@@ -354,6 +354,104 @@
     },
   };
 
+  /* ---------------- Buoyancy: volume or weighings only (any shape) ------ */
+  X.volb = {
+    mod: 'm2', label: 'Volume only (any shape)',
+    def: { vc: 'body', gwV: 0, sg1: 1, Vby: 'V', Vv: 2, Dv: 0.3, av: 0.3, matBy: 'sg', sgB: 0.6, gB: 25, WB: 1000,
+      wk: 'air1', Wair: 90, Wl1: 50, Wl2: 60, sg2: 0.8, fsolve: 'vol', fby: 'Vab', Vg: 100, subBy: 'pct', subV: 60,
+      liq2: false, l2m: 'cmp', fr1: 0.5, tank: false, Atk: 0.5, mix: false, sga: 10.5, sgb: 19.3 },
+    controls(x, el, C, U, sl) {
+      const Fu = pick(U, 'N', 'lb'), gu = pick(U, 'kN/m³', 'lb/ft³');
+      C.seg(el, { label: 'What is known', options: [['body', 'Volume + material'], ['weigh', 'Weighings'], ['float', 'Floating body']], get: () => x.vc, set: (v) => (x.vc = v) });
+      const l = C.section(el, 'Liquid');
+      C.sg(l, { label: 'Liquid 1 Sg_L', get: () => x.sg1, set: (v) => (x.sg1 = v) });
+      sl(l, 'gwV', `Unit weight of water γ_w (0 = ${pick(U, '9.81 kN/m³', '62.4 lb/ft³')})`, 0, pick(U, 10, 64), 0.001, gu);
+      const volCtl = (g) => {
+        C.seg(g, { label: 'Volume given as', options: [['V', 'Volume'], ['sph', 'Sphere D'], ['cube', 'Cube side']], get: () => x.Vby, set: (v) => (x.Vby = v) });
+        if (x.Vby === 'sph') sl(g, 'Dv', 'Sphere diameter D', 0.001, 100, 0.0001, U.len);
+        else if (x.Vby === 'cube') sl(g, 'av', 'Cube side a', 0.001, 100, 0.0001, U.len);
+        else sl(g, 'Vv', 'Volume V', 0.000001, pick(U, 1e5, 1e6), 0.000001, U.vol);
+      };
+      const b = C.section(el, x.vc === 'weigh' ? 'Weighings (apparent weight; − = force to hold it under)' : 'Body');
+      if (x.vc === 'body') {
+        volCtl(b);
+        C.seg(b, { label: 'Material given by', options: [['sg', 'Sg_B'], ['gam', 'Unit weight γ_B'], ['W', 'Weight W']], get: () => x.matBy, set: (v) => (x.matBy = v) });
+        if (x.matBy === 'sg') sl(b, 'sgB', 'Body specific gravity Sg_B', 0.001, 25, 0.001, '');
+        else if (x.matBy === 'gam') sl(b, 'gB', 'Body unit weight γ_B', 0.001, pick(U, 250, 1500), 0.001, gu);
+        else sl(b, 'WB', 'Weight in air W', 0, pick(U, 1e7, 1e6), 0.001, Fu);
+      } else if (x.vc === 'weigh') {
+        C.select(b, { label: 'Known', options: [['air1', 'Weight in air and in liquid 1'], ['v1', 'Volume and weight in liquid 1'], ['two', 'Weights in liquids 1 and 2'], ['liq', 'Volume and weights in liquids 1 and 2 (find Sg₂)']], get: () => x.wk, set: (v) => (x.wk = v) });
+        if (x.wk === 'v1' || x.wk === 'liq') volCtl(b);
+        if (x.wk === 'air1') sl(b, 'Wair', 'Weight in air W', 0, pick(U, 1e7, 1e6), 0.001, Fu);
+        sl(b, 'Wl1', "Weight in liquid 1 W'₁", -pick(U, 1e7, 1e6), pick(U, 1e7, 1e6), 0.001, Fu);
+        if (x.wk === 'two' || x.wk === 'liq') sl(b, 'Wl2', "Weight in liquid 2 W'₂", -pick(U, 1e7, 1e6), pick(U, 1e7, 1e6), 0.001, Fu);
+        if (x.wk === 'two') sl(b, 'sg2', 'Liquid 2 Sg₂', 0, 13.6, 0.001, '');
+      } else {
+        C.seg(b, { label: 'Find', options: [['vol', 'Volumes (Sg_B known)'], ['sg', 'Sg_B (volumes known)']], get: () => x.fsolve, set: (v) => (x.fsolve = v) });
+        if (x.fsolve === 'vol') {
+          C.seg(b, { label: 'Material given by', options: [['sg', 'Sg_B'], ['gam', 'Unit weight γ_B']], get: () => (x.matBy === 'W' ? 'sg' : x.matBy), set: (v) => (x.matBy = v) });
+          if (x.matBy === 'gam') sl(b, 'gB', 'Body unit weight γ_B', 0.001, pick(U, 250, 1500), 0.001, gu);
+          else sl(b, 'sgB', 'Body specific gravity Sg_B', 0.001, 25, 0.001, '');
+          C.seg(b, { label: 'Volume known', options: [['Vt', 'Total'], ['Vab', 'Above the surface'], ['Vsub', 'Submerged']], get: () => x.fby, set: (v) => (x.fby = v) });
+          sl(b, 'Vg', 'That volume', 0.000001, pick(U, 1e7, 1e8), 0.000001, U.vol);
+        } else {
+          volCtl(b);
+          C.seg(b, { label: 'Submergence given as', options: [['pct', '% submerged'], ['Vsub', 'Submerged volume'], ['Vab', 'Volume above']], get: () => x.subBy, set: (v) => (x.subBy = v) });
+          sl(b, 'subV', x.subBy === 'pct' ? 'Percent submerged' : x.subBy === 'Vsub' ? 'Submerged volume' : 'Volume above the surface', 0, x.subBy === 'pct' ? 100 : pick(U, 1e5, 1e6), 0.000001, x.subBy === 'pct' ? '%' : U.vol);
+        }
+      }
+      const o = C.section(el, 'Extras');
+      if (!(x.vc === 'weigh' && (x.wk === 'two' || x.wk === 'liq'))) {
+        C.toggle(o, { label: 'Second liquid', get: () => x.liq2, set: (v) => (x.liq2 = v) });
+        if (x.liq2) {
+          C.seg(o, { options: [['cmp', 'Weigh it in liquid 2'], ['split', 'Body across both liquids']], get: () => x.l2m, set: (v) => (x.l2m = v) });
+          sl(o, 'sg2', 'Liquid 2 Sg₂ (0 = air)', 0, 13.6, 0.001, '');
+          if (x.l2m === 'split') sl(o, 'fr1', 'Fraction of the volume in liquid 1', 0, 1, 0.001, '');
+        }
+      }
+      C.toggle(o, { label: 'Liquid rise in a tank', get: () => x.tank, set: (v) => (x.tank = v) });
+      if (x.tank) sl(o, 'Atk', 'Tank plan area A', 0.0001, pick(U, 1e4, 1e5), 0.0001, U.area);
+      C.toggle(o, { label: 'Body is a mix of two materials (Archimedes’ crown)', get: () => x.mix, set: (v) => (x.mix = v) });
+      if (x.mix) { sl(o, 'sga', 'Material A Sg', 0.01, 25, 0.001, ''); sl(o, 'sgb', 'Material B Sg', 0.01, 25, 0.001, ''); }
+    },
+    compute: (x, U) => Physics.buoyVol(x, U),
+    scene(x, res, U) {
+      const g = res.geo, sc = Scene.Scene(), R = 0.42, Fu = pick(U, 'N', 'lb');
+      const fl = g.floats && (x.vc === 'float' || (x.vc === 'body' && !g.split && !g.two));
+      const split = g.split, S2 = x.sg2;
+      const cy = fl ? R - 2 * R * g.fsub : -1.05;
+      const yi = split ? cy - R + 2 * R * Math.max(0, Math.min(1, g.fr1)) : null;
+      // liquid(s)
+      const bot = -2.2;
+      sc.rect(-1.3, bot, 1.3, split ? yi : 0, { fill: liqCol(g.S1), stroke: 'none', fop: 0.4 }, false);
+      sc.lathe([[0, bot], [1.3, bot], [1.3, split ? yi : 0], [0, split ? yi : 0]], 0, liqCol(g.S1), 0.22);
+      if (split && S2 > 0) { sc.rect(-1.3, yi, 1.3, 0, { fill: liqCol(S2), stroke: 'none', fop: 0.4 }, false); sc.lathe([[0, yi], [1.3, yi], [1.3, 0], [0, 0]], 0, liqCol(S2), 0.22); }
+      if (split) { sc.line([-1.3, yi], [1.3, yi], { stroke: '#b9770e', dash: '6 3' }); sc.text([0.62, yi - 0.14], `S₁ = ${f(g.S1)}`, { color: '#52606d' }); sc.text([0.62, yi + 0.1], S2 > 0 ? `S₂ = ${f(S2)}` : 'air', { color: '#52606d' }); }
+      sc.rect(-1.32, bot - 0.04, 1.32, 0.9, { fill: 'none', stroke: '#2c3e50', sw: 1.5 }, false);
+      if (!split || S2 > 0) { sc.line([-1.3, 0], [1.3, 0], { stroke: WATERD, sw: 1.5 }); sc.fs([-0.85, 0], {}); }
+      if (!split) sc.text([-1.25, -1.95], `Liquid S = ${f(g.S1)}`, { color: '#52606d' });
+      // body
+      sc.circle([0, cy], R, { fill: '#b08d57', stroke: '#6e4f25', sw: 2 }, 'sphere', '#b08d57');
+      sc.text([R + 0.06, fl ? cy - 0.2 : cy + 0.32], `V = ${f(g.V)} ${U.vol}`, { color: '#52606d', in3: true });
+      sc.arrow([-0.12, cy], [-0.12, cy - 0.8], { color: '#c0392b' });
+      sc.text([-R - 0.08, cy - 0.1], `W = ${f(g.W)} ${Fu}`, { color: '#c0392b', anchor: 'end' });
+      sc.arrow([0.12, cy - R - 0.55], [0.12, cy - R + 0.05], { color: '#2980b9', label: `F_B = ${f(fl ? g.W : split ? g.W - g.T : g.BF)} ${Fu}` });
+      if (!fl) {
+        const T = split ? g.T : g.Wa1;
+        if (T >= 0) {
+          sc.line([0, cy + R], [0, 1.25], { stroke: '#2c3e50', sw: 1.5 });
+          sc.rect(-0.22, 1.25, 0.22, 1.6, { fill: '#ecf0f1', stroke: '#2c3e50', sw: 1.5 }, { fill: '#ecf0f1', alpha: 1, z0: -0.15, z1: 0.15 });
+          sc.text([0.3, 1.42], `scale: ${f(T)} ${Fu}`, { color: '#2c3e50' });
+        } else {
+          sc.arrow([0, cy + R + 0.7], [0, cy + R], { color: '#8e44ad', label: `push ${f(-T)} ${Fu}` });
+        }
+      }
+      if (fl) sc.text([0.35, -1.95], `${f(100 * g.fsub)} % of V submerged`, { color: '#2c3e50' });
+      sc.depth = 1.1;
+      return sc;
+    },
+  };
+
   /* ---------------- Relative equilibrium: rotating U-tube --------------- */
   X.rotu = {
     mod: 'm3', label: 'Rotating U-tube',
@@ -480,6 +578,22 @@
       P('Hibbeler 2-142 — hot-air balloon 120 000 ft³, ρ 0.00237 / 0.00193 slug/ft³, 200 lb (1.50 kip)', 'balloon', { gasB: 'given', gamA: 0.00237 * 32.2, gamG: 0.00193 * 32.2, bsol: 'load', Vby: 'V', VB: 120000, WB: 200 }, 'EN'),
       P('Schaum 4.29 — 20 ft balloon, gas 0.0345 lb/ft³, air 0.0765, empty 100 lb (76 lb cargo)', 'balloon', { gasB: 'given', gamA: 0.0765, gamG: 0.0345, bsol: 'load', Vby: 'D', DB: 20, WB: 100 }, 'EN'),
       P('Helium balloon sized to lift 5 kN (air 15 °C, 101.3 kPa, 500 N envelope)', 'balloon', { gasB: 'he', Tair: 15, pB: 101.3, bsol: 'size', WB: 500, Wpay: 5000 }),
+      P('Schaum 4.1 — stone 90 N in air, 50 N in water (V 0.00409 m³, Sg 2.25)', 'volb', { vc: 'weigh', wk: 'air1', gwV: 9.79, sg1: 1, Wair: 90, Wl1: 50 }),
+      P('Schaum 4.15 — object 289 N in air, 187 N in water (0.0104 m³, Sg 2.83)', 'volb', { vc: 'weigh', wk: 'air1', gwV: 9.79, sg1: 1, Wair: 289, Wl1: 187 }),
+      P('Schaum 4.16 — 65 lb in air, 42 lb in oil Sg 0.75 (0.491 ft³, Sg 2.12)', 'volb', { vc: 'weigh', wk: 'air1', sg1: 0.75, Wair: 65, Wl1: 42 }, 'EN'),
+      P('2500SP 6.1 — stone 105 lb in air, 67.0 lb in water (0.609 ft³, Sg 2.76)', 'volb', { vc: 'weigh', wk: 'air1', sg1: 1, Wair: 105, Wl1: 67 }, 'EN'),
+      P('Schaum 4.19 — stone 600 N, 323 N in water, 0.610 m square tank (water rises 76 mm)', 'volb', { vc: 'weigh', wk: 'air1', gwV: 9.79, sg1: 1, Wair: 600, Wl1: 323, tank: true, Atk: 0.61 * 0.61 }),
+      P('Schaum 4.2 — 8 × 8 × 16 in prism weighs 11.0 lb in water (48 lb, Sg 1.30)', 'volb', { vc: 'weigh', wk: 'v1', sg1: 1, Vby: 'V', Vv: (8 * 8 * 16) / 1728, Wl1: 11 }, 'EN'),
+      P('Schaum 4.18 — 6 in aluminium cube, 12.2 lb in water → in Sg 1.25 (10.25 lb)', 'volb', { vc: 'weigh', wk: 'v1', sg1: 1, Vby: 'cube', av: 0.5, Wl1: 12.2, liq2: true, l2m: 'cmp', sg2: 1.25 }, 'EN'),
+      P('2500SP 6.24 — 15 in radius sphere moored in sea water (64 lb/ft³) with 160 lb tension (γ 44.4 lb/ft³)', 'volb', { vc: 'weigh', wk: 'v1', sg1: 64 / 62.4, Vby: 'sph', Dv: 2.5, Wl1: -160 }, 'EN'),
+      P('2500SP 6.51 — 4 N in water, 5 N in alcohol Sg 0.80 (0.000511 m³, 9.00 N, 1796 kg/m³)', 'volb', { vc: 'weigh', wk: 'two', gwV: 9.79, sg1: 1, Wl1: 4, Wl2: 5, sg2: 0.8 }),
+      P('2500SP 6.44 — typewriter 6 lb in water, 8 lb in oil Sg 0.86 (0.229 ft³, 88.6 lb/ft³)', 'volb', { vc: 'weigh', wk: 'two', sg1: 1, Wl1: 6, Wl2: 8, sg2: 0.86 }, 'EN'),
+      P('Schaum 4.23 — 6 ft³ needs 60 lb to hold under water, 36 lb in another liquid (Sg 0.936; book 0.937)', 'volb', { vc: 'weigh', wk: 'liq', sg1: 1, Vby: 'V', Vv: 6, Wl1: -60, Wl2: -36 }, 'EN'),
+      P('2500SP 6.22/6.23 — crown 14.0 N in air, 12.7 N in water: gold 19.3 or silver 10.5? (Sg 10.77, 96.9 % silver)', 'volb', { vc: 'weigh', wk: 'air1', gwV: 9.79, sg1: 1, Wair: 14, Wl1: 12.7, mix: true, sga: 10.5, sgb: 19.3 }),
+      P('Schaum 4.17 — 305 mm aluminium sphere, γ 25.9 kN/m³, in water and in oil 0.75 (book 238 N and 276 N)', 'volb', { vc: 'body', gwV: 9.79, sg1: 1, Vby: 'sph', Dv: 0.305, matBy: 'gam', gB: 25.9, liq2: true, l2m: 'cmp', sg2: 0.75 }),
+      P('Schaum 4.33 — 152 mm aluminium cube half in oil 0.80, half in water (60.0 N; book 60.4)', 'volb', { vc: 'body', gwV: 9.79, sg1: 1, Vby: 'cube', av: 0.152, matBy: 'gam', gB: 25.9, liq2: true, l2m: 'split', sg2: 0.8, fr1: 0.5 }),
+      P('Schaum 4.5 — metal Sg 7.25 floating in mercury Sg 13.57 (46.6 % above)', 'volb', { vc: 'float', fsolve: 'vol', sg1: 13.57, matBy: 'sg', sgB: 7.25, fby: 'Vt', Vg: 1 }),
+      P('Schaum 4.27 — iceberg 57 lb/ft³ in sea water 64 lb/ft³, 21 000 ft³ above (192 000 ft³)', 'volb', { vc: 'float', fsolve: 'vol', sg1: 64 / 62.4, matBy: 'gam', gB: 57, fby: 'Vab', Vg: 21000 }, 'EN'),
     );
     if (M3) M3.presets.push(
       P('Hibbeler 2-173 — water U-tube, legs 0.2 m and 0.4 m from the axis, levels 0.6 / 1.0 m (8.09 rad/s)', 'rotu', { r1u: 0.2, r2u: 0.4, h0u: 0.8, usolve: 'w', dhu: 0.4, sgU: 1 }),

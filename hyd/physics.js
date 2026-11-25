@@ -221,7 +221,7 @@
   HP.orifice = function (I, U) {
     const o = Out(), g = U.g, L = U.L, mode = I.mode;
     const gam = I.Sg * U.gw, Ao = (PI * I.d * I.d) / 4, hp = I.ps / gam, s2g = sqrt(2 * g);
-    const Cd = I.Cd, Cv = I.Cv, Cc = I.Cc, K = Cd * Ao * s2g;
+    let Cd = I.Cd, Cv = I.Cv, Cc = I.Cc, K = Cd * Ao * s2g;
     // liquid layers (steady and draining only): layer 1 is the bottom liquid at the orifice
     const nL = mode === 'steady' || mode === 'drain' ? Math.max(1, Math.min(4, Math.round(+I.nLay || 1))) : 1;
     const lay = [{ sg: I.Sg, t: I.H }];
@@ -229,7 +229,7 @@
     if (nL > 1) lay[0].t = I.H - lay.slice(1).reduce((a, l) => a + l.t, 0);
     let H1 = I.H;
     o.data = { mode, Ao, hp, K, Cv, Cd, Cc, d: I.d, y: I.y, g, H1, shape: I.shape };
-    if (abs(Cc * Cv - Cd) > 0.005) W(o, `Cd should equal Cc × Cv (${fmt(Cc)} × ${fmt(Cv)} = ${fmt(Cc * Cv)}). Q uses Cd = ${fmt(Cd)}.`);
+    if (!(mode === 'steady' && I.jfind === 'cv') && abs(Cc * Cv - Cd) > 0.005) W(o, `Cd should equal Cc × Cv (${fmt(Cc)} × ${fmt(Cv)} = ${fmt(Cc * Cv)}). Q uses Cd = ${fmt(Cd)}.`);
 
     S(o, nL > 1 ? 'Unit weight of the bottom liquid (layer 1)' : 'Unit weight of the liquid', nL > 1 ? 'γ₁ = Sg₁·γw' : 'γ = Sg·γw', `γ${nL > 1 ? '₁' : ''} = ${fmt(I.Sg)} × ${fmt(U.gw)}`, `${fmt(gam)} ${U.gam}`, nL > 1 ? 'The orifice discharges the bottom liquid first.' : 'Unit weight used for pressure head and jet power.');
     S(o, 'Orifice area', 'A_o = πd²/4', `A_o = π(${fmt(I.d)})²/4`, `${fmt(Ao)} ${U.A}`, 'Area of the orifice opening.');
@@ -248,16 +248,54 @@
       R(o, 'Equivalent head H_eq' + (mode === 'drain' ? ' (at H₁)' : ''), H1, L);
       o.data.layers = lay; o.data.Heq0 = H1; o.data.H1 = H1;
     }
-    const HT = H1 + hp;
-    if (hp !== 0 && mode !== 'twotank')
+    let HT = H1 + hp;
+    if (hp !== 0 && mode !== 'twotank' && !(mode === 'steady' && I.jfind === 'H'))
       S(o, 'Total head (closed tank)', nL > 1 ? 'H_T = H_eq + p_s/γ₁' : 'H_T = H + p_s/γ', `H_T = ${fmt(H1)} + ${P(I.ps)}/${fmt(gam)}`, `${fmt(HT)} ${L}`, 'Gauge pressure on the liquid surface adds a pressure head.');
     if (mode !== 'twotank' && HT <= 0) return fail(o, 'Total head is zero or negative: the vacuum on the surface is strong enough that no liquid flows out (air is drawn in instead).');
+
+    // slanted jet and measured-point problems (side orifice / nozzle)
+    const th = (mode === 'twotank' ? 0 : Math.max(-89, Math.min(89, +I.jang || 0))) * PI / 180, cth = Math.cos(th), tth = Math.tan(th);
+    const jf = mode === 'steady' ? I.jfind || 'land' : 'land';
+    o.data.th = th;
+    if (jf === 'cv' || jf === 'H') {
+      const xm = I.xm, ym = I.ym, den = 2 * cth * cth * (ym + xm * tth);
+      if (!(xm > 0) || !(den > 0)) return fail(o, 'That point cannot lie on the jet: with this angle the jet never reaches it. Check x, the drop y (positive below the orifice centre) and θ.');
+      const vm = sqrt((g * xm * xm) / den);
+      if (th === 0) S(o, 'Jet velocity from the measured point', 'x = v·t,  y = g·t²/2  →  v = x·√(g/(2y))', `v = ${fmt(xm)} × √(${fmt(g)}/(2 × ${fmt(ym)}))`, `${fmt(vm)} ${U.v}`, 'y is how far the point is below the centre of the orifice.');
+      else S(o, 'Jet velocity from the measured point', 'y = g·x²/(2v²cos²θ) − x·tanθ  →  v = √(g·x² / (2cos²θ·(y + x·tanθ)))', `v = √(${fmt(g)} × ${fmt(xm)}² / (2 × ${fmt(cth)}² × (${P(ym)} + ${fmt(xm)} × ${P(tth)})))`, `${fmt(vm)} ${U.v}`, 'y is the drop of the point below the orifice centre; θ is measured up from the horizontal.');
+      if (jf === 'cv') {
+        const vt0 = sqrt(2 * g * HT);
+        Cv = vm / vt0;
+        S(o, 'Coefficient of velocity', `Cv = v / √(2g${hp !== 0 ? 'H_T' : nL > 1 ? 'H_eq' : 'H'})`, `Cv = ${fmt(vm)} / ${fmt(vt0)}`, fmt(Cv), 'Actual jet speed over the ideal Torricelli speed.');
+        if (I.Qm > 0) {
+          Cd = I.Qm / (Ao * vt0);
+          S(o, 'Coefficient of discharge', 'Cd = Q / (A_o·√(2gH))', `Cd = ${fmt(I.Qm)} / (${fmt(Ao)} × ${fmt(vt0)})`, fmt(Cd), 'From the measured discharge.');
+          Cc = Cd / Cv;
+          S(o, 'Coefficient of contraction', 'Cc = Cd / Cv', `Cc = ${fmt(Cd)} / ${fmt(Cv)}`, fmt(Cc), '');
+        } else {
+          Cd = Cc * Cv;
+          S(o, 'Coefficient of discharge', 'Cd = Cc·Cv', `Cd = ${fmt(Cc)} × ${fmt(Cv)}`, fmt(Cd), 'No discharge was measured, so Cc is taken as entered.');
+        }
+        if (Cv > 1) W(o, 'Cv comes out above 1, which is not possible for a real jet. Check the measurements.');
+        R(o, 'Coefficient of velocity Cv', Cv, '', true); R(o, 'Coefficient of discharge Cd', Cd, '', I.Qm > 0); R(o, 'Coefficient of contraction Cc', Cc, '', I.Qm > 0);
+      } else {
+        if (nL > 1) return fail(o, 'Finding the head from the jet works with one liquid in the tank. Set the layers to one liquid.');
+        HT = (vm * vm) / (2 * g * Cv * Cv);
+        S(o, hp !== 0 ? 'Total head needed' : 'Head on the orifice', 'H = v² / (2g·Cv²)', `H = ${fmt(vm)}² / (2 × ${fmt(g)} × ${fmt(Cv)}²)`, `${fmt(HT)} ${L}`, 'Since v = Cv·√(2gH).');
+        H1 = HT - hp;
+        if (hp !== 0) S(o, 'Liquid depth above the orifice', 'H = H_T − p_s/γ', `H = ${fmt(HT)} − ${P(I.ps)}/${fmt(gam)}`, `${fmt(H1)} ${L}`, '');
+        if (!(H1 > 0)) return fail(o, 'The surface pressure alone gives more head than the jet needs, so no liquid depth is required.');
+        R(o, 'Head on the orifice H', H1, L, true);
+        o.data.H1 = H1; o.data.Iover = { H: H1 };
+      }
+      K = Cd * Ao * s2g; Object.assign(o.data, { K, Cv, Cd, Cc });
+    }
 
     const at = mode === 'steady' ? '' : ' (at H₁)';
     const Hh = mode === 'twotank' ? H1 : HT;
     const vt = sqrt(2 * g * Hh), v = Cv * vt, Q = Cd * Ao * vt, a = Cc * Ao;
     const HL = (1 / (Cv * Cv) - 1) * (v * v) / (2 * g), Pw = (gam * Q * v * v) / (2 * g);
-    const x = 2 * Cv * sqrt(Hh * I.y);
+    let x = 2 * Cv * sqrt(Hh * I.y);
     const Hs = mode === 'twotank' ? 'ΔH' : hp !== 0 ? 'H_T' : nL > 1 ? 'H_eq' : 'H';
     S(o, 'Theoretical velocity' + at, `v_t = √(2g${Hs})`, `v_t = √(2 × ${fmt(g)} × ${fmt(Hh)})`, `${fmt(vt)} ${U.v}`, 'Torricelli: ideal velocity from the head.');
     S(o, 'Actual jet velocity' + at, 'v = Cv·√(2gH)', `v = ${fmt(Cv)} × ${fmt(vt)}`, `${fmt(v)} ${U.v}`, 'Friction makes the real jet slower by Cv.');
@@ -277,10 +315,33 @@
     const side = mode === 'steady' || I.shape === 'vcyl' || I.shape === 'rect';
     o.data.side = side;
     if (mode !== 'twotank') {
-      if (side) {
+      if (side && th === 0) {
         S(o, 'Jet trajectory', 'x = 2Cv·√(H·y)', `x = 2 × ${fmt(Cv)} × √(${fmt(Hh)} × ${fmt(I.y)})`, `${fmt(x)} ${L}`, 'From x = vt and y = gt²/2: horizontal distance where the jet lands.');
-        R(o, 'Jet lands at x' + at, x, L, mode === 'steady');
+        R(o, 'Jet lands at x' + at, x, L, mode === 'steady' && jf === 'land');
+      } else if (side) {
+        const vx = v * cth, vy = v * Math.sin(th), aa = g / (2 * v * v * cth * cth);
+        x = (tth + sqrt(tth * tth + 4 * aa * I.y)) / (2 * aa);
+        S(o, 'Jet components' + at, 'v_x = v·cosθ,  v_y = v·sinθ', `v_x = ${fmt(v)} cos ${fmt(I.jang)}°,  v_y = ${fmt(v)} sin ${fmt(I.jang)}°`, `v_x = ${fmt(vx)}, v_y = ${fmt(vy)} ${U.v}`, 'θ is measured up from the horizontal (negative = pointing down).');
+        S(o, 'Path of the jet', 'z = x·tanθ − g·x² / (2v²cos²θ)', `z = ${P(tth)}·x − ${fmt(aa)}·x²`, 'z = height above the orifice centre', 'A projectile path: steady horizontal speed, gravity acting down.');
+        S(o, 'Where the jet lands', '−y = x·tanθ − g·x²/(2v²cos²θ)', `${fmt(aa)}x² − ${P(tth)}x − ${fmt(I.y)} = 0`, `x = ${fmt(x)} ${L}`, 'The ground is y below the orifice; take the positive root.');
+        const tf = x / vx;
+        S(o, 'Time in the air', 't = x / v_x', `t = ${fmt(x)} / ${fmt(vx)}`, `${fmt(tf)} s`, '');
+        if (th > 0) {
+          const zmax = (vy * vy) / (2 * g), xz = (vx * vy) / g;
+          S(o, 'Highest point of the jet', 'z_max = v_y²/(2g),  at x = v_x·v_y/g', `z_max = ${fmt(vy)}²/(2 × ${fmt(g)})`, `${fmt(zmax)} ${L} above the orifice, at x = ${fmt(xz)} ${L}`, 'The vertical speed is zero at the top.');
+          R(o, 'Highest point above the orifice', zmax, L); R(o, 'Highest point is at x', xz, L);
+          o.data.zmax = zmax; o.data.xz = xz;
+        }
+        const vimp = sqrt(v * v + 2 * g * I.y), aimp = (Math.atan2(sqrt(Math.max(0, vimp * vimp - vx * vx)), vx) * 180) / PI;
+        S(o, 'Speed where it lands', 'v_land = √(v² + 2g·y)', `v_land = √(${fmt(v)}² + 2 × ${fmt(g)} × ${fmt(I.y)})`, `${fmt(vimp)} ${U.v} at ${fmt(aimp)}° below the horizontal`, 'Energy of the free jet: it gains g·y of kinetic energy per unit mass.');
+        R(o, 'Jet lands at x' + at, x, L, mode === 'steady' && jf === 'land'); R(o, 'Time of flight', tf, 's'); R(o, 'Landing speed', vimp, U.v);
       } else W(o, 'This tank shape drains through a bottom orifice, so the jet falls vertically (no horizontal range).', 'info');
+      if (side && jf === 'pt') {
+        const xq = I.xq, aa = g / (2 * v * v * cth * cth), zq = xq * tth - aa * xq * xq;
+        S(o, 'Height of the jet at a given distance', th === 0 ? 'z = −g·x²/(2v²)' : 'z = x·tanθ − g·x²/(2v²cos²θ)', `z = ${th === 0 ? '' : `${fmt(xq)} × ${P(tth)} `}− ${fmt(aa)} × ${fmt(xq)}²`, `${fmt(zq)} ${L} (${zq < 0 ? fmt(-zq) + ' ' + L + ' below' : 'above'} the orifice centre)`, zq < -I.y ? 'That is below the ground: the jet lands before reaching this distance.' : 'For example where the jet strikes a wall at that distance.');
+        R(o, 'Jet height at x_p (+ above, − below the orifice)', zq, L, true);
+        o.data.xq = xq; o.data.zq = zq;
+      }
     }
     o.data.x = x;
     if (mode === 'steady') { o.data.tEnd = Infinity; return o; }

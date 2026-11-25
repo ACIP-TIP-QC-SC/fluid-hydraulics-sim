@@ -13,6 +13,32 @@
 
   const LAYER_DEF = [{ sg: 0.8, t: 1 }, { sg: 1, t: 2 }, { sg: 1.26, t: 0.5 }, { sg: 1.59, t: 0.5 }, { sg: 13.6, t: 0.3 }];
   const padLayers = (s) => { while (s.layers.length < 5) s.layers.push(Object.assign({}, LAYER_DEF[s.layers.length])); };
+  /* multi-fluid path solved for an unknown length x or an unknown Sg, then shown as a normal A → B run */
+  function solveLeg(s, U, patm) {
+    const f = Physics.fmt, gw = U.gw, Pu = U.press, Lu = U.len;
+    const legs = s.legs.slice(0, s.nl).map((l) => ({ sg: l.sg, dz: l.dz, cx: l.cx || 0 }));
+    const dpAB = s.pA - s.pB;
+    let step, outv;
+    if (s.msolve === 'x') {
+      const a = legs.reduce((t, l) => t + l.sg * gw * l.dz, 0), b = legs.reduce((t, l) => t + l.sg * gw * l.cx, 0);
+      if (Math.abs(b) < 1e-12) return { ok: false, err: ['Give a coefficient c on at least one leg that has a fluid in it, so x appears in the balance.'], warn: [], steps: [], out: [], geo: {} };
+      const x = (dpAB - a) / b;
+      legs.forEach((l) => (l.dz += l.cx * x));
+      step = { t: 'Unknown length from the pressure balance', f: 'p_B = p_A − Σ γᵢ (Δzᵢ + cᵢ x)  →  x = (p_A − p_B − Σγᵢ Δzᵢ) / Σγᵢ cᵢ', s: `x = (${f(s.pA)} − ${f(s.pB)} − ${f(a)}) / ${f(b)}`, r: `x = ${f(x)} ${Lu}`, n: 'Each leg then rises Δzᵢ + cᵢ x; the run from A to B below checks it.' };
+      outv = { k: 'Unknown length x', v: x, u: Lu, hl: true };
+    } else {
+      const k = Math.min(s.kLeg, s.nl) - 1, lk = legs[k];
+      if (Math.abs(lk.dz) < 1e-12) return { ok: false, err: ['The leg with the unknown Sg needs a height change Δz.'], warn: [], steps: [], out: [], geo: {} };
+      const a = legs.reduce((t, l, i) => (i === k ? t : t + l.sg * gw * l.dz), 0);
+      const sg = (dpAB - a) / (gw * lk.dz);
+      lk.sg = sg;
+      step = { t: `Unknown Sg of leg ${k + 1}`, f: 'p_A − p_B = Σ γᵢ Δzᵢ  →  Sg_k = (p_A − p_B − Σ_{i≠k} γᵢ Δzᵢ)/(γ_w Δz_k)', s: `Sg = (${f(s.pA)} − ${f(s.pB)} − ${f(a)}) / (${f(gw)} × ${f(lk.dz)})`, r: `Sg = ${f(sg)}`, n: sg < 0 ? 'Negative: check the signs of Δz.' : '' };
+      outv = { k: `Sg of leg ${k + 1}`, v: sg, u: '', hl: true };
+    }
+    const r = Physics.pressure({ sub: 'multi', patm, legs, n: s.nl, solve: 'pB', pA: s.pA, pB: s.pB, gasA: s.gasA, gasB: s.gasB }, U);
+    if (r.ok) { r.steps.unshift(step); r.out.unshift(outv); r.out.forEach((o) => { if (o.k === 'p_B (gauge)') o.hl = false; }); r.status = { cls: 'ok', text: `${outv.k} = ${f(outv.v)}${outv.u ? ' ' + outv.u : ''}` }; }
+    return r;
+  }
   const MP = {
     id: 'mp', title: 'Pressure',
     state: {
@@ -20,7 +46,7 @@
       p0: 0, n: 2, layers: [{ sg: 0.8, t: 1.5 }, { sg: 1, t: 3 }, { sg: 13.6, t: 0.5 }, { sg: 1.26, t: 0.5 }, { sg: 13.6, t: 0.3 }], zq: 4,
       type: 'utube', sgA: 1, sgM: 13.6, hp: 1.2, y: 0.6, h: 0.4, closed: false, pEnd: 0,
       inverted: false, sgB: 1, zA: 0.8, dz: 0, solve: 'dp', dP: 20,
-      nl: 4, legs: [{ sg: 1, dz: -1.2 }, { sg: 13.6, dz: 0.5 }, { sg: 1, dz: -0.3 }, { sg: 0.8, dz: 1.0 }, { sg: 1, dz: 0.5 }, { sg: 1, dz: 0.5 }], msolve: 'pB', pA: 25, pB: 0, gasA: false, gasB: false,
+      nl: 4, legs: [{ sg: 1, dz: -1.2 }, { sg: 13.6, dz: 0.5 }, { sg: 1, dz: -0.3 }, { sg: 0.8, dz: 1.0 }, { sg: 1, dz: 0.5 }, { sg: 1, dz: 0.5 }], msolve: 'pB', pA: 25, pB: 0, gasA: false, gasB: false, kLeg: 1, xGuess: 0,
       d1: 0.04, d2: 0.3, sgP: 0.88, dzP: 0.5, F1: 0.15, lever: false, Fh: 0.05, ratio: 8,
     },
     presets: [
@@ -35,6 +61,8 @@
       { name: 'Inverted U with oil, water pipes', apply: (s) => Object.assign(s, { sub: 'diff', inverted: true, sgA: 1, sgB: 1, sgM: 0.8, zA: 1.2, dz: 0, h: 0.2, solve: 'dp' }) },
       { name: 'Chambers: air at 25 kPa in A, water–mercury–water–oil to B', apply: (s) => Object.assign(s, { sub: 'multi', msolve: 'pB', pA: 25, gasA: true, gasB: false, nl: 4, legs: [{ sg: 1, dz: -1.2 }, { sg: 13.6, dz: 0.5 }, { sg: 1, dz: -0.3 }, { sg: 0.8, dz: 1.0 }, { sg: 1, dz: 0.5 }, { sg: 1, dz: 0.5 }] }) },
       { name: 'Two air chambers joined by a mercury U (find p_A)', apply: (s) => Object.assign(s, { sub: 'multi', msolve: 'pA', pB: 15, gasA: true, gasB: true, nl: 3, legs: [{ sg: 0, dz: -0.8 }, { sg: 13.6, dz: 0.35 }, { sg: 0, dz: 0.45 }, { sg: 1, dz: 0 }, { sg: 1, dz: 0 }, { sg: 1, dz: 0 }] }) },
+      { name: 'Schaum 2.35 — vessels A (water, 103.4 kPa) and B (68.95 kPa), 305 mm mercury: Sg of the liquid in B (0.49; book 0.500 with γ 9.79)', apply: (s) => Object.assign(s, { sub: 'multi', msolve: 'sg', kLeg: 3, pA: 103.4, pB: 68.95, gasA: false, gasB: false, nl: 3, legs: [{ sg: 1, dz: -2.133, cx: 0 }, { sg: 13.6, dz: 0.305, cx: 0 }, { sg: 0.5, dz: 3.048, cx: 0 }, { sg: 0.8, dz: 1.0 }, { sg: 1, dz: 0.5 }, { sg: 1, dz: 0.5 }] }) },
+      { name: 'Mercury U-tube between two water pipes: reading x for p_A − p_B = 30 kPa', apply: (s) => Object.assign(s, { sub: 'multi', msolve: 'x', pA: 30, pB: 0, gasA: false, gasB: false, nl: 3, legs: [{ sg: 1, dz: -0.5, cx: -1 }, { sg: 13.6, dz: 0, cx: 1 }, { sg: 1, dz: 0.5, cx: 0 }, { sg: 0.8, dz: 1.0 }, { sg: 1, dz: 0.5 }, { sg: 1, dz: 0.5 }] }) },
       { name: 'Hydraulic jack: 40 mm / 300 mm pistons, 0.15 kN', apply: (s) => Object.assign(s, { sub: 'press', d1: 0.04, d2: 0.3, sgP: 0.88, dzP: 0.5, F1: 0.15, lever: false }) },
       { name: 'Hydraulic jack with an 8 : 1 lever', apply: (s) => Object.assign(s, { sub: 'press', d1: 0.025, d2: 0.2, sgP: 0.9, dzP: 0, Fh: 0.05, ratio: 8, lever: true }) },
     ],
@@ -93,17 +121,21 @@
         else sl(g, 'p_A − p_B', () => s.dP, (v) => (s.dP = v), -500, 500, 0.01, U.press);
       } else if (s.sub === 'multi') {
         const c = C.section(el, 'Chambers');
-        C.seg(c, { label: 'Solve for', options: [['pB', 'p_B (given p_A)'], ['pA', 'p_A (given p_B)']], get: () => s.msolve, set: (v) => (s.msolve = v) });
-        if (s.msolve === 'pB') sl(c, 'Gauge pressure in A', () => s.pA, (v) => (s.pA = v), -100, 1000, 0.01, U.press);
-        else sl(c, 'Gauge pressure in B', () => s.pB, (v) => (s.pB = v), -100, 1000, 0.01, U.press);
+        C.select(c, { label: 'Solve for', options: [['pB', 'p_B (given p_A)'], ['pA', 'p_A (given p_B)'], ['x', 'Unknown length x (p_A and p_B known)'], ['sg', 'Unknown Sg of one leg (p_A and p_B known)']], get: () => s.msolve, set: (v) => (s.msolve = v) });
+        if (s.msolve !== 'pA') sl(c, 'Gauge pressure in A', () => s.pA, (v) => (s.pA = v), -1000, 10000, 0.01, U.press);
+        if (s.msolve !== 'pB') sl(c, 'Gauge pressure in B', () => s.pB, (v) => (s.pB = v), -1000, 10000, 0.01, U.press);
+        if (s.msolve === 'x') C.note(c, 'Each leg rises Δz = (given part) + c·x. Give c = +1 or −1 (or an area ratio) on the legs that contain the unknown length x.');
+        if (s.msolve === 'sg') C.select(c, { label: 'Leg with the unknown Sg', options: Array.from({ length: s.nl }, (_, k) => [k + 1, `Leg ${k + 1}`]), get: () => Math.min(s.kLeg, s.nl), set: (v) => (s.kLeg = +v) });
         C.toggle(c, { label: 'Chamber A holds gas (air)', get: () => s.gasA, set: (v) => (s.gasA = v) });
         C.toggle(c, { label: 'Chamber B holds gas (air)', get: () => s.gasB, set: (v) => (s.gasB = v) });
         C.seg(c, { label: 'Number of legs (A → B)', options: [1, 2, 3, 4, 5, 6].map((k) => [k, String(k)]), get: () => s.nl, set: (v) => (s.nl = +v) });
         C.note(c, 'Each leg is a vertical column of one fluid. Δz is + going up and − going down along the path from A to B.');
         for (let i = 0; i < s.nl; i++) {
           const L = C.section(el, `Leg ${i + 1}`);
-          sgRow(L, 'Fluid Sg', () => s.legs[i].sg, (v) => (s.legs[i].sg = v));
-          sl(L, 'Δz (up +, down −)', () => s.legs[i].dz, (v) => (s.legs[i].dz = v), -5, 5, 0.001, U.len);
+          if (!(s.msolve === 'sg' && i + 1 === Math.min(s.kLeg, s.nl))) sgRow(L, 'Fluid Sg', () => s.legs[i].sg, (v) => (s.legs[i].sg = v));
+          else C.note(L, 'Sg of this leg is the unknown.');
+          sl(L, s.msolve === 'x' ? 'Δz, given part (up +, down −)' : 'Δz (up +, down −)', () => s.legs[i].dz, (v) => (s.legs[i].dz = v), -50, 50, 0.001, U.len);
+          if (s.msolve === 'x') sl(L, 'Coefficient c of x in this leg', () => s.legs[i].cx || 0, (v) => (s.legs[i].cx = v), -20, 20, 0.001, '');
         }
         sl(el, 'Atmospheric pressure', patm.get, patm.set, 0, U.id === 'EN' ? 3000 : 120, 0.001, U.press);
       } else {
@@ -122,6 +154,7 @@
       const s = this.state;
       padLayers(s);
       const patm = U.id === 'EN' ? s.patmEN : s.patm;
+      if (s.sub === 'multi' && (s.msolve === 'x' || s.msolve === 'sg')) return solveLeg(s, U, patm);
       return Physics.pressure({
         sub: s.sub, patm, p0: s.p0, n: s.n, layers: s.layers, zq: s.zq,
         type: s.type, sgA: s.sgA, sgM: s.sgM, hp: s.hp, y: s.y, h: s.h, closed: s.closed, pEnd: s.pEnd,

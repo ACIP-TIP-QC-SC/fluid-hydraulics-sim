@@ -93,7 +93,11 @@
         // sections (shared)
         { k: 'D1', label: 'Pipe (inlet) diameter D₁', labelFn: (P, m) => (m === 'nozzle' ? 'Pipe (base) diameter D₁' : m === 'bern' ? 'Diameter at section 1 D₁' : 'Pipe (inlet) diameter D₁'), dim: 'mm', min: 5, max: 3000, step: 1, def: 300, modes: ['venturi', 'nozzle', 'bern'] },
         { k: 'D2', label: 'Throat diameter D₂', labelFn: (P, m) => (m === 'nozzle' ? 'Nozzle tip diameter D₂' : m === 'bern' ? 'Diameter at section 2 D₂' : P.mtype === 'orifice' ? 'Orifice diameter D₂' : 'Throat diameter D₂'), dim: 'mm', min: 2, max: 3000, step: 1, def: 150, modes: ['venturi', 'nozzle', 'bern'] },
-        { k: 'Cm', label: 'Meter coefficient C', min: 0.5, max: 1.05, step: 0.001, def: 0.98, show: (P, m) => m === 'venturi' && P.msolve !== 'C' },
+        { k: 'cby', type: 'select', label: 'Coefficient C', def: 'given', options: [['given', 'Enter C'], ['curve', 'From the standard curve C(Re) (iterated)']], show: (P, m) => m === 'venturi' && P.msolve !== 'C' && P.mtype !== 'venturi' },
+        { k: 'ntype', type: 'select', label: 'Nozzle', def: 'lr', options: [['lr', 'Long-radius (ASME) nozzle'], ['isa', 'ISA 1932 nozzle']], show: (P, m) => m === 'venturi' && P.msolve !== 'C' && P.mtype === 'nozzle' && P.cby === 'curve' },
+        { k: 'taps', type: 'select', label: 'Pressure taps', def: 'corner', options: [['corner', 'Corner taps (vena contracta region)'], ['flange', 'Flange taps (25 mm)'], ['D2', 'D and D/2 taps']], show: (P, m) => m === 'venturi' && P.msolve !== 'C' && P.mtype === 'orifice' && P.cby === 'curve' },
+        { k: 'nuM', label: 'Kinematic viscosity ν of the flowing fluid', dim: 'nu', min: 0.01, max: 100000, step: 0.001, def: 1.003, log: true, chips: [['Water 20°C', 1.003], ['Water 30°C', 0.801], ['Water 10°C', 1.306]], show: (P, m) => m === 'venturi' && P.mtype !== 'venturi' && (P.cby === 'curve' || P.msolve === 'C') },
+        { k: 'Cm', label: 'Meter coefficient C', min: 0.5, max: 1.05, step: 0.001, def: 0.98, show: (P, m) => m === 'venturi' && P.msolve !== 'C' && !(P.cby === 'curve' && P.mtype !== 'venturi') },
         // nozzle
         { k: 'nsolve', type: 'select', label: 'Solve for', def: 'Q', options: [['Q', 'Discharge from the base pressure'], ['p', 'Base pressure for a given Q']], modes: ['nozzle'] },
         { k: 'Cv', label: 'Coefficient of velocity C_v', min: 0.8, max: 1, step: 0.001, def: 0.96, modes: ['nozzle'] },
@@ -122,6 +126,9 @@
         { name: 'Schaum 12.17 (English) — 12 in × 6 in Venturi, Q = 1.49 cfs, find C', mode: 'venturi', units: 'EN', set: { mtype: 'venturi', msolve: 'C', read: 'mano', D1: 12, D2: 6, Q: 1.49, hm: 3.5, Sgm: 1.25 } },
         { name: 'Schaum 12.18 — 300 × 150 mm Venturi, C = 0.98, gauge (Sg 1.25) reads 1.18 m', mode: 'venturi', set: { mtype: 'venturi', msolve: 'Q', read: 'mano', D1: 300, D2: 150, Cm: 0.98, hm: 1.18, Sgm: 1.25 } },
         { name: 'Schaum 12.21 — 150 mm orifice in a 250 mm pipe, Δh = 1.10 m, C = 0.609', mode: 'venturi', set: { mtype: 'orifice', msolve: 'Q', read: 'dh', D1: 250, D2: 150, Cm: 0.609, dhG: 1.1 } },
+        { name: 'Schaum 12.21 with C from the orifice curve — 150 mm in 250 mm, Δh 1.10 m, water 20 °C (C 0.608, Q 0.0535; book reads 0.609 off Diagram C)', mode: 'venturi', set: { mtype: 'orifice', msolve: 'Q', read: 'dh', D1: 250, D2: 150, cby: 'curve', taps: 'corner', nuM: 1.003, dhG: 1.1 } },
+        { name: 'Schaum 12.19 (English) — 4 in orifice in an 8 in pipe, water 100 °F, 0.525 cfs: C from the curve (Δh 1.43 ft of water; book 1.44 with 0.604)', mode: 'venturi', units: 'EN', set: { mtype: 'orifice', msolve: 'h', D1: 8, D2: 4, Q: 0.525, cby: 'curve', taps: 'corner', nuM: 0.739, Sgm: 13.6 } },
+        { name: 'Long-radius nozzle 75 mm in a 150 mm pipe, 152 mm of mercury, water 20 °C: Q with C(Re) iterated', mode: 'venturi', set: { mtype: 'nozzle', msolve: 'Q', read: 'mano', D1: 150, D2: 75, cby: 'curve', ntype: 'lr', nuM: 1.003, hm: 0.152, Sgm: 13.6 } },
         { name: 'Venturi: mercury gauge reading needed for 60 L/s', mode: 'venturi', set: { mtype: 'venturi', msolve: 'h', D1: 300, D2: 150, Cm: 0.98, Q: 0.06, Sgm: 13.6 } },
         { name: 'Schaum 12.15 — pressure head at the nozzle base for 27 L/s (C_v 0.95, C_c 0.93)', mode: 'nozzle', set: { nsolve: 'p', D1: 100, D2: 50, Cv: 0.95, Cc: 0.93, Q: 0.027, dzN: 0 } },
         { name: 'Schaum 12.16 — nozzle pointing down, 7.92 m head at the base, jet power', mode: 'nozzle', set: { nsolve: 'Q', D1: 100, D2: 50, Cv: 0.962, Cc: 1, p1: 77.695, dzN: 0.914 } },
@@ -293,7 +300,7 @@
     const NG = {}; ['1x1', '1x2', '1x3', '2x1', '2x2'].forEach((g) => (NG[g] = root.HP.netGrid(g)));
     const MAXP = 12, MAXN = 9;
     const single = (m) => m !== 'net';
-    const sizeShown = (P, m) => single(m) && m !== 'D';
+    const sizeShown = (P, m) => single(m) && m !== 'D' && !(m === 'inv' && P.pinv === 'Dlam');
     const netP = [];
     for (let i = 1; i <= MAXP; i++) {
       const has = (P, m) => m === 'net' && NG[P.grid].pipes.length >= i;
@@ -311,25 +318,32 @@
     for (let j = 1; j <= MAXN; j++) nodeP.push({ k: 'q' + j, label: '', labelFn: (P) => `Junction ${(NG[P.grid].nodes[j - 1] || {}).name}`, dim: 'Q', min: -100, max: 100, step: 0.0001, def: j === 1 ? 0.4 : j >= 5 && j <= 8 ? -0.1 : 0, show: (P, m) => m === 'net' && NG[P.grid].nodes.length >= j });
     const PD = {
       id: 'pdesign', tab: 'Pipe Design & Networks', title: 'Pipe Design: Head Loss, Discharge or Size of Pipes and Ducts, and Pipe Networks (Hardy Cross)', fn: 'pipeDesign',
-      modes: [['hf', 'Head loss for a given Q'], ['Q', 'Discharge for a given head'], ['D', 'Size for a given head loss'], ['net', 'Pipe network (Hardy Cross)']],
+      modes: [['hf', 'Head loss for a given Q'], ['Q', 'Discharge for a given head'], ['D', 'Size for a given head loss'], ['inv', 'Solve backwards: viscosity, critical velocity, laminar size, coefficients, length'], ['net', 'Pipe network (Hardy Cross)']],
       speed: {},
       modeDefaults: {},
       params: [
+        { k: 'pinv', type: 'select', label: 'Find', def: 'nu', modes: ['inv'], options: [['nu', 'Viscosity for a given Reynolds number (e.g. laminar limit)'], ['Vcr', 'Critical velocity for a given Reynolds number'], ['Dlam', 'Pipe size at a given Reynolds number (laminar limit)'], ['mu', 'Viscosity from a measured laminar head loss'], ['coef', 'f, Hazen-Williams C and Manning n from a test'], ['L', 'Length for an allowable head loss']] },
+        { k: 'Rec', label: 'Reynolds number Re (2000 = lower critical)', min: 1, max: 1e7, step: 1, def: 2000, log: true, modes: ['inv'], show: (P) => P.pinv === 'nu' || P.pinv === 'Vcr' || P.pinv === 'Dlam' },
+        { k: 'byV', type: 'select', label: 'Flow given as', def: 'Q', modes: ['inv'], options: [['Q', 'Discharge Q'], ['V', 'Mean velocity V']], show: (P) => P.pinv === 'nu' || P.pinv === 'coef' || P.pinv === 'L' || P.pinv === 'mu' },
+        { k: 'Vi', label: 'Mean velocity V', dim: 'vel', min: 0.0001, max: 100, step: 0.0001, def: 1, modes: ['inv'], show: (P) => P.byV === 'V' && P.pinv !== 'Vcr' && P.pinv !== 'Dlam' },
+        { k: 'hBy', type: 'select', label: 'Measured loss given as', def: 'h', modes: ['inv'], options: [['h', 'Head loss h_f'], ['p', 'Pressure drop Δp']], show: (P) => P.pinv === 'mu' || P.pinv === 'coef' },
+        { k: 'Hm', label: 'Measured head loss h_f', dim: 'len', min: 0.00001, max: 10000, step: 0.00001, def: 1, log: true, modes: ['inv'], show: (P) => (P.pinv === 'mu' || P.pinv === 'coef') && P.hBy !== 'p' },
+        { k: 'dpm', label: 'Measured pressure drop Δp', dim: 'kPa', min: 0.00001, max: 100000, step: 0.00001, def: 10, log: true, modes: ['inv'], show: (P) => (P.pinv === 'mu' || P.pinv === 'coef') && P.hBy === 'p' },
         { k: 'pform', type: 'select', label: 'Friction formula', def: 'cole', options: [['cole', 'Darcy-Weisbach, f from Re (laminar 64/Re, Colebrook)'], ['darcy', 'Darcy-Weisbach, given f'], ['hw', 'Hazen-Williams C'], ['manning', 'Manning n']], show: single },
         { k: 'shape', type: 'select', label: 'Cross-section', def: 'circle', options: [['circle', 'Circular pipe'], ['square', 'Square duct'], ['rect', 'Rectangular duct'], ['annulus', 'Annulus (pipe inside a pipe)']], show: single },
         { k: 'D', label: 'Diameter D', labelFn: (P) => (P.shape === 'annulus' ? 'Outer diameter D' : 'Diameter D'), dim: 'mm', min: 2, max: 10000, step: 1, def: 300, show: (P, m) => sizeShown(P, m) && (P.shape === 'circle' || P.shape === 'annulus') },
         { k: 'a', label: 'Side a', labelFn: (P) => (P.shape === 'rect' ? 'Height a' : 'Side a'), dim: 'mm', min: 2, max: 10000, step: 1, def: 300, show: (P, m) => sizeShown(P, m) && (P.shape === 'square' || P.shape === 'rect') },
         { k: 'ar', label: 'Width ÷ height (width = ratio × a)', min: 0.05, max: 20, step: 0.01, def: 2, show: (P, m) => single(m) && P.shape === 'rect' },
         { k: 'Di', label: 'Inner pipe outside diameter', dim: 'mm', min: 1, max: 9000, step: 1, def: 100, show: (P, m) => single(m) && P.shape === 'annulus' },
-        { k: 'L', label: 'Length L', dim: 'len', min: 0.1, max: 100000, step: 0.1, def: 1000, log: true, show: single },
-        { k: 'Q', label: 'Discharge Q', dim: 'Q', min: 0.000001, max: 500, step: 0.000001, def: 0.1, log: true, show: (P, m) => single(m) && m !== 'Q' },
-        { k: 'H', label: 'Available head H', labelFn: (P, m) => (m === 'D' ? 'Allowable head loss H' : 'Available head H (all losses)'), dim: 'len', min: 0.0001, max: 1000, step: 0.0001, def: 5, log: true, show: (P, m) => m === 'Q' || m === 'D' },
+        { k: 'L', label: 'Length L', dim: 'len', min: 0.1, max: 100000, step: 0.1, def: 1000, log: true, show: (P, m) => single(m) && !(m === 'inv' && P.pinv === 'L') },
+        { k: 'Q', label: 'Discharge Q', dim: 'Q', min: 0.000001, max: 500, step: 0.000001, def: 0.1, log: true, show: (P, m) => single(m) && m !== 'Q' && !(m === 'inv' && (P.pinv === 'Vcr' || (P.byV === 'V' && P.pinv !== 'Dlam'))) },
+        { k: 'H', label: 'Available head H', labelFn: (P, m) => (m === 'D' || m === 'inv' ? 'Allowable head loss H' : 'Available head H (all losses)'), dim: 'len', min: 0.0001, max: 1000, step: 0.0001, def: 5, log: true, show: (P, m) => m === 'Q' || m === 'D' || (m === 'inv' && P.pinv === 'L') },
         { k: 'K', label: 'Minor losses ΣK (entrance, bends, valves, exit)', min: 0, max: 100, step: 0.01, def: 0, show: single },
         { k: 'f', label: 'Darcy friction factor f', min: 0.005, max: 0.2, step: 0.0001, def: 0.02, show: (P, m) => single(m) && P.pform === 'darcy' },
         { k: 'eps', label: 'Wall roughness ε', dim: 'mm', min: 0, max: 10, step: 0.0001, def: 0.045, show: (P, m) => single(m) && P.pform === 'cole' },
         { k: 'C', label: 'Hazen-Williams C', min: 40, max: 160, step: 1, def: 120, show: (P, m) => single(m) && P.pform === 'hw' },
         { k: 'n', label: 'Manning n', min: 0.008, max: 0.04, step: 0.0001, def: 0.012, show: (P, m) => single(m) && P.pform === 'manning' },
-        { k: 'nu', label: 'Kinematic viscosity ν', dim: 'nu', min: 0.01, max: 100000, step: 0.001, def: 1.003, log: true, show: single, chips: [['Water 20°C', 1.003], ['Water 10°C', 1.306], ['Air 20°C', 15.1]] },
+        { k: 'nu', label: 'Kinematic viscosity ν', dim: 'nu', min: 0.01, max: 100000, step: 0.001, def: 1.003, log: true, show: (P, m) => single(m) && !(m === 'inv' && (P.pinv === 'nu' || P.pinv === 'mu' || P.pinv === 'coef')), chips: [['Water 20°C', 1.003], ['Water 10°C', 1.306], ['Air 20°C', 15.1]] },
         { k: 'Sg', label: 'Fluid specific gravity Sg', min: 0.0005, max: 13.6, step: 0.0001, def: 1, log: true, show: single, chips: [['Water', 1], ['Oil', 0.85], ['Air', 0.0012]] },
         { k: 'nform', type: 'select', label: 'Friction formula', def: 'hw', options: [['hw', 'Hazen-Williams C'], ['darcy', 'Darcy-Weisbach f'], ['manning', 'Manning n']], modes: ['net'] },
         { k: 'grid', type: 'select', label: 'Network layout (loops)', def: '1x3', options: [['1x1', '1 loop'], ['1x2', '2 loops side by side'], ['1x3', '3 loops side by side'], ['2x1', '2 loops stacked'], ['2x2', '4 loops (2 × 2)']], modes: ['net'] },
@@ -349,7 +363,7 @@
       post: (R, I) => {
         if (R.invalid || I.mode === 'net') return;
         const d = R.data, key = I.shape === 'circle' || I.shape === 'annulus' ? 'D' : 'a', qs = [], hs = [];
-        for (let k = 1; k <= 40; k++) { const q = (2 * d.Q * k) / 40; const r = root.HP.pipeDesign(Object.assign({}, I, { mode: 'hf', Q: q, [key]: d.s }), S.U); const t = r.results.find((x) => x.label === 'Total head loss'); qs.push(q); hs.push(t ? t.value : NaN); }
+        for (let k = 1; k <= 40; k++) { const q = (2 * d.Q * k) / 40; const r = root.HP.pipeDesign(Object.assign({}, I, d.Iover || {}, { mode: 'hf', Q: q, [key]: d.s }), S.U); const t = r.results.find((x) => x.label === 'Total head loss'); qs.push(q); hs.push(t ? t.value : NaN); }
         d.curve = { qs, hs };
         const t = R.results.find((x) => x.label === 'Total head loss'); d.Htot = t ? t.value : NaN;
       },
@@ -364,6 +378,9 @@
         { name: 'Commercial steel 300 mm, 1 km, 0.10 m³/s, f from the Moody chart', mode: 'hf', set: { pform: 'cole', shape: 'circle', D: 300, L: 1000, Q: 0.1, eps: 0.045, nu: 1.003, K: 0 } },
         { name: 'Air in a 400 × 200 mm duct, 2 m³/s over 50 m', mode: 'hf', set: { pform: 'cole', shape: 'rect', a: 200, ar: 2, L: 50, Q: 2, eps: 0.15, nu: 15.1, Sg: 0.0012, K: 0 } },
         { name: 'Pipe size for 0.2 m³/s with 10 m of head over 2 km (Colebrook, K = 1.5)', mode: 'D', set: { pform: 'cole', shape: 'circle', L: 2000, Q: 0.2, H: 10, eps: 0.045, nu: 1.003, K: 1.5 } },
+        { name: 'Schaum 8.3 — laminar fuel oil, ν 6.09 × 10⁻⁶ m²/s, 0.0057 m³/s: pipe size (0.596 m)', mode: 'inv', set: { pinv: 'Dlam', shape: 'circle', Q: 0.0057, nu: 6.09, Rec: 2000, L: 1000, K: 0, pform: 'cole', eps: 0 } },
+        { name: 'Schaum 8.10 — oil Sg 0.86, 300 m of 50 mm pipe, 0.00114 m³/s, Δp 200 kPa: μ (0.0896 Pa·s)', mode: 'inv', set: { pinv: 'mu', shape: 'circle', D: 50, L: 300, Q: 0.00114, Sg: 0.86, hBy: 'p', dpm: 200, byV: 'Q', K: 0, pform: 'cole', eps: 0 } },
+        { name: 'Schaum 8.49 — least ν for laminar flow, 0.222 m³/s in a 300 mm pipe (0.00047 m²/s; book 0.00046)', mode: 'inv', set: { pinv: 'nu', shape: 'circle', D: 300, Q: 0.222, Rec: 2000, byV: 'Q', L: 914, K: 0, pform: 'cole', eps: 0.24 } },
         { name: 'Schaum 9.21 — three-loop network, C = 120, 0.4 m³/s in at A', mode: 'net', set: Object.assign({ nform: 'hw', grid: '1x3', hA: 100 }, (() => { const s = { q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0, q8: 0, q9: 0, q1: 0.4, q5: -0.1, q6: -0.1, q7: -0.1, q8: -0.1 }; for (let i = 1; i <= 10; i++) { s['nL' + i] = i <= 6 ? 600 : 400; s['nD' + i] = i <= 6 ? 300 : 250; s['nC' + i] = 120; } return s; })()) },
         { name: 'Two-loop network (Darcy f = 0.02), 120 L/s through A', mode: 'net', set: Object.assign({ nform: 'darcy', grid: '1x2', hA: 60, repN: '5', zRep: 20 }, (() => { const s = { q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0, q8: 0, q9: 0, q1: 0.12, q4: -0.03, q5: -0.05, q6: -0.04 }; for (let i = 1; i <= 7; i++) { s['nL' + i] = i <= 4 ? 500 : 300; s['nD' + i] = i <= 2 ? 300 : 200; s['nF' + i] = 0.02; } return s; })()) },
         { name: 'Four-loop grid (2 × 2), Hazen-Williams C = 100', mode: 'net', set: Object.assign({ nform: 'hw', grid: '2x2', hA: 80 }, (() => { const s = { q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0, q8: 0, q9: 0, q1: 0.25, q3: -0.05, q6: -0.06, q8: -0.05, q9: -0.09 }; for (let i = 1; i <= 12; i++) { s['nL' + i] = 400; s['nD' + i] = i <= 2 ? 300 : 200; s['nC' + i] = 100; } return s; })()) }

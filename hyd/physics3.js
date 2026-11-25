@@ -80,10 +80,43 @@
       S(o, `Ideal ${nm} equation`, 'Q = C A₂ √(2gΔh / (1 − β⁴)),  β = D₂/D₁', `β = ${fmt(I.D2)}/${fmt(I.D1)} = ${fmt(beta)},  1 − β⁴ = ${fmt(kb)}`, `A₂ = ${fmt(A2)} ${U.A}`, I.mtype === 'orifice' ? 'C is the orifice meter coefficient (it already includes contraction).' : 'Δh is the drop in piezometric head p/γ + z from the inlet to the throat.');
       let dh, Q, C = I.Cm;
       const byM = I.read === 'mano';
+      // standard discharge-coefficient curves C(Re_D) (ISO 5167): orifice plates (Reader-Harris/Gallagher), ISA 1932 and long-radius nozzles
+      const useCurve = I.cby === 'curve' && I.mtype !== 'venturi' && I.msolve !== 'C';
+      const nu = I.nuM, D1 = I.D1;
+      const ReOf = (q) => (4 * q) / (PI * D1 * nu);
+      const curveName = I.mtype === 'orifice' ? `orifice plate, ${{ corner: 'corner taps', flange: 'flange taps', D2: 'D and D/2 taps' }[I.taps || 'corner']} (ISO 5167-2, Reader-Harris/Gallagher)` : I.ntype === 'isa' ? 'ISA 1932 nozzle (ISO 5167-3)' : 'long-radius nozzle (ISO 5167-3)';
+      const curveF = I.mtype === 'orifice' ? 'C = 0.5961 + 0.0261β² − 0.216β⁸ + 0.000521(10⁶β/Re_D)^0.7 + (0.0188 + 0.0063A)β^3.5(10⁶/Re_D)^0.3 + tap terms,  A = (19000β/Re_D)^0.8' : I.ntype === 'isa' ? 'C = 0.9900 − 0.2262β^4.1 − (0.00175β² − 0.0033β^4.15)(10⁶/Re_D)^1.15' : 'C = 0.9965 − 0.00653 β^0.5 (10⁶/Re_D)^0.5';
+      const Cof = (Re) => {
+        if (I.mtype === 'orifice') {
+          const A = pow((19000 * beta) / Re, 0.8), Dm = U.sys === 'SI' ? D1 : D1 * 0.3048;
+          const L1 = I.taps === 'flange' ? 0.0254 / Dm : I.taps === 'D2' ? 1 : 0, L2 = I.taps === 'flange' ? 0.0254 / Dm : I.taps === 'D2' ? 0.47 : 0, M2 = (2 * L2) / (1 - beta);
+          let c = 0.5961 + 0.0261 * beta * beta - 0.216 * pow(beta, 8) + 0.000521 * pow((1e6 * beta) / Re, 0.7) + (0.0188 + 0.0063 * A) * pow(beta, 3.5) * pow(1e6 / Re, 0.3)
+            + (0.043 + 0.08 * Math.exp(-10 * L1) - 0.123 * Math.exp(-7 * L1)) * (1 - 0.11 * A) * pow(beta, 4) / (1 - pow(beta, 4)) - 0.031 * (M2 - 0.8 * pow(M2, 1.1)) * pow(beta, 1.3);
+          if (Dm < 0.07112) c += 0.011 * (0.75 - beta) * (2.8 - Dm / 0.0254);
+          return c;
+        }
+        if (I.ntype === 'isa') return 0.99 - 0.2262 * pow(beta, 4.1) - (0.00175 * beta * beta - 0.0033 * pow(beta, 4.15)) * pow(1e6 / Re, 1.15);
+        return 0.9965 - 0.00653 * sqrt(beta) * sqrt(1e6 / Re);
+      };
+      if (useCurve) {
+        if (!(nu > 0)) return fail(o, 'Enter the kinematic viscosity of the flowing fluid for the coefficient curve.');
+        S(o, 'Coefficient from the standard curve', curveF, curveName, 'C depends on β and on the pipe Reynolds number Re_D = V₁D₁/ν = 4Q/(πD₁ν)', 'Read from the equation of the curve instead of a chart, so no reading error.');
+      }
       const dhOf = () => (I.read === 'dh' ? (S(o, 'Piezometric head drop (given)', 'Δh = Δ(p/γ + z)', '', `${fmt(I.dhG)} ${L} of flowing fluid`, ''), I.dhG) : byM ? manoDH(I.hm) : (() => { const d = (I.p1 - I.p2) / gf - I.dz; S(o, 'Piezometric head drop from the pressures', 'Δh = (p₁ − p₂)/γ + (z₁ − z₂)', `Δh = (${fmt(I.p1)} − ${fmt(I.p2)})/${fmt(gf)} − ${fmt(I.dz)}`, `${fmt(d)} ${L}`, 'z₂ − z₁ = throat above the inlet.'); return d; })());
       if (I.msolve === 'Q') {
         dh = dhOf();
         if (!(dh > 0)) return fail(o, 'The piezometric head must drop toward the throat.');
+        if (useCurve) {
+          const Qi = A2 * sqrt((2 * g * dh) / kb), rows = [];
+          C = I.mtype === 'orifice' ? 0.61 : 0.98;
+          for (let k = 0; k < 40; k++) {
+            const q = C * Qi, Re = ReOf(q), Cn = Cof(Re);
+            rows.push([String(k + 1), fmt(C, 5), fmt(q, 5), fmt(Re, 4), fmt(Cn, 5)]);
+            if (abs(Cn - C) < 1e-9) { C = Cn; break; }
+            C = Cn;
+          }
+          S(o, 'Iterate C and Re until they agree', 'assume C → Q = C·Q_i → Re_D → C from the curve', `Q_i = A₂√(2gΔh/(1 − β⁴)) = ${fmt(Qi)} ${U.Q}`, `C = ${fmt(C)}`, 'Converges in a few rounds because C changes slowly with Re.', { head: ['#', 'C assumed', 'Q', 'Re_D', 'C from curve'], rows });
+        }
         Q = C * A2 * sqrt((2 * g * dh) / kb);
         S(o, 'Discharge', 'Q = C A₂ √(2gΔh/(1 − β⁴))', `Q = ${fmt(C)} × ${fmt(A2)} × √(2 × ${fmt(g)} × ${fmt(dh)} / ${fmt(kb)})`, `${fmt(Q)} ${U.Q}`, '');
       } else if (I.msolve === 'C') {
@@ -94,6 +127,7 @@
         S(o, 'Meter coefficient', 'C = Q / Q_i', `C = ${fmt(Q)} / ${fmt(Qi)}`, fmt(C), '');
       } else {
         Q = I.Q;
+        if (useCurve) { const Re = ReOf(Q); C = Cof(Re); S(o, 'Coefficient at this flow', 'Re_D = 4Q/(πD₁ν)  →  C from the curve', `Re_D = 4 × ${fmt(Q)} / (π × ${fmt(D1)} × ${fmt(nu)}) = ${fmt(Re)}`, `C = ${fmt(C)}`, 'Q is known, so no iteration is needed.'); }
         dh = (kb * pow(Q / (C * A2), 2)) / (2 * g);
         S(o, 'Piezometric head drop needed', 'Δh = (1 − β⁴)(Q/(C A₂))²/2g', `Δh = ${fmt(kb)} × (${fmt(Q)}/(${fmt(C)} × ${fmt(A2)}))² / (2 × ${fmt(g)})`, `${fmt(dh)} ${L}`, '');
         const r = abs(I.Sgm / I.Sg - 1);
@@ -107,6 +141,14 @@
       R(o, 'Discharge Q', Q, U.Q, I.msolve === 'Q'); if (I.msolve === 'C') R(o, 'Meter coefficient C', C, '', true);
       R(o, 'Piezometric head drop Δh', dh, L); R(o, 'Pipe velocity V₁', V1, U.v); R(o, 'Throat velocity V₂', V2, U.v);
       R(o, 'Flow coefficient K = C/√(1 − β⁴)', C / sqrt(kb), '');
+      if (useCurve) {
+        const Re = ReOf(Q);
+        R(o, 'Coefficient used C', C, '', true); R(o, 'Pipe Reynolds number Re_D', Re, ''); R(o, 'Reynolds number at the orifice / throat Re_d = Re_D/β', Re / beta, '');
+        const lim = I.mtype === 'orifice' ? [0.1, 0.75, 5000, 1e8] : I.ntype === 'isa' ? [0.3, 0.8, 2e4, 1e7] : [0.2, 0.8, 1e4, 1e7];
+        if (beta < lim[0] || beta > lim[1] || Re < lim[2] || Re > lim[3]) W(o, `The curve is fitted for β ${lim[0]}–${lim[1]} and Re_D ${fmt(lim[2])}–${fmt(lim[3])}; here β = ${fmt(beta)}, Re_D = ${fmt(Re)}. The coefficient is extrapolated.`);
+      } else if (I.msolve === 'C' && I.mtype !== 'venturi' && I.nuM > 0) {
+        R(o, 'Pipe Reynolds number Re_D', ReOf(Q), '');
+      }
       o.data = { kind: 'venturi', mtype: I.mtype, D1: I.D1, D2: I.D2, Q, dh, V1, V2, hm: I.msolve === 'h' ? dh / abs(I.Sgm / I.Sg - 1) : I.hm, read: I.read, Sgm: I.Sgm };
       return o;
     }
@@ -175,11 +217,15 @@
   }
   HP.pipeDesign = function (I, U) {
     if (I.mode === 'net') return HP.network(I, U);
+    I = Object.assign({}, I);
+    const pinv = I.mode === 'inv' ? I.pinv : '';
+    if (pinv === 'coef') { I.pform = 'darcy'; I.f = I.f || 0.02; }
+    if ((pinv === 'nu' || pinv === 'mu') && !(I.pform === 'cole' || I.pform === 'darcy')) I.pform = 'cole';
     const o = Out(), g = U.g, L = U.L, F = I.pform, mode = I.mode, SI = U.sys === 'SI';
     const gam = I.Sg * U.gw, rho = (gam * (SI ? 1000 : 1)) / g; // kg/m³ or slug/ft³
     const kHW = SI ? 0.8492 : 1.318, kMan = SI ? 1 : 1.486;
     const sizeName = I.shape === 'circle' || I.shape === 'annulus' ? (I.shape === 'annulus' ? 'outer diameter' : 'diameter D') : I.shape === 'rect' ? 'height a (width = ratio × a)' : 'side a';
-    const nu = I.nu;
+    let nu = I.nu;
     // friction head for flow Q in a section of size s
     function hfOf(Q, s, rec) {
       const G = geom(I.shape, s, I), Rh = G.A / G.P, Dh = 4 * Rh, V = Q / G.A, Sf = 0;
@@ -196,6 +242,47 @@
     let Q = I.Q, s = I.shape === 'circle' ? I.D : I.shape === 'annulus' ? I.D : I.a;
     if (!(I.L > 0)) return fail(o, 'Length must be positive.');
     if (I.shape === 'annulus' && !(I.Di < s)) return fail(o, 'The inner diameter must be smaller than the outer one.');
+    if (pinv) {
+      const G0 = geom(I.shape, s, I), Rh0 = G0.A / G0.P, Dh0 = 4 * Rh0, Rec = I.Rec;
+      const Vg = I.byV === 'V' ? I.Vi : Q / G0.A;
+      if (I.byV === 'V' && pinv !== 'Vcr' && pinv !== 'Dlam') { Q = Vg * G0.A; S(o, 'Discharge from the velocity', 'Q = V·A', `Q = ${fmt(Vg)} × ${fmt(G0.A)}`, `${fmt(Q)} ${U.Q}`, ''); }
+      const hMeas = I.hBy === 'p' ? I.dpm / gam : I.Hm;
+      if ((pinv === 'mu' || pinv === 'coef') && I.hBy === 'p') S(o, 'Head loss from the pressure drop', 'h_f = Δp/γ', `h_f = ${fmt(I.dpm)} / ${fmt(gam)}`, `${fmt(hMeas)} ${L}`, 'Horizontal pipe of constant size: the pressure drop is all friction.');
+      if (pinv === 'nu') {
+        nu = (Vg * Dh0) / Rec;
+        S(o, 'Kinematic viscosity for that Reynolds number', 'ν = V·D/Re', `ν = ${fmt(Vg)} × ${fmt(Dh0)} / ${fmt(Rec)}`, `ν = ${fmt(nu)} ${U.sys === 'SI' ? 'm²/s' : 'ft²/s'}`, `Any viscosity above this keeps Re below ${fmt(Rec)} (laminar).`);
+        R(o, 'Kinematic viscosity ν', nu, U.sys === 'SI' ? 'm²/s' : 'ft²/s', true); R(o, 'Absolute viscosity μ = ρν', rho * nu, U.sys === 'SI' ? 'Pa·s' : 'lb·s/ft²');
+      } else if (pinv === 'Vcr') {
+        const Vc = (Rec * nu) / Dh0; Q = Vc * G0.A;
+        S(o, 'Critical velocity', 'V_c = Re_c·ν/D', `V_c = ${fmt(Rec)} × ${fmt(nu)} / ${fmt(Dh0)}`, `${fmt(Vc)} ${U.v}`, `Q at that velocity = ${fmt(Q)} ${U.Q}.`);
+        R(o, 'Critical velocity V_c', Vc, U.v, true); R(o, 'Discharge at V_c', Q, U.Q, true);
+      } else if (pinv === 'Dlam') {
+        if (I.shape !== 'circle') return fail(o, 'The laminar size is worked out for a circular pipe.');
+        s = (4 * Q) / (PI * nu * Rec);
+        S(o, 'Diameter at the critical Reynolds number', 'Re = 4Q/(πDν) = Re_c  →  D = 4Q/(π ν Re_c)', `D = 4 × ${fmt(Q)} / (π × ${fmt(nu)} × ${fmt(Rec)})`, `D = ${fmt(s)} ${L}`, `Any larger pipe keeps the flow laminar (Re < ${fmt(Rec)}).`);
+        R(o, 'Smallest diameter for laminar flow', s, L, true);
+      } else if (pinv === 'mu') {
+        if (I.shape !== 'circle') return fail(o, 'The laminar viscosity test is for a circular pipe.');
+        nu = (g * hMeas * PI * pow(s, 4)) / (128 * I.L * Q);
+        S(o, 'Viscosity from the laminar head loss', 'h_f = 128 ν L Q/(π g D⁴)  →  ν = π g h_f D⁴/(128 L Q)', `ν = π × ${fmt(g)} × ${fmt(hMeas)} × ${fmt(s)}⁴ / (128 × ${fmt(I.L)} × ${fmt(Q)})`, `ν = ${fmt(nu)} ${U.sys === 'SI' ? 'm²/s' : 'ft²/s'}`, 'Hagen-Poiseuille; check below that the flow is laminar.');
+        R(o, 'Kinematic viscosity ν', nu, U.sys === 'SI' ? 'm²/s' : 'ft²/s', true); R(o, 'Absolute viscosity μ = ρν', rho * nu, U.sys === 'SI' ? 'Pa·s' : 'lb·s/ft²', true);
+        const Re0 = (4 * Q) / (PI * s * nu); if (Re0 >= 2000) W(o, `Re = ${fmt(Re0)} is not laminar, so the Hagen-Poiseuille assumption does not hold.`);
+        I.pform = 'cole';
+      } else if (pinv === 'coef') {
+        const V0 = Q / G0.A, Sx = hMeas / I.L;
+        const fD = (hMeas * 2 * g * Dh0) / (I.L * V0 * V0), CH = V0 / (kHW * pow(Rh0, 0.63) * pow(Sx, 0.54)), nM = (kMan * pow(Rh0, 2 / 3) * sqrt(Sx)) / V0;
+        S(o, 'Coefficients from the test', 'f = 2g D h_f/(L V²);  C = V/(k R^0.63 S^0.54);  n = k R^(2/3) S^(1/2)/V', `V = ${fmt(V0)} ${U.v}, S = h_f/L = ${fmt(Sx)}, R = ${fmt(Rh0)} ${L}`, `f = ${fmt(fD)},  C = ${fmt(CH)},  n = ${fmt(nM)}`, 'All three describe the same measured loss.');
+        R(o, 'Darcy friction factor f', fD, '', true); R(o, 'Hazen-Williams C', CH, '', true); R(o, 'Manning n', nM, '', true);
+        I.f = fD;
+      } else if (pinv === 'L') {
+        const Ht = I.H; if (!(Ht > 0)) return fail(o, 'Give the allowable head loss.');
+        const Lx = bis((l) => { I.L = l; return hfOf(Q, s).H - Ht; }, 1e-6, 1e8);
+        I.L = Lx;
+        S(o, 'Length for the allowable head loss', `H = h_f + ΣK V²/2g,  ${F === 'hw' ? 'Hazen-Williams' : F === 'manning' ? 'Manning' : 'h_f = f (L/D) V²/2g'}`, `solved for L so the losses equal ${fmt(Ht)} ${L}`, `L = ${fmt(Lx)} ${L}`, 'Longest pipe that keeps the loss within the limit.');
+        R(o, 'Length L', Lx, L, true);
+      }
+      o.data_Iover = { nu, L: I.L, D: s, a: s, Q, f: I.f };
+    }
     if ((F === 'cole') && !(nu > 0)) return fail(o, 'Enter the kinematic viscosity to use Colebrook.');
     const fName = { darcy: 'Darcy-Weisbach with a given f', cole: 'Darcy-Weisbach, f from Re (64/Re laminar, Colebrook turbulent)', hw: 'Hazen-Williams', manning: 'Manning' }[F];
     const formula = F === 'hw' ? `V = ${kHW} C R^0.63 S^0.54` : F === 'manning' ? `V = (${SI ? '1' : '1.486'}/n) R^(2/3) S^(1/2)` : 'h_f = f (L/D_h) V²/2g';
@@ -235,9 +322,10 @@
     R(o, 'Wall shear stress τ₀', tau, SI ? 'Pa' : 'psf'); R(o, 'Shear velocity u*', ustar, U.v);
     R(o, 'Power lost', U.P1(Pw), U.P1u);
     if (nu > 0) R(o, 'Velocity at Re = 2000 (laminar limit)', (2000 * nu) / r.Dh, U.v);
-    if (r.Re >= 2000 && r.Re < 4000) W(o, `Re = ${fmt(r.Re)} is in the transition zone; f is uncertain.`);
+    if (r.Re >= 2000 && r.Re < 4000 && !(pinv === 'nu' || pinv === 'Vcr' || pinv === 'Dlam')) W(o, `Re = ${fmt(r.Re)} is in the transition zone; f is uncertain.`);
     if (F === 'hw' && r.Re < 1e5 && nu > 0) W(o, 'Hazen-Williams is meant for turbulent water flow in larger pipes; check with Darcy-Weisbach.', 'info');
-    o.data = { kind: 'pipe', shape: I.shape, s, G, V: r.V, Re: r.Re, f: r.f, Dh: r.Dh, hf: r.hf, hm: r.hm, L: I.L, Q };
+    o.data = { kind: 'pipe', shape: I.shape, s, G, V: r.V, Re: r.Re, f: r.f, Dh: r.Dh, hf: r.hf, hm: r.hm, L: I.L, Q, Iover: o.data_Iover ? Object.assign(o.data_Iover, { pform: I.pform }) : null };
+    delete o.data_Iover;
     return o;
   };
 

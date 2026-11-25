@@ -50,7 +50,8 @@
         row.append(bar);
       };
       const patm = { get: () => (U.id === 'EN' ? s.patmEN : s.patm), set: (v) => (U.id === 'EN' ? (s.patmEN = v) : (s.patm = v)) };
-      C.seg(el, { label: 'Situation', options: [['depth', 'Pressure at a depth'], ['utube', 'Piezometer / U-tube'], ['diff', 'Differential manometer'], ['multi', 'Chambers & multi-fluid'], ['press', 'Hydraulic press']], get: () => s.sub, set: (v) => (s.sub = v) });
+      C.seg(el, { label: 'Situation', options: [['depth', 'Pressure at a depth'], ['utube', 'Piezometer / U-tube'], ['diff', 'Differential manometer'], ['multi', 'Chambers & multi-fluid'], ['press', 'Hydraulic press']].concat(root.StatX ? root.StatX.options('mp') : []), get: () => s.sub, set: (v) => (s.sub = v) });
+      if (root.StatX && root.StatX.is(s.sub, 'mp')) { root.StatX.controls(s.sub, s, el, C); return; }
       if (s.sub === 'depth') {
         const t = C.section(el, 'Tank');
         sl(t, 'Gas pressure on top p₀ (gauge, 0 = open)', () => s.p0, (v) => (s.p0 = v), -100, 500, 0.1, U.press);

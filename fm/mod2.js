@@ -15,7 +15,7 @@
   const M2 = {
     id: 'm2', title: 'Buoyancy & Flotation',
     state: {
-      sgL: 1, drive: 'sg', sgB: 0.6, W: 10, shape: 'box', dims: defDims, mode: 'auto', draft: 0.5, P: 0,
+      sub: 'body', sgL: 1, drive: 'sg', sgB: 0.6, W: 10, shape: 'box', dims: defDims, mode: 'auto', draft: 0.5, P: 0,
       layer: false, sg2: 0.8, t2: 0.3, layer3: false, sg3: 0.7, t3: 0.2, stab: false, zG: null, phi: 10,
       ballast: { on: false, bodyDef: 'solid', Wbody: 860, matDef: 'sg', sgb: 11.3, gb: 700, place: 'inside', solve: 'findW', targetBy: 'draft', target: 0.8, givenBy: 'W', Wb: 1, mb: 10 },
     },
@@ -36,6 +36,10 @@
 
     controls(el, C) {
       const s = this.state, U = root.App.U(), B = BODY[s.shape], d = s.dims[s.shape];
+      if (root.StatX) {
+        C.seg(el, { label: 'Problem', options: [['body', 'Floating or submerged body']].concat(root.StatX.options('m2')), get: () => s.sub || 'body', set: (v) => (s.sub = v) });
+        if (root.StatX.is(s.sub, 'm2')) { root.StatX.controls(s.sub, s, el, C); return; }
+      }
       C.sg(el, { label: 'Liquid Sg_L', get: () => s.sgL, set: (v) => (s.sgL = v) });
       const b = C.section(el, 'Body');
       const opts = Object.keys(BODY).map((k) => [k, BODY[k].name, BODY[k].group]);

@@ -460,6 +460,14 @@
       forces.push({ name: 'P_s', F: Ps, dir: 'x', sign: +1, x: 0, y: p.hsilt / 3, arm: p.hsilt / 3, M: Ps * p.hsilt / 3, kind: 'O' });
       if (p.hsilt > h1) warn.push('Silt is deeper than the water — check h_s.');
     }
+    // ---- ice thrust (force per unit length at the water surface) ----
+    let Pi = 0;
+    const yi = p.ice ? Math.min(h1, Hmax) : 0;
+    if (p.ice && p.Pice > 0) {
+      Pi = p.Pice;
+      st.add('Ice thrust at the water surface', 'P_i (given, per unit length)', '', `P_i = ${f(Pi)} ${Fu} at y = h = ${f(yi)} ${Lu}`, 'Horizontal push of an ice sheet on the upstream face; overturning and sliding.');
+      forces.push({ name: 'P_i', F: Pi, dir: 'x', sign: +1, x: 0, y: yi, arm: yi, M: Pi * yi, kind: 'O' });
+    }
     // ---- uplift ----
     let upl = [];
     let Uf = 0;
@@ -477,11 +485,11 @@
 
     // ---- sums ----
     const Rv = Wc + waterUp.reduce((s, c) => s + c.F, 0) + waterDn.reduce((s, c) => s + c.F, 0) - Uf;
-    const Rh = P1 + Ps - P2;
+    const Rh = P1 + Ps + Pi - P2;
     const RM = comps.reduce((s, c) => s + c.M, 0) + waterUp.reduce((s, c) => s + c.M, 0) + waterDn.reduce((s, c) => s + c.M, 0) + (P2 * h2) / 3;
-    const OM = P1 * (h1 / 3) + (Ps * (p.hsilt || 0)) / 3 * (p.silt ? 1 : 0) + upl.reduce((s, q) => s + q.M, 0);
+    const OM = P1 * (h1 / 3) + (Ps * (p.hsilt || 0)) / 3 * (p.silt ? 1 : 0) + Pi * yi + upl.reduce((s, q) => s + q.M, 0);
     st.add('Sum of vertical forces', 'R_y = ΣW_concrete + ΣW_water − U', `R_y = ${f(Wc)} + ${f(Rv - Wc + Uf)} − ${f(Uf)}`, `R_y = ${f(Rv)} ${Fu}`, '');
-    st.add('Sum of horizontal forces', 'R_x = P + P_s − P₂', `R_x = ${f(P1)} + ${f(Ps)} − ${f(P2)}`, `R_x = ${f(Rh)} ${Fu}`, '');
+    st.add('Sum of horizontal forces', Pi ? 'R_x = P + P_s + P_i − P₂' : 'R_x = P + P_s − P₂', Pi ? `R_x = ${f(P1)} + ${f(Ps)} + ${f(Pi)} − ${f(P2)}` : `R_x = ${f(P1)} + ${f(Ps)} − ${f(P2)}`, `R_x = ${f(Rh)} ${Fu}`, '');
     st.add('Righting moment about the toe', 'RM = Σ W·arm (+ P₂ h₂/3)', '', `RM = ${f(RM)} ${Mu}`, 'Concrete and water weights, plus the tailwater thrust.');
     st.add('Overturning moment about the toe', 'OM = P h/3 + P_s h_s/3 + Σ U·arm', '', `OM = ${f(OM)} ${Mu}`, 'Upstream thrust, silt and uplift.');
     if (!(Rv > 0)) return { ...fail(['Uplift exceeds the weight — the dam floats (R_y ≤ 0).'], warn, st.list) };
@@ -523,6 +531,7 @@
     out.push({ k: 'Water thrust P', v: P1, u: Fu });
     if (P2) out.push({ k: 'Tailwater thrust P₂', v: P2, u: Fu });
     if (Ps) out.push({ k: 'Silt thrust P_s', v: Ps, u: Fu });
+    if (Pi) out.push({ k: 'Ice thrust P_i', v: Pi, u: Fu });
     if (p.uplift) out.push({ k: 'Uplift U', v: Uf, u: Fu });
     out.push({ k: 'R_y', v: Rv, u: Fu }, { k: 'R_x', v: Rh, u: Fu }, { k: 'RM (about toe)', v: RM, u: Mu }, { k: 'OM (about toe)', v: OM, u: Mu });
     out.push({ k: 'FS overturning', v: FSo, u: '', hl: true }, { k: 'FS sliding', v: FSs, u: '', hl: true }, { k: 'x̄ from toe', v: xb, u: Lu }, { k: 'Eccentricity e', v: e, u: Lu });
@@ -531,7 +540,7 @@
     const status = { cls: okAll ? (mode === 'trap' ? 'ok' : 'warn') : 'bad', text: `FS_OT = ${f(FSo)}, FS_S = ${f(FSs)}${mode === 'trap' ? '' : mode === 'out' ? ' — OVERTURNS' : ' — outside middle third'}` };
     return {
       ok: true, err, warn, steps: st.list, out, status,
-      geo: { prof: top, B, Hmax, h1, h2, comps, waterUp, waterDn, P1, P2, Ps, hsilt: p.silt ? p.hsilt : 0, upl, Uf, Rv, Rh, RM, OM, xb, e, qT, qH, mode, gc },
+      geo: { prof: top, B, Hmax, h1, h2, comps, waterUp, waterDn, P1, P2, Ps, hsilt: p.silt ? p.hsilt : 0, Pi, yi, upl, Uf, Rv, Rh, RM, OM, xb, e, qT, qH, mode, gc },
     };
   }
 

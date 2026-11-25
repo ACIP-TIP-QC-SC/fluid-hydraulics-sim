@@ -30,7 +30,8 @@
 
     controls(el, C) {
       const S = this.state, U = root.App.U();
-      C.seg(el, { label: 'Motion', options: [['lin', 'Rectilinear acceleration'], ['rot', 'Rotating vessel']], get: () => S.sub, set: (v) => (S.sub = v) });
+      C.seg(el, { label: 'Motion', options: [['lin', 'Rectilinear acceleration'], ['rot', 'Rotating vessel']].concat(root.StatX ? root.StatX.options('m3') : []), get: () => S.sub, set: (v) => (S.sub = v) });
+      if (root.StatX && root.StatX.is(S.sub, 'm3')) { root.StatX.controls(S.sub, S, el, C); return; }
       if (S.sub === 'lin') {
         const s = S.lin;
         C.sg(el, { get: () => s.sg, set: (v) => (s.sg = v) });

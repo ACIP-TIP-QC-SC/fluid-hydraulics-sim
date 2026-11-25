@@ -24,18 +24,19 @@
       pts: [[0, 0], [0, 12], [2, 12], [2, 10], [4, 7], [9, 0]],
       h1: 9, tail: false, h2: 1.5,
       gcBy: 'gc', gc: 24, gcEN: 150, sgc: 2.4,
-      uplift: true, upf: 100, silt: false, hsilt: 2, gsub: 10, gsubEN: 65, phis: 30,
+      uplift: true, upf: 100, silt: false, hsilt: 2, gsub: 10, gsubEN: 65, phis: 30, ice: false, Pice: 150, PiceEN: 10000,
       mu: 0.6, fsoReq: 1.5, fssReq: 1.5, qa: 0, qaEN: 0,
       showSplit: true,
     },
     presets: [
-      { name: 'Test D1 — trapezoidal dam: crest 2 m, base 8 m, H = 10 m, water 9 m, full uplift, μ = 0.75', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.trap, h1: 9, tail: false, uplift: true, upf: 100, silt: false, gcBy: 'gc', gc: 24, mu: 0.75 }) },
-      { name: 'Rectangular dam 3 × 8 m, water to the crest (barely stands)', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.rect, h1: 8, tail: false, uplift: false, silt: false, gcBy: 'gc', gc: 24, mu: 0.6 }) },
-      { name: 'Triangular dam 7 × 10 m, Sg_c = 2.4, full uplift (slides)', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.tri, h1: 10, tail: false, uplift: true, upf: 100, silt: false, gcBy: 'sg', sgc: 2.4, mu: 0.65 }) },
-      { name: 'Upstream batter + tailwater 1.5 m, 2/3 uplift', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.batter, h1: 11, tail: true, h2: 1.5, uplift: true, upf: 66.67, silt: false, gcBy: 'gc', gc: 24, mu: 0.75 }) },
-      { name: 'Silt 3 m against the upstream face', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.trap, h1: 9.5, tail: false, uplift: true, upf: 50, silt: true, hsilt: 3, gsub: 10, phis: 30, gcBy: 'gc', gc: 24, mu: 0.6 }) },
-      { name: 'Irregular (stepped) dam — custom profile', apply: (s) => Object.assign(s, { shape: 'custom', pts: [[0, 0], [0, 12], [2, 12], [2, 10], [4, 7], [9, 0]], h1: 11, tail: true, h2: 1, uplift: true, upf: 100, silt: false, gcBy: 'gc', gc: 24, mu: 0.65 }) },
-      { name: 'Slender dam that fails (resultant outside middle third)', apply: (s) => Object.assign(s, { shape: 'param', a: 1.5, H: 10, bu: 0, hu: 0, bd: 3.5, hs: 9, h1: 10, tail: false, uplift: true, upf: 100, silt: false, gcBy: 'gc', gc: 24, mu: 0.6 }) },
+      { name: 'Test D1 — trapezoidal dam: crest 2 m, base 8 m, H = 10 m, water 9 m, full uplift, μ = 0.75', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.trap, h1: 9, tail: false, uplift: true, upf: 100, silt: false, ice: false, gcBy: 'gc', gc: 24, mu: 0.75 }) },
+      { name: 'Rectangular dam 3 × 8 m, water to the crest (barely stands)', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.rect, h1: 8, tail: false, uplift: false, silt: false, ice: false, gcBy: 'gc', gc: 24, mu: 0.6 }) },
+      { name: 'Triangular dam 7 × 10 m, Sg_c = 2.4, full uplift (slides)', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.tri, h1: 10, tail: false, uplift: true, upf: 100, silt: false, ice: false, gcBy: 'sg', sgc: 2.4, mu: 0.65 }) },
+      { name: 'Upstream batter + tailwater 1.5 m, 2/3 uplift', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.batter, h1: 11, tail: true, h2: 1.5, uplift: true, upf: 66.67, silt: false, ice: false, gcBy: 'gc', gc: 24, mu: 0.75 }) },
+      { name: 'Silt 3 m against the upstream face', apply: (s) => Object.assign(s, { shape: 'param', ...TEMPLATES.trap, h1: 9.5, tail: false, uplift: true, upf: 50, silt: true, ice: false, hsilt: 3, gsub: 10, phis: 30, gcBy: 'gc', gc: 24, mu: 0.6 }) },
+      { name: 'Irregular (stepped) dam — custom profile', apply: (s) => Object.assign(s, { shape: 'custom', pts: [[0, 0], [0, 12], [2, 12], [2, 10], [4, 7], [9, 0]], h1: 11, tail: true, h2: 1, uplift: true, upf: 100, silt: false, ice: false, gcBy: 'gc', gc: 24, mu: 0.65 }) },
+      { name: 'Slender dam that fails (resultant outside middle third)', apply: (s) => Object.assign(s, { shape: 'param', a: 1.5, H: 10, bu: 0, hu: 0, bd: 3.5, hs: 9, h1: 10, tail: false, uplift: true, upf: 100, silt: false, ice: false, gcBy: 'gc', gc: 24, mu: 0.6 }) },
+      { name: 'Schaum 3.19 — 100 ft dam, 20 ft crest, 75 ft base, full uplift, ice 12 480 lb/ft, masonry 2.50γ (resultant at the third point, x̄ = 25 ft)', units: 'EN', apply: (s) => Object.assign(s, { shape: 'param', a: 20, H: 100, bu: 0, hu: 0, bd: 55.05, hs: 100, h1: 100, tail: false, uplift: true, upf: 100, silt: false, ice: true, PiceEN: 12480, gcBy: 'sg', sgc: 2.5, mu: 0.6 }) },
     ],
 
     controls(el, C) {
@@ -86,6 +87,8 @@
         C.slider(w, { label: 'Submerged unit weight of silt γ′', min: 1, max: en ? 120 : 20, step: 0.01, get: () => (en ? s.gsubEN : s.gsub), set: (v) => (en ? (s.gsubEN = v) : (s.gsub = v)), unit: U.gamma });
         sl(w, 'Angle of internal friction φ', 'phis', 0, 45, 0.1, '°');
       }
+      C.toggle(w, { label: 'Ice thrust at the water surface', get: () => s.ice, set: (v) => (s.ice = v) });
+      if (s.ice) C.slider(w, { label: 'Ice thrust per unit length P_i', min: 0, max: en ? 100000 : 2000, step: 0.01, get: () => (en ? s.PiceEN : s.Pice), set: (v) => (en ? (s.PiceEN = v) : (s.Pice = v)), unit: U.fpl });
       const c = C.section(el, 'Stability criteria');
       sl(c, 'Coefficient of friction μ (base)', 'mu', 0.1, 1.5, 0.01, '');
       sl(c, 'Required FS overturning', 'fsoReq', 1, 3, 0.01, '');
@@ -97,7 +100,7 @@
 
     compute(U) {
       const s = this.state, en = U.id === 'EN';
-      return Physics.dam(Object.assign({}, s, { gc: en ? s.gcEN : s.gc, gsub: en ? s.gsubEN : s.gsub, qa: en ? s.qaEN : s.qa }), U);
+      return Physics.dam(Object.assign({}, s, { gc: en ? s.gcEN : s.gc, gsub: en ? s.gsubEN : s.gsub, qa: en ? s.qaEN : s.qa, Pice: en ? s.PiceEN : s.Pice }), U);
     },
 
     draw2D(svg, res, U, opts) {
@@ -138,6 +141,7 @@
         D.text([-U.gw * h1 * k, 0], `γh = ${f(U.gw * h1)} ${Pu}`, { dy: -6, anchor: 'start', size: 10.5, color: '#c0392b' });
         D.force([0, h1 / 3], [1, 0], 70, { color: COL.force, label: `P = ${f(g.P1)} ${Fu}`, lp: 'tail', ldx: -4, ldy: -8, anchor: 'end' });
       }
+      if (g.Pi > 0) D.force([0, g.yi], [1, 0], 50, { color: '#5dade2', label: `P_i = ${f(g.Pi)}`, lp: 'tail', ldx: -4, ldy: -8, anchor: 'end' });
       if (g.Ps > 0) D.force([0, g.hsilt / 3], [1, 0], 50, { color: '#6d4c41', label: `P_s = ${f(g.Ps)}`, lp: 'tail', ldx: -4, ldy: 16, anchor: 'end' });
       if (g.P2 > 0) D.force([B, h2 / 3], [-1, 0], 55, { color: COL.force, label: `P₂ = ${f(g.P2)}`, lp: 'tail', ldx: 6, ldy: -8 });
       // uplift diagram
@@ -228,6 +232,7 @@
         arrow([-0.3 * H, g.h1 / 3, zm], [0, g.h1 / 3, zm], '#c0392b', `P = ${f(g.P1)} ${Fu}`, 3);
       }
       if (g.P2 > 0) arrow([B + 0.25 * H, g.h2 / 3, zm], [B, g.h2 / 3, zm], '#c0392b', `P₂ = ${f(g.P2)}`, 3);
+      if (g.Pi > 0) arrow([-0.25 * H, g.yi, zm * 0.5], [0, g.yi, zm * 0.5], '#5dade2', `P_i = ${f(g.Pi)}`, 3);
       if (g.Ps > 0) arrow([-0.25 * H, g.hsilt / 3, zm * 0.5], [0, g.hsilt / 3, zm * 0.5], '#6d4c41', `P_s = ${f(g.Ps)}`, 3);
       const qMax = Math.max(isFinite(g.qT) ? g.qT : 0, isFinite(g.qH) ? g.qH : 0, g.upl && g.upl.u1 !== undefined ? Math.max(g.upl.u1, g.upl.u2) : 0, 1e-9);
       const ps = (0.18 * H) / qMax;

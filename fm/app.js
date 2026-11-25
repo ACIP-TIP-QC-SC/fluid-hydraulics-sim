@@ -8,8 +8,8 @@
   const $ = (id) => document.getElementById(id);
 
   const App = {
-    units: 'SI', view: '2d', showP: true, active: 'mv', res: null,
-    modules: { mv: root.MV, mp: root.MP, m1: root.M1, md: root.MD, m2: root.M2, m3: root.M3 },
+    units: 'SI', view: '2d', showP: true, active: 'mf', res: null,
+    modules: { mf: root.MF, mv: root.MV, mp: root.MP, m1: root.M1, md: root.MD, m2: root.M2, m3: root.M3 },
     U() { return Physics.UNITS[this.units]; },
     mod() { return this.modules[this.active]; },
   };

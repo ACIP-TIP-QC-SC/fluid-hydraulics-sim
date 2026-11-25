@@ -28,7 +28,8 @@
     controls(el, C) {
       const s = this.state;
       const U = root.App.U();
-      C.seg(el, { label: 'Surface type', options: [['vertical', 'Plane vertical'], ['inclined', 'Plane inclined'], ['curved', 'Curved']], get: () => s.sub, set: (v) => (s.sub = v) });
+      C.seg(el, { label: 'Surface type', options: [['vertical', 'Plane vertical'], ['inclined', 'Plane inclined'], ['curved', 'Curved']].concat(root.StatX ? root.StatX.options('m1') : []), get: () => s.sub, set: (v) => (s.sub = v) });
+      if (root.StatX && root.StatX.is(s.sub, 'm1')) { root.StatX.controls(s.sub, s, el, C); return; }
       C.sg(el, { get: () => s.sg, set: (v) => (s.sg = v) });
       if (s.sub !== 'curved') {
         const g = C.section(el, 'Gate');

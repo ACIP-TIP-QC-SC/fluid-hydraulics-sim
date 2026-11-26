@@ -279,9 +279,10 @@
     if (mode !== 'twotank' && HT <= 0) return fail(o, 'Total head is zero or negative: the vacuum on the surface is strong enough that no liquid flows out (air is drawn in instead).');
 
     // slanted jet and measured-point problems (side orifice / nozzle)
-    const angDeg = I.jby === 'slope' ? (I.jdir === 'down' ? -1 : 1) * (Math.atan(Math.max(0, +I.zw || 0)) * 180) / PI : +I.jang || 0;
+    const angDeg = I.jby === 'slope' ? (I.jdir === 'down' ? -1 : 1) * (Math.atan(Math.max(0, +I.zw || 0)) * 180) / PI : I.jby === 'wall' ? (+I.wth || 90) - 90 : +I.jang || 0;
     const th = (mode === 'twotank' ? 0 : Math.max(-89, Math.min(89, angDeg))) * PI / 180, cth = Math.cos(th), tth = Math.tan(th);
-    if (mode !== 'twotank' && I.jby === 'slope') S(o, 'Jet angle from the slope of the tank wall', 'θ = tan⁻¹(z)  (jet leaves normal to a wall sloping z H : 1 V)', `θ = tan⁻¹(${fmt(+I.zw || 0)})`, `θ = ${fmt((th * 180) / PI)}° ${th < 0 ? 'below' : 'above'} the horizontal`, 'The wall makes tan⁻¹(1/z) with the horizontal, so its normal makes tan⁻¹(z).');
+    if (mode !== 'twotank' && I.jby === 'slope') S(o, 'Jet angle from the slope of the tank wall', 'θ = tan⁻¹(z)  (jet leaves normal to a wall sloping z H : 1 V)', `θ = tan⁻¹(${fmt(+I.zw || 0)})`, `θ = ${fmt((th * 180) / PI)}° ${th < 0 ? 'below' : 'above'} the horizontal`, 'The wall makes tan⁻¹(1/z) with the horizontal, so its normal makes tan⁻¹(z). A wall that overhangs the liquid sends the jet up; one that leans back (liquid on top of it) sends it down.');
+    if (mode !== 'twotank' && I.jby === 'wall') S(o, 'Jet angle from the angle of the tank wall', 'θ_jet = θ_wall − 90°  (jet leaves normal to the wall; θ_wall from the +x axis, liquid on the left)', `θ_jet = ${fmt(+I.wth)}° − 90°`, `θ = ${fmt((th * 180) / PI)}° ${th < 0 ? 'below' : 'above'} the horizontal`, +I.wth > 90 ? 'The wall overhangs the liquid, so the jet leaves pointing up and out.' : +I.wth < 90 ? 'The wall leans back under the liquid, so the jet leaves pointing down and out.' : 'Vertical wall: horizontal jet.');
     const jf = mode === 'steady' ? I.jfind || 'land' : 'land';
     o.data.th = th;
     if (jf === 'cv' || jf === 'H') {

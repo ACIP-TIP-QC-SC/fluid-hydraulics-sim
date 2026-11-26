@@ -188,7 +188,7 @@
       }
       const p = C.section(el, 'Wall and loading');
       C.toggle(p, { label: 'Inclined wall', get: () => x.incl, set: (v) => (x.incl = v) });
-      if (x.incl) sl(p, 'thA', 'Wall angle θ from horizontal', 5, 90, 0.1, '°');
+      if (x.incl) sl(p, 'thA', 'Wall angle θ from the +x axis (over 90° = wall leans over the liquid)', 5, 175, 0.1, '°');
       sl(p, 'psA', 'Gas pressure on the surface (gauge)', 0, 1000, 0.01, U.press);
       C.toggle(p, { label: 'Hinged along a horizontal line', get: () => x.hingeA, set: (v) => (x.hingeA = v) });
       if (x.hingeA) { sl(p, 'sHinge', 'Hinge line s_h (down the plate)', 0, 100, 0.001, U.len); sl(p, 'sProp', 'Support (stop) line s_P', 0, 100, 0.001, U.len); }
@@ -217,14 +217,14 @@
       const CPs = W(g.yp), Gs = W(g.G.sc);
       sc.arrow([CPs[0] + nL[0] * span * 0.38, CPs[1] + nL[1] * span * 0.38], CPs, { color: '#c0392b', w: 3, label: `F = ${f(g.F)} ${U.force}`, no3: true });
       sc.dot(Gs, '#16a085', '', { r: 4 }); sc.dot(CPs, '#c0392b', '', { r: 4 });
-            if (g.th < 89.9) sc.add({ t: 'arc', c: Wb, r: 30, a0: 0, a1: g.th, s: `θ = ${f(g.th)}°`, only2d: true });
+            if (Math.abs(g.th - 90) > 0.1) sc.add({ t: 'arc', c: Wb, r: 30, a0: 0, a1: g.th, s: `θ = ${f(g.th)}°`, only2d: true });
       sc.text([xl, Wb[1] - span * 0.12], 'Side section', { color: '#52606d', size: 12 }).only2d = true;
       // front view, to the right of the section (s measured down from the surface line)
-      const X0 = span * 0.55 - xmn, F = (q) => [X0 + q[0], -q[1]];
+      const X0 = (Wb[0] > 0 ? Wb[0] + span * 0.35 : 0) + span * 0.55 - xmn, F = (q) => [X0 + q[0], -q[1]]; // clear of a wall that leans over the liquid
       const fx0 = X0 + xmn - span * 0.25, fx1 = X0 + xmx + span * 0.25;
       sc.rect(fx0, -Lw, fx1, 0, { fill: '#e9edf1', stroke: '#9aa3ad', sw: 1 }, false);
       sc.line([fx0, 0], [fx1, 0], { stroke: WATERD, sw: 1.6, no3: true });
-      sc.text([fx0, 0], g.th < 89.9 ? 'surface line (along the wall)' : 'free surface', { color: WATERD, size: 10.5, dy: -5 });
+      sc.text([fx0, 0], Math.abs(g.th - 90) > 0.1 ? 'surface line (along the wall)' : 'free surface', { color: WATERD, size: 10.5, dy: -5 });
       sc.poly(g.pts.map(F), { fill: GATE, stroke: '#a04000', sw: 2, fop: 0.8 }, false);
       sc.line(F([g.G.xc, 0]), F([g.G.xc, g.G.sc]), { stroke: '#16a085', dash: '3 3', no3: true });
       sc.dot(F([g.G.xc, g.G.sc]), '#16a085', 'G'); sc.dot(F([g.xp, g.yp]), '#c0392b', 'CP');
@@ -235,7 +235,7 @@
       sc.text([fx0, -Lw - span * 0.12], 'Front view (true shape)', { color: '#52606d', size: 12 }).only2d = true;
       sc.items.forEach((it) => { if (it.t !== 'text' || !it.o.in3) it.only2d = true; });
       // 3D: wall slab in the plane of the plate, liquid block in front, plate set into the wall, F normal at CP
-      const dep = span * 0.9;
+      const dep = span * 0.9 + Math.max(0, -cs * Lw);
       sc.add({ t: 'custom3', only3d: true, fn: (V) => {
         const P3 = (xx, sv, z) => [xx, -sv * sn, z - sv * cs]; // wall plane leans back by (90° − θ)
         const wx0 = xmn - span * 0.3, wx1 = xmx + span * 0.3;
@@ -546,7 +546,7 @@
         C.seg(g, { label: 'Shape', options: [['rect', 'Rectangle'], ['circ', 'Circle']], get: () => x.cpShape, set: (v) => (x.cpShape = v) });
         if (x.cpShape === 'circ') sl(g, 'Dcp', 'Diameter D', 0.01, 50, 0.001, U.len);
         else { sl(g, 'Lg', 'Height L (down the plate)', 0.01, 50, 0.001, U.len); sl(g, 'bG', 'Width b', 0.01, 50, 0.001, U.len); }
-        sl(g, 'thG', 'Plate angle θ from horizontal (90 = vertical)', 5, 90, 0.1, '°');
+        sl(g, 'thG', 'Plate angle θ from the +x axis (90 = vertical, over 90° = leans over the liquid)', 5, 175, 0.1, '°');
         sl(g, 'eCP', 'CP below the centroid, along the plate (or pivot below the centroid)', 0.0001, 10, 0.0001, U.len);
         return;
       }
@@ -557,7 +557,7 @@
       if (plate) {
         sl(g, 'Lg', 'Length L', 0.01, 100, 0.001, U.len);
         sl(g, 'thG', 'Angle θ from horizontal (90 = vertical)', 1, 90, 0.1, '°');
-        if (x.thG < 90) C.seg(g, { label: 'Liquid is', options: [['above', 'On top of the plate'], ['under', 'Under the plate (it leans over the liquid)']], get: () => x.lean, set: (v) => (x.lean = v) });
+        if (x.thG < 90) C.seg(g, { label: 'Liquid is', options: [['above', 'On top of the plate'], ['under', 'Under the plate (it leans over the liquid, i.e. 180° − θ from +x)']], get: () => x.lean, set: (v) => (x.lean = v) });
         if (x.gs !== 'h') sl(g, 'hB', 'Liquid depth above the bottom edge', 0, 200, 0.001, U.len);
         if (x.gs !== 'lift') sl(g, 'sH', 'Hinge / pivot: distance down the gate from its top edge (0 = top, L = bottom)', 0, 100, 0.001, U.len);
       } else {

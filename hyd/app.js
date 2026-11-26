@@ -194,10 +194,11 @@
       { k: 't4', label: 'Layer 4 thickness t₄ (top)', dim: 'len', min: 0.01, max: 20, step: 0.01, def: 0.3, show: (P, m) => nLayOf(P, m) >= 4 },
       { k: 'sg4', label: 'Layer 4 specific gravity Sg₄', min: 0.5, max: 13.6, step: 0.01, def: 0.6, chips: LSG_CHIPS, show: (P, m) => nLayOf(P, m) >= 4 },
       { k: 'y', label: 'Orifice height above ground y', dim: 'len', min: 0, max: 20, step: 0.01, def: 1.5, modes: ['steady', 'drain', 'inflow'] },
-      { k: 'jby', type: 'select', label: 'Jet direction given by', def: 'ang', modes: ['steady', 'drain', 'inflow'], options: [['ang', 'Angle θ'], ['slope', 'Slope of the tank wall (jet normal to it)']], show: (P, m) => m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect' },
-      { k: 'jang', label: 'Jet angle θ above the horizontal (− = pointing down)', dim: 'deg', min: -89, max: 89, step: 0.1, def: 0, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby !== 'slope' },
+      { k: 'jby', type: 'select', label: 'Jet direction given by', def: 'ang', modes: ['steady', 'drain', 'inflow'], options: [['ang', 'Angle θ'], ['slope', 'Slope of the tank wall (jet normal to it)'], ['wall', 'Angle of the tank wall from the +x axis (jet normal to it)']], show: (P, m) => m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect' },
+      { k: 'jang', label: 'Jet angle θ above the horizontal (− = pointing down)', dim: 'deg', min: -89, max: 89, step: 0.1, def: 0, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && (P.jby || 'ang') === 'ang' },
       { k: 'zw', label: 'Wall slope z (z H : 1 V)', min: 0, max: 20, step: 0.01, def: 1, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'slope' },
-      { k: 'jdir', type: 'select', label: 'Jet points', def: 'up', modes: ['steady', 'drain', 'inflow'], options: [['up', 'Upward (wall leans back)'], ['down', 'Downward (wall overhangs)']], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'slope' },
+      { k: 'wth', label: 'Wall angle from the +x axis, liquid on the left (over 90° = wall overhangs the liquid, jet points up)', dim: 'deg', min: 1, max: 179, step: 0.1, def: 135, modes: ['steady', 'drain', 'inflow'], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'wall' },
+      { k: 'jdir', type: 'select', label: 'Jet points', def: 'up', modes: ['steady', 'drain', 'inflow'], options: [['up', 'Upward (wall overhangs the liquid)'], ['down', 'Downward (wall leans back, liquid on top of it)']], show: (P, m) => (m === 'steady' || P.shape === 'vcyl' || P.shape === 'rect') && P.jby === 'slope' },
       { k: 'jfind', type: 'select', label: 'Jet question', def: 'land', modes: ['steady'], options: [['land', 'Where the jet lands'], ['pt', 'Height of the jet at a distance x_p'], ['cv', 'Coefficients from a measured point on the jet'], ['H', 'Head needed for the jet to pass a point'], ['vm', 'Coefficients from a measured jet velocity'], ['Qdj', 'Coefficients from measured Q and jet diameter'], ['HLv', 'Head and Cv from the head lost and jet velocity'], ['dQ', 'Orifice size for a required Q'], ['HQ', 'Head for a required Q'], ['psQ', 'Surface pressure for a required Q']] },
       { k: 'vm', label: 'Measured jet velocity v (vena contracta)', dim: 'vel', min: 0.01, max: 200, step: 0.01, def: 8.53, modes: ['steady'], show: (P) => P.jfind === 'vm' || P.jfind === 'HLv' },
       { k: 'dj', label: 'Measured jet diameter d_j', dim: 'mm', min: 1, max: 500, step: 0.1, def: 40, modes: ['steady'], show: (P) => P.jfind === 'Qdj' },
@@ -247,6 +248,7 @@
       { name: 'Schaum 12.55 — standard orifice for 0.016 m³/s under 8.69 m (50 mm)', mode: 'steady', set: { H: 8.69, Sg: 1, ps: 0, Cd: 0.61, Cv: 0.98, Cc: 0.6224, jang: 0, jfind: 'dQ', Qt: 0.016 } },
       { name: 'Schaum 12.57 — oil Sg 0.8, 75 mm orifice, Q 0.026, jet 58.5 mm, H 7.47 m, air −152 mm Hg (Cd 0.601, Cc 0.608, Cv 0.988; book prints 0.580, 0.590, 0.982, which the printed data do not give)', mode: 'steady', set: { H: 7.47, d: 75, Sg: 0.8, ps: -20.27, jang: 0, jfind: 'Qdj', Qm: 0.026, dj: 58.5 } },
       { name: 'Schaum 12.82 — tank 4.88 × 1.22 m, 1.22 m of oil empties in 10 min 10 s through 100 mm (Cd 0.620; book rounds to 0.60, and its 12.83 answer 0.314 m needs 0.62)', mode: 'drain', set: { H: 1.22, H2: 0, d: 100, Sg: 0.75, ps: 0, shape: 'rect', Lt: 4.88, Bt: 1.22, dsolve: 'Cd', tm: 610, tq: 0 } },
+      { name: 'Overhanging wall at 135° from +x (45° inside the liquid): jet leaves 45° up, H 3 m, orifice 2 m above the ground', mode: 'steady', set: { H: 3, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 2, jby: 'wall', wth: 135, jfind: 'land' } },
       { name: 'Slanted nozzle 30° up, H 4 m, 1.5 m above the ground', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 1.5, jang: 30, jfind: 'land' } },
       { name: 'Slanted jet 20° down: height where it meets a wall 2 m away', mode: 'steady', set: { H: 4, d: 50, Cd: 0.6, Cv: 0.98, Cc: 0.612, ps: 0, y: 3, jang: -20, jfind: 'pt', xq: 2 } }
     ]
@@ -269,10 +271,19 @@
     else { Wt = Math.max(I.Db, I.Dt); Ht = I.Hf; hw = (h) => I.Db / 2 + ((I.Dt - I.Db) / 2) * clamp(h / I.Hf, 0, 1); }
     return { sh, Wt, Ht, hw, side };
   }
+  // side-orifice tank whose orifice wall is normal to the jet (2026-11-26): an upward jet means the wall overhangs
+  // the liquid, a downward jet means it leans back under it. x measured from the orifice, z up from the orifice.
+  function sideWall(G, th) {
+    const tw = clamp(Math.tan(th || 0), -4, 4);
+    const xr = (z) => -z * tw;
+    const xl = Math.min(-G.Wt, xr(G.Ht) - 0.5 * G.Wt);
+    return { tw, xr, xl, wthDeg: 90 + ((th || 0) * 180) / PI };
+  }
   function tankPath(ctx, V, G, cx, yo, fl) {
     const X = V.X, Y = V.Y, top = yo + G.Ht;
     ctx.beginPath();
-    if (G.side) { ctx.rect(X(-G.Wt), Y(top), G.Wt * V.sx, (G.Ht + fl) * V.sy); }
+    if (G.side && G.sw && G.sw.tw) { const w = G.sw; ctx.moveTo(X(w.xl), Y(top)); ctx.lineTo(X(w.xl), Y(yo - fl)); ctx.lineTo(X(w.xr(-fl)), Y(yo - fl)); ctx.lineTo(X(w.xr(G.Ht)), Y(top)); ctx.closePath(); }
+    else if (G.side) { ctx.rect(X(-G.Wt), Y(top), G.Wt * V.sx, (G.Ht + fl) * V.sy); }
     else if (G.sh === 'cone') { ctx.moveTo(X(cx - G.Wt / 2), Y(top)); ctx.lineTo(X(cx), Y(yo)); ctx.lineTo(X(cx + G.Wt / 2), Y(top)); ctx.closePath(); }
     else if (G.sh === 'sphere' || G.sh === 'hcyl') { ctx.arc(X(cx), Y(yo + G.Wt / 2), (G.Wt / 2) * V.sx, 0, 2 * PI); }
     else { const rb = G.hw(0), rt = G.hw(G.Ht); ctx.moveTo(X(cx - rt), Y(top)); ctx.lineTo(X(cx - rb), Y(yo)); ctx.lineTo(X(cx + rb), Y(yo)); ctx.lineTo(X(cx + rt), Y(top)); ctx.closePath(); }
@@ -281,6 +292,8 @@
     const d = R.data, I = d.Iover ? Object.assign({}, S.I, d.Iover) : S.I, mode = d.mode, g = S.U.g, L = S.U.L, th = d.th || 0;
     if (mode === 'twotank') return drawTwoTank(ctx, W, H, R, A, T);
     const G = tankGeom(I, mode);
+    const SW = G.side ? (G.sw = sideWall(G, th)) : null;
+    const eL = (z) => (SW ? SW.xl : cx - G.hw(z)), eR = (z) => (SW ? SW.xr(z) : cx + G.hw(z)); // tank edges at height z above the orifice
     let hT = mode === 'steady' ? I.H : d.hAt ? d.hAt(S.simT) : I.H;
     const h = sm(A, 'h', hT, T.rdt, 14);
     const hp = d.hp || 0, heqNow = d.layers ? (d.heqOf ? d.heqOf(Math.max(0, h)) : d.H1 + hp) : h + hp, v = d.Cv * Math.sqrt(2 * g * Math.max(0, heqNow));
@@ -289,14 +302,14 @@
     const cx = G.side ? -G.Wt / 2 : 0;
     const xLand0 = G.side ? (th ? d.x || 0 : 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo)) : 0;
     const span = Math.max(G.Wt + xLand0, yo + G.Ht, 1), ztop = Math.max(yo + G.Ht, G.side && d.zmax ? yo + d.zmax : 0);
-    const b = smB(A, 'b', { x0: (G.side ? -G.Wt : -G.Wt / 2) - 0.22 * span, x1: Math.max(xLand0, G.side ? 0.3 * G.Wt : G.Wt / 2) + 0.12 * span + (d.layers && !G.side ? 0.65 * span : 0), y0: -0.07 * span, y1: ztop + 0.08 * span }, T.rdt);
+    const b = smB(A, 'b', { x0: (G.side ? SW.xl : -G.Wt / 2) - 0.22 * span, x1: Math.max(xLand0, G.side ? 0.3 * G.Wt : G.Wt / 2) + 0.12 * span + (d.layers && !G.side ? 0.65 * span : 0), y0: -0.07 * span, y1: ztop + 0.08 * span }, T.rdt);
     const V = view(b, W, H, { l: 20, r: 20, t: 26, b: 26 }, true);
     const X = V.X, Y = V.Y;
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     ground(ctx, 0, W, Y(0), H - Y(0));
     // stand / legs
     const bottomY = G.side ? yo - fl : yo;
-    if (bottomY > 0.001) { ctx.fillStyle = C.wall; ctx.globalAlpha = 0.25; const lx = G.side ? [-G.Wt * 0.9, -G.Wt * 0.1] : [cx - G.Wt * 0.35, cx + G.Wt * 0.35]; lx.forEach((x) => ctx.fillRect(X(x) - 3, Y(G.side ? bottomY : yo + (G.sh === 'cone' ? G.Ht * 0.4 : G.sh === 'frustum' ? 0 : G.Wt * 0.2)), 6, Y(0) - Y(G.side ? bottomY : yo + (G.sh === 'cone' ? G.Ht * 0.4 : G.sh === 'frustum' ? 0 : G.Wt * 0.2)))); ctx.globalAlpha = 1; }
+    if (bottomY > 0.001) { ctx.fillStyle = C.wall; ctx.globalAlpha = 0.25; const lx = G.side ? [lerp(SW.xl, SW.xr(-fl), 0.1), lerp(SW.xl, SW.xr(-fl), 0.9)] : [cx - G.Wt * 0.35, cx + G.Wt * 0.35]; lx.forEach((x) => ctx.fillRect(X(x) - 3, Y(G.side ? bottomY : yo + (G.sh === 'cone' ? G.Ht * 0.4 : G.sh === 'frustum' ? 0 : G.Wt * 0.2)), 6, Y(0) - Y(G.side ? bottomY : yo + (G.sh === 'cone' ? G.Ht * 0.4 : G.sh === 'frustum' ? 0 : G.Wt * 0.2)))); ctx.globalAlpha = 1; }
     datum(ctx, 0, W, Y(yo), 'Datum (orifice ℄)');
     // water
     const lvl = yo + Math.max(0, h);
@@ -308,19 +321,24 @@
     if (bands) bands.forEach((q) => { const zi = q.z1; if (zi <= 1e-9 || zi >= h - 1e-9) return; const hw = G.hw(zi); stroke(ctx, [[X(cx - hw), Y(yo + zi)], [X(cx + hw), Y(yo + zi)]], layCol(q.j), 1.5, [6, 3]); });
     // outline
     tankPath(ctx, V, G, cx, yo, fl); ctx.strokeStyle = C.wall; ctx.lineWidth = 3; ctx.stroke();
-    if (G.side) { ctx.fillStyle = C.bg; const ro = Math.max(2, (I.d / 2) * V.sy); ctx.fillRect(X(0) - 3, Y(yo) - ro, 6, 2 * ro); }
-    if (hp !== 0 && G.side) { stroke(ctx, [[X(-G.Wt), Y(yo + G.Ht)], [X(0), Y(yo + G.Ht)]], C.wall, 4); txt(ctx, `p_s = ${fmt(I.ps)} ${S.U.p} (closed)`, X(-G.Wt / 2), Y(yo + G.Ht) - 12, { align: 'center', size: 11, mono: true, bg: C.bg }); }
+    if (G.side) { ctx.save(); ctx.translate(X(0), Y(yo)); ctx.rotate(-th); ctx.fillStyle = C.bg; const ro = Math.max(2, (I.d / 2) * V.sy); ctx.fillRect(-3, -ro, 6, 2 * ro); ctx.restore(); }
+    if (G.side && SW.tw) { // wall angle, measured from +x like the hydrostatic gates
+      const bx = X(SW.xr(-fl)), by = Y(yo - fl), a1 = (SW.wthDeg * PI) / 180;
+      ctx.beginPath(); ctx.arc(bx, by, 26, -a1, 0); ctx.strokeStyle = C.muted; ctx.lineWidth = 1.2; ctx.stroke();
+      const zl = 0.75 * G.Ht; txt(ctx, `wall at ${fmt(SW.wthDeg)}° from +x${SW.tw > 0 ? ' (overhangs the liquid)' : ' (leans back)'}`, X(SW.xr(zl)) + 10, Y(yo + zl), { size: 10.5, mono: true, color: C.muted, bg: C.bg });
+    }
+    if (hp !== 0 && G.side) { stroke(ctx, [[X(SW.xl), Y(yo + G.Ht)], [X(SW.xr(G.Ht)), Y(yo + G.Ht)]], C.wall, 4); txt(ctx, `p_s = ${fmt(I.ps)} ${S.U.p} (closed)`, X((SW.xl + SW.xr(G.Ht)) / 2), Y(yo + G.Ht) - 12, { align: 'center', size: 11, mono: true, bg: C.bg }); }
     // free surface symbol and level
-    const hwL = G.hw(Math.max(0, h));
-    if (h > 0.001) { stroke(ctx, [[X(cx - hwL), Y(lvl)], [X(cx + hwL), Y(lvl)]], C.water_deep, 1.5); surfSym(ctx, X(cx + hwL * 0.45), Y(lvl)); }
+    const hz = Math.max(0, h);
+    if (h > 0.001) { stroke(ctx, [[X(eL(hz)), Y(lvl)], [X(eR(hz)), Y(lvl)]], C.water_deep, 1.5); surfSym(ctx, X(lerp(eL(hz), eR(hz), SW && SW.tw > 0 ? 0.35 : 0.72)), Y(lvl)); }
     // dimensions
-    const dimX = X((G.side ? -G.Wt : cx - G.Wt / 2)) - 18;
+    const dimX = X((G.side ? SW.xl : cx - G.Wt / 2)) - 18;
     dimV(ctx, dimX, Y(yo), Y(lvl), `${mode === 'steady' ? 'H' : 'h'} = ${fmt(h)} ${L}`, null, 'left');
-    if (mode !== 'steady' && I.H2 >= 0 && (mode !== 'inflow' || true)) { const y2 = Y(yo + I.H2); stroke(ctx, [[X(cx - G.hw(I.H2)) - 6, y2], [X(cx + G.hw(I.H2)) + 6, y2]], C.egl, 1, [5, 4]); txt(ctx, 'H₂', X(cx + G.hw(I.H2)) + 8, y2, { size: 11, color: C.egl, mono: true }); }
-    if (mode === 'inflow' && isFinite(d.heq) && d.heq > 0 && d.heq < G.Ht) { const ye = Y(yo + d.heq); stroke(ctx, [[X(cx - G.hw(d.heq)), ye], [X(cx + G.hw(d.heq)), ye]], C.ok, 1, [2, 3]); txt(ctx, 'h_eq', X(cx - G.hw(d.heq)) + 4, ye - 8, { size: 11, color: C.ok, mono: true }); }
+    if (mode !== 'steady' && I.H2 >= 0 && (mode !== 'inflow' || true)) { const y2 = Y(yo + I.H2); stroke(ctx, [[X(eL(I.H2)) - 6, y2], [X(eR(I.H2)) + 6, y2]], C.egl, 1, [5, 4]); txt(ctx, 'H₂', X(eR(I.H2)) + 8, y2, { size: 11, color: C.egl, mono: true }); }
+    if (mode === 'inflow' && isFinite(d.heq) && d.heq > 0 && d.heq < G.Ht) { const ye = Y(yo + d.heq); stroke(ctx, [[X(eL(d.heq)), ye], [X(eR(d.heq)), ye]], C.ok, 1, [2, 3]); txt(ctx, 'h_eq', X(eL(d.heq)) + 4, ye - 8, { size: 11, color: C.ok, mono: true }); }
     if (yo > 0.01) dimV(ctx, dimX - (G.side ? 0 : 0) - 0, Y(0), Y(yo) - 0, `y = ${fmt(yo)} ${L}`, null, 'left');
     // inflow pipe
-    if (mode === 'inflow' && d.Qin > 0) { const xp = X(cx - G.hw(G.Ht) * 0.5), yp = Y(yo + G.Ht + 0.05 * span); stroke(ctx, [[xp - 40, yp], [xp, yp], [xp, yp + 8]], C.pipe, 6); txt(ctx, `Q_in = ${fmt(d.Qin)} ${S.U.Q}`, xp - 40, yp - 12, { size: 11, mono: true }); }
+    if (mode === 'inflow' && d.Qin > 0) { const xp = X(G.side ? lerp(eL(G.Ht), eR(G.Ht), 0.25) : cx - G.hw(G.Ht) * 0.5), yp = Y(yo + G.Ht + 0.05 * span); stroke(ctx, [[xp - 40, yp], [xp, yp], [xp, yp + 8]], C.pipe, 6); txt(ctx, `Q_in = ${fmt(d.Qin)} ${S.U.Q}`, xp - 40, yp - 12, { size: 11, mono: true }); }
     // jet
     const dj = Math.sqrt(d.Cc) * I.d;
     const jet = [];
@@ -344,7 +362,7 @@
     const dt = T.pdt;
     const v0 = d.v0 || 1;
     if (dt > 0 && v > 1e-6) { let n = dt * 70 * clamp(v / v0, 0.15, 1.5); while (n > 0 && A.parts.length < 480) { if (rnd() < n) A.parts.push({ k: 'j', t: 0, v, o: (rnd() - 0.5) * dj }); n -= 1; } }
-    if (dt > 0 && A.parts.filter((p) => p.k === 't').length < 130 && h > 0.01) for (let i = 0; i < 3; i++) { const hh = rnd() * h; A.parts.push({ k: 't', x: cx + (rnd() * 2 - 1) * G.hw(hh) * 0.95, y: yo + hh }); }
+    if (dt > 0 && A.parts.filter((p) => p.k === 't').length < 130 && h > 0.01) for (let i = 0; i < 3; i++) { const hh = rnd() * h; A.parts.push({ k: 't', x: lerp(eL(hh), eR(hh), 0.025 + 0.95 * rnd()), y: yo + hh }); }
     ctx.fillStyle = C.part;
     const keep = [];
     for (const p of A.parts) {
@@ -356,7 +374,7 @@
         const ox = G.side ? 0 : 0, dx = ox - p.x, dy = yo - p.y, r = Math.hypot(dx, dy) + 1e-9;
         const spd = (0.04 + 0.5 * Math.exp(-r / (0.25 * G.Wt + 0.05))) * v * 0.25;
         p.x += (dx / r) * spd * dt; p.y += (dy / r) * spd * dt;
-        if (r < Math.max(I.d, 0.02 * G.Wt) || p.y > lvl || Math.abs(p.x - cx) > G.hw(p.y - yo) + 1e-6) continue;
+        if (r < Math.max(I.d, 0.02 * G.Wt) || p.y > lvl || p.x < eL(p.y - yo) - 1e-6 || p.x > eR(p.y - yo) + 1e-6) continue;
         keep.push(p); ctx.globalAlpha = 0.55; ctx.fillRect(X(p.x) - 1, Y(p.y) - 1, 2.5, 2.5); ctx.globalAlpha = 1;
       }
     }
@@ -1455,6 +1473,7 @@
 
   /* ---------------- Module 1: tank and orifice in 3D ---------------- */
   function tankRing(G, I, mode, zr) {
+    if (G.side && G.sw && G.sw.tw) { const w = G.sw, o = G.Wt / 2, b = G.Wt / 2; return [[o + w.xl, -b], [o + w.xr(zr), -b], [o + w.xr(zr), b], [o + w.xl, b]]; } // slanted orifice wall
     if (G.sh === 'rect' && mode !== 'steady') { const a = I.Lt / 2, b = I.Bt / 2; return [[-a, -b], [a, -b], [a, b], [-a, b]]; }
     if (G.sh === 'hcyl') { const a = G.hw(zr), b = I.Lh / 2; return [[-a, -b], [a, -b], [a, b], [-a, b]]; }
     return circleRing(0, 0, G.side ? G.Wt / 2 : G.hw(zr));
@@ -1463,6 +1482,7 @@
     const d = R.data, I = d.Iover ? Object.assign({}, S.I, d.Iover) : S.I, th = d.th || 0, mode = d.mode, g = S.U.g, U = S.U, L = U.L;
     if (mode === 'twotank') return drawTwoTankIso(ctx, W, H, R, A, T);
     const G = tankGeom(I, mode);
+    if (G.side) G.sw = sideWall(G, th);
     const h = sm(A, 'h', mode === 'steady' ? I.H : d.hAt(S.simT), T.rdt, 14);
     const hp = d.hp || 0, heqNow = d.layers ? (d.heqOf ? d.heqOf(Math.max(0, h)) : d.H1 + hp) : h + hp, v = d.Cv * Math.sqrt(2 * g * Math.max(0, heqNow));
     const jetCol = d.layers ? layCol(d.layerAt ? d.layerAt(Math.max(0, h)) : 0) : C.water;
@@ -1473,8 +1493,8 @@
     const ringW = (zw) => ring(zw - yo);
     const xL0 = G.side ? (th ? d.x || 0 : 2 * d.Cv * Math.sqrt(Math.max(0, d.H1 + hp) * yo)) : 0;
     const Rt = Math.max(G.Wt / 2, G.sh === 'rect' && mode !== 'steady' ? I.Bt / 2 : 0, G.sh === 'hcyl' ? I.Lh / 2 : 0);
-    const gx0 = -Rt * 1.5, gx1 = xo + xL0 + Math.max(0.4, Rt * 0.6), gy0 = -Rt * 1.5, gy1 = Rt * 1.5;
-    const { P, s } = isoFit(A, 'ib', [[gx0, gy0, 0], [gx1, gy0, 0], [gx1, gy1, 0], [gx0, gy1, 0], [-Rt, Rt, yo + G.Ht], [Rt, -Rt, yo + G.Ht], [-Rt, -Rt, yo + G.Ht]].concat(d.layers && !G.side ? [[Rt * 3.2, -Rt * 1.5, yo + G.Ht]] : []).concat(G.side && d.zmax ? [[xo + d.xz, 0, yo + d.zmax]] : []), W, H, 34, T.rdt);
+    const gx0 = Math.min(-Rt, G.side ? G.Wt / 2 + G.sw.xl : -Rt) - Rt * 0.5, gx1 = xo + xL0 + Math.max(0.4, Rt * 0.6), gy0 = -Rt * 1.5, gy1 = Rt * 1.5;
+    const { P, s } = isoFit(A, 'ib', [[gx0, gy0, 0], [gx1, gy0, 0], [gx1, gy1, 0], [gx0, gy1, 0], [-Rt, Rt, yo + G.Ht], [Rt, -Rt, yo + G.Ht], [-Rt, -Rt, yo + G.Ht]].concat(G.side && G.sw.tw ? [[G.Wt / 2 + G.sw.xl, Rt, yo + G.Ht], [G.Wt / 2 + G.sw.xr(G.Ht), -Rt, yo + G.Ht]] : []).concat(d.layers && !G.side ? [[Rt * 3.2, -Rt * 1.5, yo + G.Ht]] : []).concat(G.side && d.zmax ? [[xo + d.xz, 0, yo + d.zmax]] : []), W, H, 34, T.rdt);
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
     groundGrid(ctx, P, gx0, gx1, gy0, gy1);
     // shadows
@@ -1501,12 +1521,12 @@
     }
     ctx.globalAlpha = 1;
     finish();
-    if (h > 0.001) { const c = P(0, 0, yo + h); surfSym(ctx, c[0], c[1]); }
+    if (h > 0.001) { const rh = ring(h), c = P(rh.reduce((a, q) => a + q[0], 0) / rh.length, 0, yo + h); surfSym(ctx, c[0], c[1]); }
     if (hp !== 0) { fillPoly(ctx, ring(G.Ht).map((p) => P(p[0], p[1], yo + G.Ht)), C.wall, 0.35, C.wall, 2); const c = P(0, 0, yo + G.Ht); txt(ctx, `closed: p_s = ${fmt(I.ps)} ${U.p}`, c[0], c[1] - 14, { align: 'center', size: 11, mono: true, bg: C.bg }); }
     if (mode === 'inflow' && d.Qin > 0) { const a = P(-G.Wt * 0.2, 0, yo + G.Ht + 0.25 * G.Ht), b = P(-G.Wt * 0.2, 0, yo + h); stroke(ctx, [a, b], C.water, 4); stroke(ctx, [[a[0] - 30, a[1]], a], C.pipe, 7); txt(ctx, `Q_in = ${fmt(d.Qin)} ${U.Q}`, a[0] - 30, a[1] - 14, { size: 11, mono: true }); }
     // orifice opening
     const ro = Math.max(I.d / 2, 2 / s);
-    if (G.side) fillPoly(ctx, circleRing(0, 0, ro, 20).map((q) => P(xo, q[0], yo + q[1])), C.bg, 1, C.wall, 1.5);
+    if (G.side) fillPoly(ctx, circleRing(0, 0, ro, 20).map((q) => P(xo - q[1] * Math.sin(th), q[0], yo + q[1] * Math.cos(th))), C.bg, 1, C.wall, 1.5);
     else fillPoly(ctx, circleRing(0, 0, ro, 20).map((q) => P(q[0], q[1], yo)), C.bg, 1, C.wall, 1.5);
     // jet tube + shadow
     if (v > 1e-6) {

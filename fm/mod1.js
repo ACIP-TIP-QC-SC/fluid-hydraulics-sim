@@ -18,6 +18,7 @@
       { name: 'Test 1 — Vertical rectangle 2×3 m, top 1 m deep', apply: (s) => Object.assign(s, { sub: 'vertical', sg: 1, h1: 1, shape: 'rect', ps: 0, both: false, hinge: 'none' }, { dims: Object.assign(s.dims, { rect: { b: 2, h: 3 } }) }) },
       { name: 'Test 2 — Vertical circle D = 2 m, centre 3 m deep', apply: (s) => Object.assign(s, { sub: 'vertical', sg: 1, h1: 2, shape: 'circle', ps: 0, both: false, hinge: 'none' }, { dims: Object.assign(s.dims, { circle: { D: 2 } }) }) },
       { name: 'Inclined 60° rectangle, hinged at top', apply: (s) => Object.assign(s, { sub: 'inclined', theta: 60, sg: 1, h1: 1.5, shape: 'rect', ps: 0, both: false, hinge: 'top' }, { dims: Object.assign(s.dims, { rect: { b: 1.5, h: 2.5 } }) }) },
+      { name: 'Overhanging gate θ = 135° (liquid under it), rectangle 1.5 × 2 m, top 1 m deep', apply: (s) => Object.assign(s, { sub: 'inclined', theta: 135, sg: 1, h1: 1, shape: 'rect', ps: 0, both: false, hinge: 'none' }, { dims: Object.assign(s.dims, { rect: { b: 1.5, h: 2 } }) }) },
       { name: 'Triangle apex up, oil Sg 0.80', apply: (s) => Object.assign(s, { sub: 'vertical', sg: 0.8, h1: 2, shape: 'tri', orient: 'up', ps: 0, both: false, hinge: 'none' }, { dims: Object.assign(s.dims, { tri: { b: 2, h: 3 } }) }) },
       { name: 'Closed tank, p_s = 20 kPa', apply: (s) => Object.assign(s, { sub: 'vertical', sg: 1, h1: 1, shape: 'rect', ps: 20, both: false, hinge: 'none' }, { dims: Object.assign(s.dims, { rect: { b: 2, h: 3 } }) }) },
       { name: 'Water on both sides (4 m / 3.2 m)', apply: (s) => Object.assign(s, { sub: 'vertical', sg: 1, h1: 1, shape: 'rect', ps: 0, both: true, sg2: 1, h2: 0.2, hinge: 'bottom' }, { dims: Object.assign(s.dims, { rect: { b: 2, h: 3 } }) }) },
@@ -49,7 +50,10 @@
         if (s.shape === 'trap') { sl('a', 'Top width a', 0.1, 10); sl('b', 'Bottom width b', 0.1, 10); sl('h', 'Height h', 0.1, 10); }
         const p = C.section(el, 'Position & loading');
         C.slider(p, { label: 'Depth of top edge h₁ (vertical)', min: 0, max: 20, step: 0.01, get: () => s.h1, set: (v) => (s.h1 = v), unit: U.len });
-        if (s.sub === 'inclined') C.slider(p, { label: 'Inclination θ from horizontal', min: 5, max: 90, step: 0.1, get: () => s.theta, set: (v) => (s.theta = v), unit: '°' });
+        if (s.sub === 'inclined') {
+          C.slider(p, { label: 'Angle θ of the gate from the +x axis (over 90° = gate leans over the liquid)', min: 5, max: 175, step: 0.1, get: () => s.theta, set: (v) => (s.theta = v), unit: '°' });
+          if (s.theta > 90) C.note(p, `The gate overhangs: the liquid is UNDER it, so F pushes up and out (imaginary liquid above). If your figure gives the acute angle α inside the liquid, enter θ = 180° − α.`);
+        }
         C.slider(p, { label: 'Surface gas pressure p_s (closed tank)', min: 0, max: 200, step: 0.1, get: () => s.ps, set: (v) => (s.ps = v), unit: U.press });
         C.toggle(p, { label: 'Liquid on both sides', get: () => s.both, set: (v) => (s.both = v) });
         if (s.both) {
@@ -130,6 +134,15 @@
     D.line([F.wallX(yBot), yBot], [F.wallX(yTopB), yTopB], { stroke: '#2c3e50', sw: 5 });
     D.line([xL, 0], [F.wallX(0), 0], { stroke: COL.waterDark, sw: 1.5 });
     D.fs([xL + (F.wallX(0) - xL) * 0.25, 0], { label: g.ps > 0 ? 'liquid surface' : `Sg = ${f(state.sg)}` });
+    // liquid (real or imaginary) vertically above the gate, up to the (equivalent) free surface: its weight is F_V
+    if (Math.abs(g.thDeg - 90) > 0.1 && !both) {
+      const ys = g.heq || 0;
+      const prism = [F.T, B, [B[0], ys], [F.T[0], ys]];
+      D.poly(prism, { fill: g.over ? 'none' : COL.meta, fop: 0.08, stroke: COL.meta, sw: 1.2, dash: g.over ? '6 4' : null });
+      const mx = (F.T[0] + B[0]) / 2;
+      D.text([mx, ys], g.over ? `imaginary liquid above the gate → F_V = ${f(g.FV)} ${U.force} ↑` : `real liquid above the gate → F_V = ${f(g.FV)} ${U.force} ↓`,
+        { color: COL.meta, anchor: 'middle', size: 10.5, dy: -8 });
+    }
     // gate
     D.line(F.T, B, { stroke: COL.gate, sw: 8 });
     // pressure diagram on the wetted side
@@ -185,12 +198,14 @@
     D.line([F.wallX(CG[1]), CG[1]], [dimX + 92 / D.sc, CG[1]], { stroke: COL.cg, sw: 0.6, dash: '3 3' });
     D.line([F.wallX(CP[1]), CP[1]], [dimX + 166 / D.sc, CP[1]], { stroke: COL.cp, sw: 0.6, dash: '3 3' });
     D.line([F.wallX(F.T[1]), F.T[1]], [dimX + 18 / D.sc, F.T[1]], { stroke: COL.dim, sw: 0.6, dash: '3 3' });
-    if (g.thDeg < 89.9) {
+    const slanted = Math.abs(g.thDeg - 90) > 0.1;
+    if (slanted) {
       const bx = F.wallX(yBot);
       D.line([bx, yBot], [bx - 2.5, yBot], { stroke: COL.dim, sw: 0.6 });
       D.arc([bx, yBot], 46, 0, g.thDeg, `θ = ${f(g.thDeg)}°`);
+      if (g.over) D.arc([bx, yBot], 30, g.thDeg, 180, `α = ${f(180 - g.thDeg)}°`);
     }
-    if (g.thDeg < 89.9) D.dim(F.T, B, `L = ${f(G.Lp)}`, 64);
+    if (slanted) D.dim(F.T, B, `L = ${f(G.Lp)}`, 64);
     // front-view inset
     inset(D, G, g, U);
     void xd;

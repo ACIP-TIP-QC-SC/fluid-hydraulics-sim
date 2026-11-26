@@ -218,7 +218,7 @@
     if (!G || !(G.A > 0)) err.push('Gate dimensions must be positive.');
     if (!(p.sg > 0)) err.push('Specific gravity must be positive.');
     if (p.h1 < 0) err.push('Gate is partly ABOVE the free surface (h₁ < 0). F = γh̄A is only valid for a fully submerged plane — only the wetted part is loaded. Set h₁ ≥ 0.');
-    if (!(thDeg > 0 && thDeg <= 90)) err.push('Inclination θ must be between 0° and 90°.');
+    if (!(thDeg > 0 && thDeg < 180)) err.push('Angle θ must be between 0° and 180° (measured from the +x axis; over 90° the gate leans over the liquid).');
     if (p.ps < 0) err.push('Surface pressure must be ≥ 0 (gauge).');
     if (p.both && p.h2 < 0) err.push('Gate is partly above the second free surface (h₂ < 0).');
     if (err.length) return { ok: false, err, warn, steps: [], out, geo: { G, thDeg, sn, cs } };
@@ -260,6 +260,11 @@
     st.add('Centre of pressure along the plate', 'y_p = ȳ + I_g/(A ȳ)', `y_p = ${f(ybar)} + ${f(e)}`, `y_p = ${f(yp)} ${L}`,
       'Inclined distance from the free-surface line to the line of action of F.');
     const hp = yp * sn;
+    const over = thDeg > 90 + 1e-9;
+    if (!vertical && over) {
+      st.add('Gate leans over the liquid (θ > 90°)', 'sin θ = sin(180° − θ)', `sin ${f(thDeg)}° = sin ${f(180 - thDeg)}°`, `sin θ = ${f(sn)}`,
+        `The liquid is under the gate. Depths along the plate use the acute angle ${f(180 - thDeg)}° it makes with the free surface, so F and the CP come out the same way; only the direction of F changes (it pushes up and out on the gate).`);
+    }
     if (!vertical) {
       st.add('Vertical depth of the centre of pressure', 'h_p = y_p sin θ', `h_p = ${f(yp)} × sin ${f(thDeg)}°`, `h_p = ${f(hp)} ${L}`,
         'Converts the inclined CP distance to a vertical depth.');
@@ -274,6 +279,16 @@
       `p_top = ${f(gam)}×${f(p.h1)}${p.ps ? ' + ' + f(p.ps) : ''};  p_bot = ${f(gam)}×${f(hBot)}${p.ps ? ' + ' + f(p.ps) : ''}`,
       `p_top = ${f(pTop)} ${U.press},  p_bot = ${f(pBot)} ${U.press}`, 'These are the ordinates of the pressure diagram (trapezoid / triangle).');
 
+    // components of F (F acts normal to the plate, from the liquid onto it)
+    const FH = F * sn, FV = F * Math.abs(cs);
+    if (!vertical) {
+      st.add('Horizontal component of F', 'F_H = F sin θ', `F_H = ${f(F)} × sin ${f(thDeg)}°`, `F_H = ${f(FH)} ${U.force}  (→, toward the dry side)`,
+        'Equals the force on the vertical projection of the gate.');
+      if (Math.abs(cs) > 1e-9) st.add('Vertical component of F', 'F_V = F |cos θ|', `F_V = ${f(F)} × |cos ${f(thDeg)}°|`,
+        `F_V = ${f(FV)} ${U.force}  (${over ? '↑ upward' : '↓ downward'})`,
+        over ? 'The liquid is under the gate, so F_V pushes up: it equals the weight of the IMAGINARY liquid between the gate and the free surface above it.'
+          : 'The liquid is on top of the gate, so F_V pushes down: it equals the weight of the REAL liquid between the gate and the free surface.');
+    }
     out.push({ k: 'γ', v: gam, u: U.gamma });
     out.push({ k: 'Area A', v: G.A, u: U.area });
     out.push({ k: 'I_g', v: G.Ig, u: U.inertia });
@@ -282,6 +297,8 @@
     out.push({ k: 'Total force F', v: F, u: U.force, hl: true });
     out.push({ k: 'Eccentricity e', v: e, u: L });
     if (!vertical) out.push({ k: 'y_p (inclined)', v: yp, u: L, hl: true });
+    if (!vertical) out.push({ k: 'F_H (horizontal, →)', v: FH, u: U.force });
+    if (!vertical && Math.abs(cs) > 1e-9) out.push({ k: over ? 'F_V (vertical, ↑ up)' : 'F_V (vertical, ↓ down)', v: FV, u: U.force });
     out.push({ k: 'h_p (depth of CP)', v: hp, u: L, hl: true });
     if (p.ps > 0) out.push({ k: 'h_p below actual surface', v: hp - heq, u: L });
     out.push({ k: 'p at top edge', v: pTop, u: U.press });
@@ -352,7 +369,7 @@
       ok: true, err, warn, steps: st.list, out,
       status: { cls: 'ok', text: `F = ${f(F)} ${U.force} at h_p = ${f(hp)} ${L}` },
       geo: {
-        G, thDeg, sn, cs, gam, heq, yTop, ybar, hbar, F, e, yp, hp, sCP: sCP1, sCG: G.yc, pTop, pBot, hBot,
+        G, thDeg, sn, cs, gam, heq, yTop, ybar, hbar, F, FH, FV, over, e, yp, hp, sCP: sCP1, sCG: G.yc, pTop, pBot, hBot,
         both: p.both ? { gam2, F2, yp2, yTop2, sCP2: yp2 - yTop2, h2: p.h2, Fnet, sR } : null,
         hinge, h1: p.h1, ps: p.ps,
       },

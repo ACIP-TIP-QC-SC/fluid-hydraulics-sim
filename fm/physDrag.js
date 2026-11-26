@@ -545,7 +545,7 @@
       if (isFinite(Rep)) out.push({ k: 'Prototype Reynolds number', v: Rep, u: '' });
       out.push({ k: 'Prototype Froude number', v: Frp, u: '' });
     }
-    return ok(st, out, warn, { cls: 'ok', text: `V_r = ${f(Vr)}` }, { kind: 'sim', Lr, Vr, Vm, Vp, law });
+    return ok(st, out, warn, { cls: 'ok', text: `V_r = ${f(Vr)}` }, { kind: 'sim', Lr, Vr, Vm, Vp, law, tr, Qr, Fr, Pr });
   }
 
   Object.assign(P0, { dragLift, similitude, dragUnits: units, cdSphere, cdCyl });

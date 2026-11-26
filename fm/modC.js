@@ -241,6 +241,7 @@
         }
         sc.pline(pts, { stroke: RED, sw: 2.5 });
         sc.dot([X(v1), Y(g.p1)], BLUE, '1'); sc.dot([X(v2), Y(g.p2)], BLUE, '2');
+        sc.text([0.3, 4.4], `p₂/p₁ = ${f(g.p2 / g.p1)},  v₂/v₁ = ${f(v2 / v1)}`, { size: 12, color: '#52606d', in3: true });
         sc.text([0.3, 4.9], `T₁ = ${f(g.T1)} ${u.T}  →  T₂ = ${f(g.T2)} ${u.T}`, { size: 13, color: INK, in3: true });
       } else if (tp === 'mach') {
         const M = g.M;
@@ -323,6 +324,8 @@
           duct([[0, -1], [8, -1], [8, 1], [0, 1]]);
           sc.line([4, -1], [4, 1], { stroke: RED, sw: 4 });
           sc.arrow([1, 0], [3, 0], { color: GREEN, label: `M₁ = ${f(g.M1)}`, ldy: -12 }); sc.arrow([5, 0], [6.2, 0], { color: GREEN, label: `M₂ = ${f(g.M2)}`, ldy: -12 });
+          sc.text([4, -1.5], `across the shock: p₂/p₁ = ${f(g.pr)},  T₂/T₁ = ${f(g.Tr)},  ρ₂/ρ₁ = ${f(g.rr)}`, { anchor: 'middle', size: 12, color: RED, in3: true });
+          sc.text([0.3, 0.6], 'supersonic', { size: 11, color: '#7f8c8d' }); sc.text([4.3, 0.6], 'subsonic', { size: 11, color: '#7f8c8d' });
         } else if (g.kind === 'oblique') {
           const th = g.th, be = g.be, L = 6;
           sc.poly([[0, 0], [L, 0], [L, L * Math.tan(th)]], { fill: STEEL, stroke: INK, sw: 1.5 }, { fill: STEEL, alpha: 0.9 });

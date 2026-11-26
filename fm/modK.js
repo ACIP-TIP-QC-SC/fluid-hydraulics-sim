@@ -206,7 +206,12 @@
           const a = (90 - (g.inc > 0 ? g.inc : 90)) * DEG, c = Math.cos(a + PI / 2), s2 = Math.sin(a + PI / 2), hl = 1.3, t = 0.09;
           const P = (al, n) => [c * al + Math.cos(a) * n, s2 * al + Math.sin(a) * n];
           sc.poly([P(-hl, -t), P(hl, -t), P(hl, t), P(-hl, t)], { fill: STEEL, stroke: INK, sw: 1.5 }, { fill: STEEL, alpha: 0.9 });
-          if (g.inc > 0) sc.text([1.0, -1.1], `α = ${f(g.inc)}°`, { size: 12 });
+          if (g.inc > 0 && g.inc < 90) {
+            // angle at the trailing end: plate extended (dashed) against the horizontal flow direction
+            const E = P(-hl, 0), ex = [E[0] - c * 0.9, E[1] - s2 * 0.9];
+            sc.line(E, ex, { stroke: '#95a5a6', sw: 1, dash: '5 4', no3: true }); sc.line(E, [E[0] + 1.0, E[1]], { stroke: '#95a5a6', sw: 1, dash: '5 4', no3: true });
+            sc.add({ t: 'arc', c: E, r: 48, a0: -g.inc, a1: 0, s: `α = ${f(g.inc)}°`, only2d: true });
+          }
         } else sc.poly([[-1.2, -0.5], [0.2, -0.75], [1.3, -0.3], [1.3, 0.3], [0.2, 0.75], [-1.2, 0.5], [-1.4, 0]], { fill: STEEL, stroke: INK, sw: 2 }, { fill: STEEL, alpha: 0.9 });
         sc.arrow([1.25, 0], [2.85, 0], { color: RED, label: `F_D = ${f(g.FD)} ${u.F}`, w: 3.5, lp: 'head', ldy: 16 });
         if (g.FL > 0) sc.arrow([0, 1.15], [0, 2.6], { color: PURP, label: `F_L = ${f(g.FL)} ${u.F}`, w: 3.5, lp: 'head', ldx: 8 });
@@ -230,7 +235,9 @@
         const dn = !g.up;
         sc.arrow([0, dn ? 0.55 : -0.55], [0, dn ? 2.0 : -2.0], { color: RED, label: `F_D = ${f(g.FD)} ${u.F}`, w: 3, lp: 'head', ldx: 8 });
         sc.arrow([0.9, dn ? 1.0 : -1.0], [0.9, dn ? -1.0 : 1.0], { color: GREEN, label: `V = ${f(g.V)} ${u.v}`, ldx: 8 });
-        if (g.W > 0) { sc.arrow([-0.7, -0.3], [-0.7, -1.7], { color: INK, label: 'W', lp: 'head', anchor: 'end', ldx: -6 }); sc.arrow([-1.2, 0.3], [-1.2, 1.7], { color: '#2980b9', label: 'F_B', lp: 'head', anchor: 'end', ldx: -6 }); }
+        if (g.W > 0) { sc.arrow([-0.7, -0.3], [-0.7, -1.7], { color: INK, label: `W = ${f(g.W)} ${u.F}`, lp: 'head', anchor: 'end', ldx: -6 }); sc.arrow([-1.2, 0.3], [-1.2, 1.7], { color: '#2980b9', label: g.FB > 0 ? `F_B = ${f(g.FB)} ${u.F}` : 'F_B', lp: 'head', anchor: 'end', ldx: -6 }); }
+        else sc.arrow([-0.9, dn ? -0.3 : 0.3], [-0.9, dn ? -1.9 : 1.9], { color: INK, label: `${dn ? 'W − F_B' : 'F_B − W'} = ${f(g.FD)} ${u.F}`, lp: 'head', anchor: 'end', ldx: -6 });
+        sc.text([0.5, -2.7], 'terminal velocity: forces balance', { size: 11, color: '#7f8c8d' });
         sc.text([-1.8, -3.5], `D = ${f(g.D / u.dF)} ${u.du}`, { size: 12, in3: true });
         sc.autoBounds(0.1); sc.padR = 120; return sc;
       }
@@ -244,7 +251,10 @@
         sc.arrow([0, 0.5], [0, 2.3], { color: PURP, label: `F_L = ${f(g.FL)} ${u.F}`, w: 3.5, lp: 'head', ldx: 8 });
         if (g.FD > 0) sc.arrow([2.1, 0], [3.4, 0], { color: RED, label: `F_D = ${f(g.FD)} ${u.F}`, w: 3.5, lp: 'head', ldy: 16 });
         sc.line([-1.2, 0], [2.0, 0], { stroke: '#95a5a6', sw: 1, dash: '5 4' });
-        sc.text([-1.0, -1.1], `α = ${f(g.al)}°`, { size: 12, in3: true });
+        { const le = R([0, 0]), te = R([1, 0]), ux = (te[0] - le[0]), uy = (te[1] - le[1]), L = Math.hypot(ux, uy);
+          sc.line(le, [te[0] + (ux / L) * 0.8, te[1] + (uy / L) * 0.8], { stroke: '#95a5a6', sw: 1, dash: '2 3', no3: true });
+          if (Math.abs(g.al) > 0.05) sc.add({ t: 'arc', c: le, r: 150, a0: -g.al, a1: 0, s: `α = ${f(g.al)}° (chord vs flow)`, only2d: true }); }
+        sc.add({ t: 'text', p: [-1.0, -1.1], s: `α = ${f(g.al)}°`, o: { size: 12, in3: true }, only3d: true });
         sc.autoBounds(0.1); sc.padR = 120; return sc;
       }
       if (g.kind === 'coast') {

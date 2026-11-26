@@ -91,7 +91,7 @@
         sc.poly([[x0, 0], [x0 + 3 * s, 0], [x0 + 3.4 * s, 0.6 * s], [x0 - 0.2 * s, 0.6 * s]], { fill: STEEL, stroke: INK, sw: 1.5 }, { fill: STEEL, alpha: 0.9 });
         sc.poly([[x0 + 0.8 * s, 0.6 * s], [x0 + 2.0 * s, 0.6 * s], [x0 + 2.0 * s, 1.0 * s], [x0 + 0.8 * s, 1.0 * s]], { fill: '#ecf0f1', stroke: INK, sw: 1 }, { fill: '#ecf0f1', alpha: 0.9 });
         sc.text([x0, -0.55], lab, { size: 12, in3: true });
-        if (isFinite(V)) sc.arrow([x0 + 3.5 * s, 0.3 * s], [x0 + 3.5 * s + 1.0, 0.3 * s], { color: GREEN, label: `${f(V)} ${u.v}` });
+        if (isFinite(V) && V > 0) sc.arrow([x0 + 3.5 * s, 0.3 * s], [x0 + 3.5 * s + 1.0, 0.3 * s], { color: GREEN, label: `${lab === 'prototype' ? 'V_p' : 'V_m'} = ${f(V)} ${u.v}` });
       };
       sc.rect(-0.6, -0.2, 9.6, 0.15, { fill: WATER, stroke: 'none', fop: 0.4 }, false);
       const sm = Math.max(0.12, Math.min(1, Math.sqrt(g.Lr)));
@@ -99,6 +99,10 @@
       ship(5.8, sm, `model 1 : ${f(1 / g.Lr)}`, g.Vm);
       const name = { Fr: 'Froude', Re: 'Reynolds', ReFr: 'Froude + Reynolds', We: 'Weber', Ma: 'Mach' }[g.law];
       sc.text([0, 2.0], `${name} law:  V_r = ${f(g.Vr)},  L_r = ${f(g.Lr)}`, { size: 13, color: RED, in3: true });
+      // ratio table (model ÷ prototype) under the sketch
+      const rows = [['Length L_r', g.Lr], ['Velocity V_r', g.Vr], ['Time t_r = L_r/V_r', g.tr], ['Discharge Q_r = V_r L_r²', g.Qr], ['Force F_r = ρ_r V_r² L_r²', g.Fr], ['Power P_r = F_r V_r', g.Pr]].filter((r) => isFinite(r[1]));
+      sc.text([0, -1.2], 'Ratios (model ÷ prototype)', { size: 12, color: '#34495e' });
+      rows.forEach((r, i) => { const x = i < 3 ? 0 : 4.8, y = -1.75 - (i % 3) * 0.5; sc.text([x, y], `${r[0]} = ${f(r[1])}`, { size: 12, color: '#1d2733' }); });
       sc.autoBounds(0.1); sc.padR = 120; return sc;
     },
 

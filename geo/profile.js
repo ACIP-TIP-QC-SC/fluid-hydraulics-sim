@@ -86,7 +86,7 @@
         if (o.label !== false) {
           const g = pr.G[i];
           D.text([x0 + 0.04 * W, -(z + l.H / 2)], `${i + 1}. ${(G.SOILS[l.soil] || G.SOILS.sand).name}`, { dy: -4, size: 11.5, color: '#1d2733', weight: 700 });
-          D.text([x0 + 0.04 * W, -(z + l.H / 2)], pr.zw >= z + l.H ? `γ = ${f(g.gm)}` : pr.zw <= z ? `γ_sat = ${f(g.gsat)}` : `γ = ${f(g.gm)} / ${f(g.gsat)}`, { dy: 11, size: 10.5, color: '#1d2733' });
+          D.text([x0 + 0.04 * W, -(z + l.H / 2)], l.note ? l.note : pr.zw >= z + l.H ? `γ = ${f(g.gm)}` : pr.zw <= z ? `γ_sat = ${f(g.gsat)}` : `γ = ${f(g.gm)} / ${f(g.gsat)}`, { dy: 11, size: 10.5, color: '#1d2733' });
         }
         z += l.H;
       });

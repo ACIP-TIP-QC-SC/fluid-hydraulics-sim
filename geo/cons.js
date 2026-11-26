@@ -47,7 +47,7 @@
     if (p.src === 'given') {
       if (!(p.Hg > 0) || !(p.s0g > 0)) return fail(['Enter the clay thickness and the initial effective stress.']);
       // one clay layer whose effective stress at mid-depth equals the given σ′₀
-      prof = { by: 'gamma', wt: 0, cap: 0, q: 0, seep: 'none', layers: [{ soil: 'clay', H: p.Hg, g: U.gw + (2 * p.s0g) / p.Hg, gsat: U.gw + (2 * p.s0g) / p.Hg }] };
+      prof = { by: 'gamma', wt: 0, cap: 0, q: 0, seep: 'none', layers: [{ soil: 'clay', H: p.Hg, g: U.gw + (2 * p.s0g) / p.Hg, gsat: U.gw + (2 * p.s0g) / p.Hg, note: `σ′₀ = ${f(p.s0g)} at mid-depth (given)` }] };
       p = Object.assign({}, p, { layer: 0 });
     }
     const pr = P.soilProfile(prof, U);

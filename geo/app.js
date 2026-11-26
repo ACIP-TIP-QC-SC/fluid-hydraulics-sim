@@ -102,7 +102,7 @@
       $('resetIso').hidden = true;
       svg.style.cursor = m.onClick ? 'crosshair' : '';
       if (!res.ok) emptyMsg(svg, res);
-      else { m.draw2D(svg, res, U, { showP: App.showP }); }
+      else { m.draw2D(svg, res, U, { showP: App.showP }); if (!m.noDeclutter && root.UI.declutter) root.UI.declutter(svg); }
     } else {
       svg.setAttribute('hidden', ''); cv.removeAttribute('hidden');
       $('resetIso').hidden = false;

@@ -169,8 +169,8 @@
         if (g.slB) clip(g.slB, x0, x1, y0, y1).forEach((pp) => sc.pline(pp, { stroke: PURP, sw: 2, dash: '6 4' }));
         if (g.path) clip(g.path, x0 - W, x1 + W, y0 - W, y1 + W).forEach((pp) => sc.pline(pp, { stroke: ORNG, sw: 2.5 }));
         const vm = hyp(g.v[0], g.v[1]), am = hyp(g.acc[0], g.acc[1]), Lv = 0.35 * W;
-        if (vm > 0) sc.arrow([A.x, A.y], [A.x + (Lv * g.v[0]) / vm, A.y + (Lv * g.v[1]) / vm], { color: GREEN, label: 'V' });
-        if (am > 1e-9) sc.arrow([A.x, A.y], [A.x + (Lv * g.acc[0]) / am, A.y + (Lv * g.acc[1]) / am], { color: RED, label: 'a' });
+        if (vm > 0) sc.arrow([A.x, A.y], [A.x + (Lv * g.v[0]) / vm, A.y + (Lv * g.v[1]) / vm], { color: GREEN, label: `V = ${f(vm)} ${u.V}`, lp: 'head', size: 12 });
+        if (am > 1e-9) sc.arrow([A.x, A.y], [A.x + (Lv * g.acc[0]) / am, A.y + (Lv * g.acc[1]) / am], { color: RED, label: `a = ${f(am)} ${u.a}`, lp: 'head', size: 12 });
         sc.dot([A.x, A.y], INK, 'A');
         if (g.PB) sc.dot([g.PB.x, g.PB.y], PURP, 'B');
         sc.text([x0, y1 + 0.12 * W], 'blue: streamline through A' + (g.PB ? ', purple: through B' : '') + (g.path ? ', orange: particle path' : '') + (g.t ? ` (t = ${f(g.t)} s)` : ''), { size: 11, color: INK });

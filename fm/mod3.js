@@ -152,14 +152,14 @@
     // original (rest) surface
     const rest = [[0, Math.min(H, Math.max(0, g.c0))], [L, Math.min(H, Math.max(0, g.c0 + g.s0 * L))]].map(W);
     D.line(rest[0], rest[1], { stroke: '#1b4f72', sw: 1.2, dash: '7 5' });
-    D.text(rest[1], 'original level', { dx: 6, dy: 4, color: '#1b4f72', size: 10.5 });
+    if (g.c0 < H - 1e-9 || Math.abs(g.s0) > 1e-12) D.text(rest[1], 'original level', { dx: 6, dy: 4, color: '#1b4f72', size: 10.5 });
     // free surface + imaginary extension
     const fx = (x) => c + s * x;
     const segs = [];
     for (let i = 0; i <= 60; i++) { const x = (i / 60) * L; segs.push([x, fx(x)]); }
     D.pline(segs.filter((p) => p[1] >= 0 && p[1] <= H).map(W), { stroke: COL.waterDark, sw: 2 });
     const ext = segs.filter((p) => p[1] > H || p[1] < 0);
-    if (ext.length) D.pline([[-0.25 * L, fx(-0.25 * L)], [1.25 * L, fx(1.25 * L)]].map(W), { stroke: COL.waterDark, sw: 1, dash: '3 4' });
+    if (ext.length) { D.pline([[-0.25 * L, fx(-0.25 * L)], [1.25 * L, fx(1.25 * L)]].map(W), { stroke: COL.waterDark, sw: 1, dash: '3 4' }); D.text(W([1.25 * L, fx(1.25 * L)]), g.closed ? 'imaginary surface (p = p₀)' : 'imaginary surface', { color: COL.waterDark, size: 10.5, anchor: 'end', dy: s > 0 ? -6 : 14 }); }
     // pressure diagrams on the end walls
     if (opts.showP && final) {
       const pAt = (x, y) => g.gEff * Math.max(0, fx(x) - y) + g.p0;
@@ -213,7 +213,7 @@
     if (final) {
       const cn = g.corners;
       const lab = (p, v, anchor, dy) => D.text(W(p), `${f(v)} ${U.press}`, { anchor, dy, color: '#7b241c', size: 10, dx: anchor === 'end' ? -6 : 6 });
-      lab([0, 0], cn.backBottom, 'start', -4); lab([L, 0], cn.frontBottom, 'end', -4);
+      if (!opts.showP) { lab([0, 0], cn.backBottom, 'start', -4); lab([L, 0], cn.frontBottom, 'end', -4); } // the pressure diagrams already carry these
       if (g.closed) { lab([0, H], cn.backTop, 'start', 12); lab([L, H], cn.frontTop, 'end', 12); }
     }
     // probe
@@ -273,7 +273,8 @@
 
   function drawRot(svg, res, U, opts, st) {
     const g = res.geo, { R, H, zv, k } = g;
-    const below = Math.min(0, zv) - 0.15 * H;
+    const far = zv < -0.7 * H, vis = far ? -0.55 * H : zv; // a vertex far below the bottom is cut off (break) so the vessel stays readable
+    const below = Math.min(0, vis) - 0.15 * H;
     const D = root.UI.Draw2D(svg, { xmin: -R * 1.9, xmax: R * 2.6, ymin: Math.min(below, -0.35 * H), ymax: H * 1.3 }, { pad: 40 });
     D.svg.style.cursor = 'crosshair';
     const sec = rotSection(g);
@@ -294,7 +295,7 @@
     }
     // imaginary parabola
     const par = [];
-    for (let i = 0; i <= 80; i++) { const x = -R + (2 * R * i) / 80; const z = zv + k * x * x; par.push([x, Math.min(z, H * 1.25)]); }
+    for (let i = 0; i <= 80; i++) { const x = -R + (2 * R * i) / 80; const z = zv + k * x * x; if (z >= vis) par.push([x, Math.min(z, H * 1.25)]); }
     D.pline(par, { stroke: COL.waterDark, sw: 1, dash: '3 4' });
     D.pline(sec.up.filter((p, i) => { const x = p[0]; const z = zv + k * x * x; return z >= (g.shape === 'cone' ? (H * Math.abs(x)) / R : 0) - 1e-9 && z <= H + 1e-9; }), { stroke: COL.waterDark, sw: 2 });
     // original level
@@ -314,15 +315,18 @@
     D.arrow(a0, a1, { color: COL.force, w: 2, head: 10 });
     D.text([rx, cy], `ω = ${f(st.omega)} rad/s (${f((st.omega * 60) / (2 * PI))} rpm)`, { dx: 10, dy: -4, color: COL.force });
     // vertex
-    D.dot([0, zv], '#8e44ad', zv < 0 ? 'vertex (imaginary)' : 'vertex', { r: 4, dx: 8, dy: 14 });
+    if (!far) D.dot([0, zv], '#8e44ad', zv < 0 ? 'vertex (imaginary)' : 'vertex', { r: 4, dx: 8, dy: 14 });
+    else { D.text([0, vis], `↓ vertex ${f(-zv)} ${U.len} below the bottom (imaginary)`, { color: '#8e44ad', size: 10.5, anchor: 'middle', dy: 16 }); [-0.12, 0.12].forEach((o) => D.line([R * 1.25 - 0.08 * R, vis + o * 0.1 * H], [R * 1.25 + 0.08 * R, vis + o * 0.1 * H + 0.04 * H], { stroke: COL.dim, sw: 1.2 })); }
     // dims
     const xr = R * 1.25;
-    D.dim([xr, zv], [xr, g.rim], `h = ${f(g.h)}`, -10, { anchor: 'start', ldx: 8 });
-    D.line([-R, g.rim], [xr, g.rim], { stroke: COL.dim, sw: 0.6, dash: '3 3' });
-    D.line([0, zv], [xr, zv], { stroke: COL.dim, sw: 0.6, dash: '3 3' });
+    const rimV = Math.min(g.rim, 1.3 * H), cut = rimV < g.rim;
+    D.dim([xr, vis], [xr, rimV], `h = ${f(g.h)}${far || cut ? ' (vertex to rim, partly imaginary)' : ''}`, -10, { anchor: 'start', ldx: 8 });
+    if (cut) [-0.12, 0.12].forEach((o) => D.line([xr - 0.08 * R, rimV + o * 0.1 * H - 0.04 * H], [xr + 0.08 * R, rimV + o * 0.1 * H], { stroke: COL.dim, sw: 1.2 }));
+    else D.line([-R, g.rim], [xr, g.rim], { stroke: COL.dim, sw: 0.6, dash: '3 3' });
+    if (!far) D.line([0, zv], [xr, zv], { stroke: COL.dim, sw: 0.6, dash: '3 3' });
     if (g.kase === 1 && g.h > 1e-6) {
       D.dim([-R * 1.3, g.d], [-R * 1.3, g.rim], `h/2 = ${f(g.h / 2)}`, 10, { anchor: 'end', ldx: -8 });
-      D.dim([-R * 1.3, zv], [-R * 1.3, g.d], `h/2`, 10, { anchor: 'end', ldx: -8 });
+      D.dim([-R * 1.3, vis], [-R * 1.3, g.d], `h/2`, 10, { anchor: 'end', ldx: -8 });
     }
     D.dim([R * 1.9, 0], [R * 1.9, H], `H = ${f(H)}`, -10, { anchor: 'start', ldx: 8 });
     D.dim([-R, below + 0.05 * H], [R, below + 0.05 * H], `2R = ${f(2 * R)}`, 0, { ldy: 16 });
@@ -366,14 +370,16 @@
     V.lathe([...bot, ...top.reverse()], '#4aa3df', 0.42, null, 40);
     V.circle(0, H, 0, R, '#2c3e50', 2);
     if (g.shape !== 'cone') V.circle(0, 0, 0, R, '#2c3e50', 2);
-    V.line([[0, Math.min(0, g.zv) - 0.1 * H, 0], [0, H * 1.25, 0]], '#7f8c8d', 1, [8, 4]);
+    const vis3 = g.zv < -0.7 * H ? -0.55 * H : g.zv;
+    V.line([[0, Math.min(0, vis3) - 0.1 * H, 0], [0, H * 1.25, 0]], '#7f8c8d', 1, [8, 4]);
     // paraboloid meridian (dashed): shows the imaginary part below the bottom or above the lid, which h is measured on
-    if (g.zv < -1e-9 || g.rim > H + 1e-9) { const pr = []; for (let i = -40; i <= 40; i++) { const r = (R * i) / 40; pr.push([r, g.zv + g.k * r * r, 0]); } V.line(pr, '#0b3d91', 1.2, [5, 4]); }
+    if (g.zv < -1e-9 || g.rim > H + 1e-9) { const pr = []; for (let i = -40; i <= 40; i++) { const r = (R * i) / 40, z = g.zv + g.k * r * r; if (z >= vis3 && z <= 1.35 * H) pr.push([r, z, 0]); } if (pr.length > 1) V.line(pr, '#0b3d91', 1.2, [5, 4]); }
     void half;
     const u = U.len, gap = 0.3 * Math.max(R, 0.3 * H);
     V.dim([0, H, 0], [R, H, 0], `R = ${f(R)} ${u}`, [0, gap * 0.6, 0]);
     V.dim([R, 0, 0], [R, H, 0], `H = ${f(H)} ${u}`, [gap, 0, 0]);
-    V.dim([-R, g.zv, 0], [-R, g.rim, 0], `h = ${f(g.h)} ${u}`, [-gap, 0, 0], '#0b3d91');
+    if (vis3 === g.zv && g.rim <= 1.35 * H) V.dim([-R, vis3, 0], [-R, g.rim, 0], `h = ${f(g.h)} ${u}`, [-gap, 0, 0], '#0b3d91');
+    else V.label([-R - gap, 0.2 * H, R], `h = ${f(g.h)} ${u} (vertex to rim, partly imaginary)`, '#0b3d91');
     V.autoBounds();
   }
 

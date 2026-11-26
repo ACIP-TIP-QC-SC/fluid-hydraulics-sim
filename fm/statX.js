@@ -382,8 +382,9 @@
       sc.circle([0, 1.6], R, { fill: x.gasB === 'hot' ? '#f5b041' : '#d6eaf8', stroke: '#2c3e50', sw: 2, fop: 0.85 }, 'sphere', x.gasB === 'hot' ? '#f5b041' : '#d6eaf8');
       sc.line([-0.7, 0.9], [-0.25, 0], { stroke: '#5d6d7e' }); sc.line([0.7, 0.9], [0.25, 0], { stroke: '#5d6d7e' });
       sc.rect(-0.3, -0.35, 0.3, 0, { fill: '#c8a165', stroke: '#7e5109' }, { fill: '#c8a165', alpha: 1, z0: -0.3, z1: 0.3 });
-      sc.arrow([0, 2.65], [0, 3.6], { color: '#2980b9', label: 'buoyancy − gas weight' });
-      sc.arrow([0.45, -0.18], [0.45, -1.1], { color: '#2c3e50', label: 'payload + balloon' });
+      const Fu = pick(U, 'N', 'lb'), L = g.net + x.WB;
+      sc.arrow([0, 2.65], [0, 3.6], { color: '#2980b9', label: `L = V(γ_a − γ_g) = ${f(L)} ${Fu}` });
+      sc.arrow([0.45, -0.18], [0.45, -1.1], { color: '#2c3e50', label: `W_balloon + payload = ${f(x.WB)} + ${f(g.net)} ${Fu}` });
       sc.dim([-R, 0.45], [R, 0.45], `D = ${f(g.D)} ${U.len}`, -6);
       sc.text([1.15, 1.9], `V = ${f(g.V)} ${U.vol}`, { color: '#52606d', in3: true });
       sc.depth = 0.6;
@@ -478,9 +479,10 @@
         if (T >= 0) {
           sc.line([0, cy + R], [0, 1.25], { stroke: '#2c3e50', sw: 1.5 });
           sc.rect(-0.22, 1.25, 0.22, 1.6, { fill: '#ecf0f1', stroke: '#2c3e50', sw: 1.5 }, { fill: '#ecf0f1', alpha: 1, z0: -0.15, z1: 0.15 });
-          sc.text([0.3, 1.42], `scale: ${f(T)} ${Fu}`, { color: '#2c3e50' });
+          sc.text([0.3, 1.42], 'spring scale', { color: '#2c3e50' });
+          sc.arrow([0.06, cy + R + 0.02], [0.06, cy + R + 0.55], { color: '#8e44ad', label: `T = W − F_B = ${f(T)} ${Fu} (reading)` });
         } else {
-          sc.arrow([0, cy + R + 0.7], [0, cy + R], { color: '#8e44ad', label: `push ${f(-T)} ${Fu}` });
+          sc.arrow([0, cy + R + 0.7], [0, cy + R], { color: '#8e44ad', label: `hold-down force = ${f(-T)} ${Fu}` });
         }
       }
       if (fl) sc.text([0.35, -1.95], `${f(100 * g.fsub)} % of V submerged`, { color: '#2c3e50' });

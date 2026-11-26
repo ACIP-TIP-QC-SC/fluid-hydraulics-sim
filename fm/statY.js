@@ -168,7 +168,7 @@
       { k: 'Displaced volume at the start V₁', v: V1, u: U.vol }, { k: 'Displaced volume at the end V₃', v: V3, u: U.vol },
       { k: `Load per ${pick(U, 'cm', 'in')} of immersion`, v: (g1 * Aw * pick(U, 0.01, 1 / 12)) / k, u: wl },
     ];
-    return ok(st, out, warn, `d₃ = ${f(d3)} ${U.len}`, { d1: p.d1, d3, dRef, s1: p.s1, s3: p.s3, Aw });
+    return ok(st, out, warn, `d₃ = ${f(d3)} ${U.len}`, { d1: p.d1, d3, dRef, s1: p.s1, s3: p.s3, Aw, W1: p.W1, W3: W3 / k });
   }
   X.ship = {
     mod: 'm2', label: 'Ship draft change',
@@ -193,15 +193,20 @@
     compute: (x, U) => ship(x, U),
     scene(x, res, U) {
       const g = res.geo, sc = Scene.Scene(), B = 8, H = Math.max(g.d1, g.d3) * 1.7;
-      const hull = (cx, d, s, lab) => {
+      const fu = (WUNITS(U)[x.wu] || [''])[0];
+      const hull = (cx, d, s, lab, W) => {
         sc.rect(cx - B * 0.75, -H * 0.2, cx + B * 0.75, d, { fill: s > 1.005 ? '#5dade2' : WATER, stroke: 'none', fop: 0.4 }, { fill: WATER, alpha: 0.2 });
         sc.poly([[cx - B / 2, 0], [cx + B / 2, 0], [cx + B / 2, H], [cx - B / 2, H]].map((q) => [q[0], q[1]]).map((q) => [q[0], q[1] - 0]), { fill: '#d5d8dc', stroke: INK, sw: 1.6 }, { fill: '#d5d8dc', alpha: 0.95 });
         sc.line([cx - B * 0.75, d], [cx + B * 0.75, d], { stroke: WATERD, sw: 1.6 });
         sc.dim([cx + B / 2 + 0.6, 0], [cx + B / 2 + 0.6, d], `d = ${f(d)} ${U.len}`, -16);
         sc.text([cx, -H * 0.32], lab, { anchor: 'middle', in3: true });
+        if (W > 0) {
+          sc.arrow([cx - B * 0.15, H * 0.75], [cx - B * 0.15, H * 0.75 - H * 0.45], { color: RED, label: `W = ${f(W)} ${fu}`, z3: B * 0.32 });
+          sc.arrow([cx + B * 0.15, -H * 0.14], [cx + B * 0.15, d * 0.45], { color: BLUE, label: `BF = W (floats)`, z3: B * 0.32 });
+        }
       };
-      hull(0, g.d1, g.s1, `start: S = ${f(g.s1)}`);
-      hull(B * 1.9, g.d3, g.s3, `final: S = ${f(g.s3)}`);
+      hull(0, g.d1, g.s1, `start: S = ${f(g.s1)}`, g.W1);
+      hull(B * 1.9, g.d3, g.s3, `final: S = ${f(g.s3)}`, g.W3);
       sc.depth = B * 0.6;
       return sc;
     },
@@ -231,7 +236,7 @@
       { k: 'Submerged depth now', v: dr, u: U.len }, { k: 'Submerged depth when the anchor lifts', v: drN, u: U.len },
       { k: 'Max buoyancy (fully submerged)', v: gs * A * p.Hb, u: fu },
     ];
-    return ok(st, out, warn, `T = ${f(T)} ${fu}, tide rise = ${f(rise)} ${U.len}`, { D: p.Db, H: p.Hb, dr, drN, T, BF });
+    return ok(st, out, warn, `T = ${f(T)} ${fu}, tide rise = ${f(rise)} ${U.len}`, { D: p.Db, H: p.Hb, dr, drN, T, BF, net });
   }
   X.anch = {
     mod: 'm2', label: 'Buoy on an anchor (tide)',
@@ -261,9 +266,15 @@
       sc.lathe([[0, y0], [D / 2, y0], [D / 2, y0 + H], [0, y0 + H]], 0, GATE, 0.9);
       const b = D * 0.45; sc.rect(-b, 0, b, b * 0.9, { fill: STEEL, stroke: INK, sw: 1.4 }, { fill: STEEL, alpha: 0.95, z0: -b, z1: b });
       sc.line([0, b * 0.9], [0, y0], { stroke: INK, sw: 1.6 });
-      sc.text([0.08 * D, (b + y0) / 2], `T = ${f(g.T)}`, { size: 11, color: RED, in3: true });
-      sc.dim([D / 2 + 0.15 * D, y0], [D / 2 + 0.15 * D, sea], `draft = ${f(g.dr)} ${U.len}`, -16);
-      sc.dim([-D / 2 - 0.15 * D, y0], [-D / 2 - 0.15 * D, y0 + H], `H = ${f(H)}`, 16);
+      const fu = pick(U, 'N', 'lb'), Fm = Math.max(g.BF, g.T, x.Wb, 1e-9), aL = (k) => H * (0.45 + 0.55 * k / Fm);
+      // forces on the buoy: BF up (from below), W down (from its centre), T down along the line
+      sc.arrow([-D * 0.28, y0 - aL(g.BF)], [-D * 0.28, y0], { color: BLUE, label: `BF = ${f(g.BF)} ${fu}`, anchor: 'end', ldx: -6 });
+      if (x.Wb > 0) sc.arrow([D * 0.22, y0 + H * 0.75], [D * 0.22, y0 + H * 0.75 - aL(x.Wb) * 0.8], { color: INK, label: `W = ${f(x.Wb)} ${fu}` });
+      sc.arrow([D * 0.06, y0], [D * 0.06, y0 - aL(g.T)], { color: RED, label: `T = ${f(g.T)} ${fu}`, lp: 'head', ldy: 14 });
+      sc.arrow([D * 0.06, b * 0.9], [D * 0.06, b * 0.9 + H * 0.5], { color: RED, label: `T on the block (lifts it when T = W′ = ${f(g.net)} ${fu})` });
+      sc.dim([D / 2 + 0.15 * D, y0], [D / 2 + 0.15 * D, sea], `draft = ${f(g.dr)} ${U.len}`, -0.01);
+      if (g.H > 0) sc.dim([-D / 2 - 0.15 * D, y0], [-D / 2 - 0.15 * D, y0 + H], `H = ${f(H)} ${U.len}`, 0.01);
+      else sc.text([-D / 2 - 0.1 * D, y0 + H * 0.9], 'H not given', { anchor: 'end', size: 11, color: '#7f8c8d' });
       sc.depth = D;
       return sc;
     },

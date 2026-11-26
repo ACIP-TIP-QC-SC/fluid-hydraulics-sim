@@ -116,9 +116,15 @@
         V.extrude([P(s0, 0), P(s0 + s.L, 0), P(s0 + s.L, tf), P(s0, tf)], -s.B / 2, s.B / 2, OIL, 0.85, OILD);
         V.extrude([P(s0, tf), P(s0 + s.L, tf), P(s0 + s.L, tf + hb), P(s0, tf + hb)], -s.B / 2, s.B / 2, BLOCK, 0.95, '#7f5539');
         const c = P(s0 + s.L / 2, tf + hb / 2);
-        V.line([[c[0], c[1], 0], [c[0], c[1] - 0.6 * s.L, 0]], '#2c3e50', 3); V.label([c[0], c[1] - 0.6 * s.L, 0], `W = ${f(g.W)} ${u.F}`, '#2c3e50');
+        V.line([[c[0], c[1], s.B / 2 + 0.02 * s.L], [c[0], c[1] - 0.6 * s.L, s.B / 2 + 0.02 * s.L]], '#2c3e50', 3); V.label([c[0], c[1] - 0.6 * s.L, s.B / 2 + 0.02 * s.L], `W = ${f(g.W)} ${u.F}`, '#2c3e50');
         const vs = s.solve === 'up' ? -1 : 1, a = P(s0 + s.L / 2, tf + hb + 0.15 * s.L), b = P(s0 + s.L / 2 + vs * 0.5 * s.L, tf + hb + 0.15 * s.L);
         V.line([[a[0], a[1], 0], [b[0], b[1], 0]], '#c0392b', 3); V.label([b[0], b[1], 0], `V = ${f(g.V)} ${u.V}`, '#c0392b');
+        // film drag on the block's front face (opposite the motion) and, when a push is needed, P
+        const zf = s.B / 2 + 0.02 * s.L, Ar = 0.4 * s.L;
+        const tA = vs > 0 ? P(s0, tf + 0.3 * hb) : P(s0 + s.L, tf + 0.3 * hb), tB = [tA[0] - vs * d[0] * Ar, tA[1] - vs * d[1] * Ar];
+        V.line([[tA[0], tA[1], zf], [tB[0], tB[1], zf]], OILD, 3); V.label([tB[0], tB[1], zf], `τA = ${f(g.tau * g.A)} ${u.F}`, OILD);
+        if (s.theta > 0) { const wA = P(s0 + s.L, tf + 0.72 * hb), wB = [wA[0] + d[0] * Ar, wA[1] + d[1] * Ar]; V.line([[wA[0], wA[1], zf], [wB[0], wB[1], zf]], '#7d3c98', 3); V.label([wB[0], wB[1], zf], `W sin θ = ${f(g.Wp)} ${u.F}`, '#7d3c98'); }
+        if (vs < 0) { const pB = P(s0, tf + 0.55 * hb), pA = [pB[0] - d[0] * Ar * 1.2, pB[1] - d[1] * Ar * 1.2]; V.line([[pA[0], pA[1], zf], [pB[0], pB[1], zf]], '#1e8449', 3); V.label([pA[0], pA[1], zf], `P = ${f(g.F)} ${u.F}`, '#1e8449'); }
         V.dim([P(s0, tf + hb)[0], P(s0, tf + hb)[1], s.B / 2], [P(s0 + s.L, tf + hb)[0], P(s0 + s.L, tf + hb)[1], s.B / 2], `L = ${f(s.L)} ${u.len}`, [n[0] * 0.2 * s.L, n[1] * 0.2 * s.L, 0]);
         const q = P(s0 + s.L, tf); V.dim([q[0], q[1], -s.B / 2], [q[0], q[1], s.B / 2], `B = ${f(s.B)} ${u.len}`, [0.4 * s.L, 0, 0]);
         V.label([Lr * Math.cos(th) * 0.8, 0.02, zb], `θ = ${f(s.theta)}°`, '#34495e');
@@ -209,16 +215,21 @@
     const s0 = 0.8 * s.L;
     D.poly([P(s0 - 0.05 * s.L, 0), P(s0 + 1.05 * s.L, 0), P(s0 + s.L, tf), P(s0, tf)], { fill: OIL, stroke: OILD, sw: 1 });
     D.poly([P(s0, tf), P(s0 + s.L, tf), P(s0 + s.L, tf + hb), P(s0, tf + hb)], { fill: BLOCK, stroke: '#7f5539', sw: 2 });
-    const c = P(s0 + s.L / 2, tf + hb / 2);
-    D.force([c[0], c[1] - 0.001], [0, -1], 90, { color: COL.weight, label: `W = ${f(g.W)} ${u.F}`, lp: 'head', ldx: -8, ldy: 14, anchor: 'end' });
-    if (s.theta > 0) D.arrow(c, [c[0] + d[0] * 0.45 * s.L * Math.sin(th) * 1.5, c[1] + d[1] * 0.45 * s.L * Math.sin(th) * 1.5], { color: '#7d3c98', w: 2, label: `W sin θ = ${f(g.Wp)}`, lp: 'head', size: 11 });
-    const vs = s.solve === 'up' ? -1 : 1;
-    const a = P(s0 + s.L * 0.2, tf + hb + 0.12 * s.L), b = P(s0 + s.L * 0.2 + vs * 0.6 * s.L, tf + hb + 0.12 * s.L);
-    D.arrow(a, b, { color: '#c0392b', w: 3, label: `V = ${f(g.V)} ${u.V}`, lp: 'head', ldy: -8 });
-    const ta = P(s0 + s.L * 0.5, tf * 0.5), tb2 = P(s0 + s.L * 0.5 - vs * 0.35 * s.L, tf * 0.5);
-    D.arrow(ta, tb2, { color: OILD, w: 2, label: `τA = ${f(g.tau * g.A)} ${u.F}`, lp: 'tail', ldx: 8, ldy: 22, size: 11 });
-    if (s.solve === 'up') { const pa = P(s0 - 0.6 * s.L, tf + hb / 2), pb = P(s0, tf + hb / 2); D.arrow(pa, pb, { color: '#1e8449', w: 3, label: `P = ${f(g.F)} ${u.F}`, lp: 'tail', ldy: -8 }); }
-    D.dim(P(s0, tf + hb), P(s0 + s.L, tf + hb), `L = ${f(s.L)} ${u.len}`, 26);
+    const c = P(s0 + s.L / 2, tf + hb / 2), vs = s.solve === 'up' ? -1 : 1, Ar = 0.4 * s.L;
+    D.dot(c, '#2c3e50', '', { r: 3 });
+    D.arrow(c, [c[0], c[1] - 0.5 * s.L], { color: COL.weight, w: 3, label: `W = ${f(g.W)} ${u.F}`, lp: 'head', ldx: 8, ldy: 16 });
+    // forces along the slope, each drawn on the face it acts through so the labels stay off the block
+    const along = (sv, nv, dir, col, lab, w) => { const p0 = P(sv, nv), p1 = P(sv + dir * Ar, nv); D.arrow(p0, p1, { color: col, w: w || 2.5, label: lab, lp: 'head', ldx: dir > 0 ? 6 : -6, anchor: dir > 0 ? 'start' : 'end', ldy: -6, size: 11.5 }); };
+    if (s.theta > 0) along(s0 + s.L, tf + 0.72 * hb, 1, '#7d3c98', `W sin θ = ${f(g.Wp)} ${u.F}`);
+    if (vs > 0) along(s0, tf + 0.3 * hb, -1, OILD, `τA = ${f(g.tau * g.A)} ${u.F} (film drag)`);
+    else {
+      along(s0 + s.L, tf + 0.3 * hb, 1, OILD, `τA = ${f(g.tau * g.A)} ${u.F} (film drag)`);
+      const pa = P(s0 - Ar * 1.2, tf + hb * 0.55), pb = P(s0, tf + hb * 0.55);
+      D.arrow(pa, pb, { color: '#1e8449', w: 3, label: `P = ${f(g.F)} ${u.F}`, lp: 'tail', ldy: -8, anchor: 'end', ldx: -6 });
+    }
+    const a = P(s0 + s.L * 0.5 - vs * 0.3 * s.L, tf + hb + 0.2 * s.L), b = P(s0 + s.L * 0.5 + vs * 0.3 * s.L, tf + hb + 0.2 * s.L);
+    D.arrow(a, b, { color: '#c0392b', w: 3, label: `V = ${f(g.V)} ${u.V}`, lp: 'head', ldy: -8, anchor: vs > 0 ? 'start' : 'end', ldx: vs > 0 ? 6 : -6 });
+    D.dim(P(s0, -0.02 * s.L), P(s0 + s.L, -0.02 * s.L), `L = ${f(s.L)} ${u.len}`, -22);
     D.arc([xmax, 0], 46, 180 - s.theta, 180, `θ = ${f(s.theta)}°`);
     const fp = P(s0 + s.L, tf / 2); D.text(fp, `oil film t = ${f(g.tIn)} ${u.t} (drawn exaggerated)`, { dx: 10, dy: 14, color: OILD, size: 11 });
     profileInset(D, D.W - 210, 20, 190, 140, 'Velocity profile in the film', false);

@@ -169,15 +169,15 @@
       }
       // resultant & middle third
       const xR = B - g.xb;
-      D.line([B / 3, 0], [B / 3, -0.035 * H], { stroke: '#e67e22', sw: 2 }); D.line([(2 * B) / 3, 0], [(2 * B) / 3, -0.035 * H], { stroke: '#e67e22', sw: 2 });
-      D.text([B / 2, -0.03 * H], 'middle third', { anchor: 'middle', size: 10, color: '#e67e22', dy: 2 });
+      D.line([B / 3, 0], [B / 3, 0.035 * H], { stroke: '#e67e22', sw: 2 }); D.line([(2 * B) / 3, 0], [(2 * B) / 3, 0.035 * H], { stroke: '#e67e22', sw: 2 }); D.line([B / 3, 0.012 * H], [(2 * B) / 3, 0.012 * H], { stroke: '#e67e22', sw: 1, dash: '4 3' });
+      D.text([B / 2, 0.012 * H], 'middle third', { anchor: 'middle', size: 10, color: '#e67e22', dy: -4 });
       if (xR > xl && xR < xr) D.force([xR, 0], [0, 1], 60, { color: '#8e44ad', label: `R_y = ${f(g.Rv)} ${Fu}`, lp: 'tail', ldx: 6, ldy: 14 });
       // dims
       D.dim([0, ymin + 0.03 * H], [B, ymin + 0.03 * H], `B = ${f(B)} ${Lu}`, -2);
       D.dim([xr - 0.05 * (xr - B), 0], [xr - 0.05 * (xr - B), H], `H = ${f(H)} ${Lu}`, 10, { anchor: 'end', ldx: -6 });
       const crest = g.prof.filter((q) => Math.abs(q[1] - H) < 1e-9);
       if (crest.length >= 2) { const c0 = crest[0][0], c1 = crest[crest.length - 1][0]; if (c1 - c0 > 1e-9) D.dim([c0, H], [c1, H], `a = ${f(c1 - c0)}`, -14); }
-      if (B - g.xb > 0) D.dim([xR, -0.012 * H], [B, -0.012 * H], `x̄ = ${f(g.xb)}`, 12, { color: '#8e44ad' });
+      if (B - g.xb > 0) { D.dim([xR, 0.2 * H], [B, 0.2 * H], `x̄ = ${f(g.xb)} (from toe)`, -0.01, { color: '#8e44ad' }); D.line([xR, 0], [xR, 0.2 * H], { stroke: '#8e44ad', sw: 0.8, dash: '3 3' }); D.line([B, 0], [B, 0.2 * H], { stroke: '#8e44ad', sw: 0.8, dash: '3 3' }); }
       D.text([xl, H * 1.08], `per 1 ${Lu} length · γ_c = ${f(g.gc)} ${U.gamma}`, { size: 11, color: '#5d6b7a', dx: 4 });
       // righting / overturning moments about the toe
       const Mu = U.mom, toe = [D.X(B), D.Y(0)];
@@ -253,13 +253,10 @@
         V.label([0, y0 - g.qH * ps, zm], `q_heel = ${f(g.qH)}`, '#8e44ad');
       }
       const xR = B - g.xb;
-      if (xR > xl && xR < xr) arrow([xR, -0.02 * H, zm], [xR, 0.25 * H, zm], '#8e44ad', `R_y = ${f(g.Rv)} ${Fu}`, 3);
-      V.dim([0, 0, zm], [B, 0, zm], `B = ${f(B)} ${Lu}`, [0, 0, 0.35 * Lz]);
-      { const r = 0.12 * H, ptsR = [], ptsO = [];
-        for (let i = 0; i <= 20; i++) { const a = ((95 + 80 * i / 20) * Math.PI) / 180; ptsR.push([B + r * Math.cos(a), r * Math.sin(a), zm]); ptsO.push([B + 1.6 * r * Math.cos(a), 1.6 * r * Math.sin(a), zm]); }
-        V.line(ptsR, '#1e8449', 2.6); V.line(ptsO, '#c0392b', 2.6);
-        V.label(ptsR[20], `RM = ${f(g.RM)} ${U.mom}`, '#1e8449');
-        V.label(ptsO[0], `OM = ${f(g.OM)} ${U.mom}`, '#c0392b'); }
+      if (xR > xl && xR < xr) { arrow([xR, -0.02 * H, zm], [xR, 0.25 * H, zm], '#8e44ad', null, 3); V.label([xR, 0.27 * H, zm], `R_y = ${f(g.Rv)} ${Fu}`, '#8e44ad'); }
+      V.dim([0, -0.06 * H, zm], [B, -0.06 * H, zm], `B = ${f(B)} ${Lu}`, [0, -0.05 * H, 0.25 * Lz]);
+      // RM / OM are listed in the 2D box; a single note keeps the 3D view clear
+      V.label([xl, 1.2 * H, 0], `about the toe: RM = ${f(g.RM)}, OM = ${f(g.OM)} ${U.mom}`, '#34495e');
       V.dim([B, 0, 0], [B, H, 0], `H = ${f(H)} ${Lu}`, [0.15 * B + 0.1 * H, 0, 0]);
       if (g.h1 > 0) V.dim([xl, 0, zm], [xl, g.h1, zm], `h = ${f(g.h1)} ${Lu}`, [-0.15 * H, 0, 0]);
       V.dim([0, H, 0], [0, H, Lz], `strip ${f(Lz)} ${Lu} (results per 1 ${Lu})`, [-0.12 * B, 0.1 * H, 0]);

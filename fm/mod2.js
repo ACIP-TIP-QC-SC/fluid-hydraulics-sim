@@ -184,6 +184,18 @@
       V.line([[-Wx, 0, -Wx], [Wx, 0, -Wx], [Wx, 0, Wx], [-Wx, 0, Wx], [-Wx, 0, -Wx]], '#1f6fa8', 1.5);
       V.label([0, g.zB + yb, 0], 'B', '#2980b9');
       V.label([0, g.zG + yb, 0], 'G', '#2c3e50');
+      // forces: W down at G, BF up at B (drawn out of the body so they read clearly)
+      const Fm3 = Math.max(g.W || 0, g.BF || 0) || 1, aL = 0.35 * Math.max(H, bw);
+      const arr3 = (a, b, c, lab) => {
+        V.line([a, b], c, 3);
+        const dy = b[1] - a[1], hh = Math.min(Math.abs(dy) * 0.3, 0.08 * Math.max(H, bw)), sg = Math.sign(dy);
+        V.face([b, [b[0] - hh * 0.4, b[1] - sg * hh, b[2]], [b[0] + hh * 0.4, b[1] - sg * hh, b[2]]], c, 1, null);
+        V.face([b, [b[0], b[1] - sg * hh, b[2] - hh * 0.4], [b[0], b[1] - sg * hh, b[2] + hh * 0.4]], c, 1, null);
+        V.label([a[0] + (sg > 0 ? 0.25 : -0.25) * bw, a[1], a[2]], lab, c);
+      };
+      const zF = (['box', 'hcyl', 'triside'].includes(s.shape) ? d.L / 2 : bw / 2) + 0.05 * Math.max(bw, H);
+      if (g.W > 0) { const y = g.zG + yb, L = aL * (0.5 + 0.5 * g.W / Fm3); arr3([-0.12 * bw, y, zF], [-0.12 * bw, y - L, zF], '#c0392b', `W = ${f(g.W)} ${U.force}`); }
+      if (g.BF > 0) { const y = g.zB + yb, L = aL * (0.5 + 0.5 * g.BF / Fm3); arr3([0.12 * bw, y - L, zF], [0.12 * bw, y, zF], '#2980b9', `BF = ${f(g.BF)} ${U.force}`); }
       // dimensions
       const u = U.len, xm = bw / 2, gap = 0.25 * Math.max(bw, H);
       const zm = s.shape === 'box' ? d.L / 2 : s.shape === 'hcyl' || s.shape === 'triside' ? d.L / 2 : s.shape === 'custom' ? Math.sqrt(d.A) / 2 : s.shape === 'tri' ? (2 * d.t) / 3 : xm;

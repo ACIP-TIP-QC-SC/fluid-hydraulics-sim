@@ -231,9 +231,12 @@
           const ve = Rv([g.V2x, g.V2y]), vl = Math.hypot(ve[0], ve[1]) || 1, e2 = R([end[0] + dir[0] * 1.5, end[1] + dir[1] * 1.5]);
           if (vl > 1e-6) sc.arrow(e2, [e2[0] + (ve[0] / vl) * 0.9, e2[1] + (ve[1] / vl) * 0.9], { color: WATERD, label: `V₂ = ${f(Math.hypot(g.V2x, g.V2y))} ${u.v}` });
           const Fd = Rv([g.Fx, g.Fy]), mid = R([Rr * Math.sin(th / 2) * 1.35, Rr - Rr * Math.cos(th / 2) * 1.35]);
-          forceArrow([mid[0] + (Fd[0] / (Math.hypot(Fd[0], Fd[1]) || 1)) * 1.7, mid[1] + (Fd[1] / (Math.hypot(Fd[0], Fd[1]) || 1)) * 1.7], Fd[0], Fd[1], `R = ${f(Math.hypot(g.Fx, g.Fy))} ${u.F}`, 1.4);
+          forceArrow([mid[0] + (Fd[0] / (Math.hypot(Fd[0], Fd[1]) || 1)) * 1.7, mid[1] + (Fd[1] / (Math.hypot(Fd[0], Fd[1]) || 1)) * 1.7], Fd[0], Fd[1], `R = ${f(Math.hypot(g.Fx, g.Fy))} ${u.F}  (F_x = ${f(Math.abs(g.Fx))}, F_y = ${f(Math.abs(g.Fy))})`, 1.4);
           if (g.motion !== 'fixed') sc.arrow(R([-0.6, -1.0]), R([0.4, -1.0]), { color: GREEN, label: `u = ${f(g.u)} ${u.v}` });
-          sc.text(R([0.2, Rr + 0.1]), `θ = ${f(g.theta)}°`, { size: 12 });
+          // θ measured at the vane exit from the incoming jet direction
+          const e0 = R(end), ref = R([end[0] + 1.1, end[1]]);
+          sc.line(e0, ref, { stroke: '#7f8c8d', dash: '4 3', sw: 1, no3: true });
+          sc.add({ t: 'arc', c: e0, r: 42, a0: vert ? 90 : 0, a1: (vert ? 90 : 0) + g.theta, s: `θ = ${f(g.theta)}°`, only2d: true });
         }
         sc.autoBounds(0.12); sc.padR = 120; return sc;
       }
@@ -274,7 +277,7 @@
         // force on the fitting drawn from the middle of the bend
         const mid = th > 1e-3 ? [Rc * Math.sin(th / 2), Rc * (1 - Math.cos(th / 2))] : [-0.7, -w1 - 0.95];
         const FL = Math.hypot(g.Fx, g.Fy) || 1, fd = [g.Fx / FL, g.Fy / FL];
-        sc.arrow(mid, [mid[0] + fd[0] * 2.0, mid[1] + fd[1] * 2.0], { color: RED, w: 3.5, lp: 'head', label: `F on the fitting = ${f(FL)} ${u.F}`, ldy: fd[1] < -0.3 || th <= 1e-3 ? 16 : -8, anchor: fd[0] < -0.3 ? 'end' : undefined, ldx: fd[0] < -0.3 ? -6 : 6 });
+        sc.arrow(mid, [mid[0] + fd[0] * 2.0, mid[1] + fd[1] * 2.0], { color: RED, w: 3.5, lp: 'head', label: `F on the fitting = ${f(FL)} ${u.F}  (F_x = ${f(Math.abs(g.Fx))}, F_y = ${f(Math.abs(g.Fy))})`, ldy: fd[1] < -0.3 || th <= 1e-3 ? 16 : -8, anchor: fd[0] < -0.3 ? 'end' : undefined, ldx: fd[0] < -0.3 ? -6 : 6 });
         if (g.plane === 'v' && g.W > 0) sc.arrow([-1.0, -w1 - 0.15], [-1.0, -w1 - 1.1], { color: '#7f8c8d', label: `W = ${f(g.W)} ${u.F}`, lp: 'head', ldy: 14, anchor: 'middle', ldx: 0 });
         sc.text([-3, w1 + 0.3], `D₁ = ${f(g.D1 / u.dF)} ${u.du}, p₁ = ${f(g.p1 / u.pF)} ${u.pu}`, { size: 11.5 });
         const dpos = [E[0] + c * L2 * 0.5 - nn[0] * (w2 + 0.3), E[1] + s * L2 * 0.5 - nn[1] * (w2 + 0.3) - (th < 0.2 ? 0.15 : 0)];
@@ -319,9 +322,11 @@
           // jet leaves backward (clockwise tangent) tilted outward by α
           const tx = s, ty = -c, jd = [tx * Math.cos(al) + c * Math.sin(al), ty * Math.cos(al) + s * Math.sin(al)];
           sc.line(tip, [tip[0] + jd[0] * 1.2, tip[1] + jd[1] * 1.2], { stroke: WATER, sw: 6 });
+          if (i === 0) sc.arrow([tip[0] + jd[0] * 1.3, tip[1] + jd[1] * 1.3], [tip[0] + jd[0] * 2.1, tip[1] + jd[1] * 2.1], { color: WATERD, label: 'jet', lp: 'head', ldx: 6, ldy: 4 });
         }
+        sc.add({ t: 'arc', c: [0, 0], r: 46, a0: 200, a1: 330, s: 'T', o: { color: RED, head: true, w: 2.4 }, only2d: true });
         sc.text([0.3, 0.45], g.w > 0 ? `ω = ${f((g.w * 60) / (2 * PI))} rpm` : 'held still', { size: 12, in3: true });
-        sc.text([-2.2, -2.9], `T = ${f(g.T)} ${u.M} (counterclockwise)`, { size: 13, color: RED, in3: true });
+        sc.text([-2.2, -2.9], `T = ${f(g.T)} ${u.M} (reaction turns the arms counterclockwise ↺)`, { size: 13, color: RED, in3: true });
         sc.dim([0, 0], [2, 0], `r = ${f(g.r)} ${u.L}`, -18);
         sc.autoBounds(0.15); sc.padR = 100; return sc;
       }

@@ -245,7 +245,8 @@
         const pts = [];
         const n = 24;
         for (let i = 0; i <= n; i++) { const a = ((a0 + ((a1 - a0) * i) / n) * Math.PI) / 180; pts.push([cx + rpx * Math.cos(a), cy - rpx * Math.sin(a)]); }
-        s('polyline', { points: pts.map((q) => q.join(',')).join(' '), fill: 'none', stroke: o.color || COL.dim, 'stroke-width': 1.2 }, g);
+        s('polyline', { points: pts.map((q) => q.join(',')).join(' '), fill: 'none', stroke: o.color || COL.dim, 'stroke-width': o.w || 1.2 }, g);
+        if (o.head) { const ae = (a1 * Math.PI) / 180, sg = a1 >= a0 ? 1 : -1, e = pts[n]; D.head(e[0], e[1], -sg * Math.sin(ae), -sg * Math.cos(ae), o.color || COL.dim, 10, g); }
         const am = (((a0 + a1) / 2) * Math.PI) / 180;
         if (label) D.text([cx + (rpx + 8) * Math.cos(am), cy - (rpx + 8) * Math.sin(am)], label, { px: true, color: o.color || COL.dim, size: 12, anchor: Math.cos(am) >= 0 ? 'start' : 'end', dy: 4 }, g);
         return g;

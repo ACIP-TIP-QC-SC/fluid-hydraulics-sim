@@ -532,7 +532,7 @@
       out.unshift({ k: 'Upstream Mach M₁', v: M1, u: '' }, { k: 'Upstream velocity V₁', v: s.V, u: u.V });
       out.push({ k: 'Mach number M₂', v: M2, u: '', hl: true }, { k: 'Pressure p₂', v: c.Pd(p2), u: u.pa, hl: true }, { k: 'Temperature T₂', v: T2, u: u.T, hl: true }, { k: 'Velocity V₂', v: V2, u: u.V, hl: true }, { k: 'Density ρ₂', v: s.rho * rr, u: u.rho },
         { k: 'p₂/p₁', v: pr, u: '' }, { k: 'T₂/T₁', v: Tr, u: '' }, { k: 'ρ₂/ρ₁', v: rr, u: '' }, { k: 'p₀₂/p₀₁', v: p0r, u: '' }, { k: 'Stagnation pressure p₀₂', v: c.Pd(p02), u: u.pa }, { k: 'Stagnation temperature T₀ (unchanged)', v: s.T0, u: u.T }, { k: 'Entropy rise Δs', v: ds, u: u.s });
-      return done(st, out, warn, { cls: 'ok', text: `M₁ = ${f(M1)} → M₂ = ${f(M2)}` }, { topic, kind, M1, M2, th, be });
+      return done(st, out, warn, { cls: 'ok', text: `M₁ = ${f(M1)} → M₂ = ${f(M2)}` }, { topic, kind, M1, M2, th, be, pr, Tr, rr });
     }
 
     /* ---------- Fanno flow ---------- */

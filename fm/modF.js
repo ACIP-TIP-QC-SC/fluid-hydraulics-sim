@@ -230,9 +230,9 @@
         }
         const sg = g.sg, col = sg > 3 ? HG : sg >= 0.98 && sg <= 1.05 ? WATER : sg < 0.01 ? GAS : OIL;
         sc.rect(0, 0, 1, 1, { fill: col, stroke: '#2c3e50', sw: 1.5, fop: 0.8 }, { alpha: 0.65, fill: col });
-        sc.dim([0, 0], [1, 0], g.V ? `V = ${f(g.V)} ${u.V}` : '1 unit volume', -22);
+        sc.dim([0, 1], [1, 1], g.V ? `V = ${f(g.V)} ${u.V}` : '1 unit volume', 22);
         sc.text([0.5, 0.62], `ρ, γ, S = ${f(sg)}`, { anchor: 'middle', size: 14, in3: true });
-        sc.arrow([0.5, 0.35], [0.5, -0.35], { color: '#2c3e50', label: 'W = mg' });
+        sc.arrow([0.5, 0.35], [0.5, -0.35], { color: '#2c3e50', label: 'W = mg = γV', lp: 'head', ldy: 16 });
         sc.autoBounds(0.2); return sc;
       }
       if (T === 'gas') {
@@ -244,8 +244,8 @@
         const r = res.out;
         const val = (k) => (r.find((o) => o.k.startsWith(k)) || {}).v;
         sc.text([0, 0.15], `p = ${f(val('Absolute pressure'))} ${u.pabs}`, { anchor: 'middle', size: 13, in3: true });
-        sc.text([0, -0.15], `T = ${f(val('Absolute temperature'))} ${u.Ta}`, { anchor: 'middle', size: 13 });
-        sc.text([0, -0.45], `ρ = ${f(val('Density'))} ${u.rho}`, { anchor: 'middle', size: 13, color: '#c0392b' });
+        sc.text([0, -0.15], `T = ${f(val('Absolute temperature'))} ${u.Ta}`, { anchor: 'middle', size: 13, in3: true });
+        sc.text([0, -0.45], `ρ = ${f(val('Density'))} ${u.rho}`, { anchor: 'middle', size: 13, color: '#c0392b', in3: true });
         if (s.solve === 'm' && shp === 'sphere') sc.dim([-1, -1.15], [1, -1.15], `D = ${f(s.vD)}`, -6);
         sc.autoBounds(0.15); sc.depth = 2; return sc;
       }
@@ -266,14 +266,16 @@
         sc.autoBounds(0.12); sc.depth = 1; return sc;
       }
       if (T === 'bulk') {
-        const e = Math.min(0.5, Math.max(0.05, g.strain * 5));
+        const e = Math.min(0.4, Math.max(0.15, g.strain * 5));
         sc.rect(-0.05, 0, 1.05, 2.4, { fill: 'none', stroke: '#2c3e50', sw: 2 }, false);
         sc.rect(0, 0, 1, 2 * (1 - e), { fill: WATER, stroke: '#2c3e50', fop: 0.85 }, { fill: WATER, alpha: 0.55 });
         sc.line([0, 2], [1, 2], { stroke: '#7f8c8d', dash: '5 4' });
-        sc.text([1.1, 2], 'V₁', { color: '#52606d' });
+        sc.text([-0.12, 2], 'V₁ (before)', { color: '#52606d', anchor: 'end' });
+        sc.text([-0.12, 2 * (1 - e)], 'V₂ (after)', { color: '#52606d', anchor: 'end' });
         sc.rect(0, 2 * (1 - e), 1, 2 * (1 - e) + 0.15, { fill: STEEL, stroke: '#2c3e50' }, { fill: STEEL, alpha: 0.95 });
         sc.arrow([0.5, 3.2], [0.5, 2 * (1 - e) + 0.2], { color: '#c0392b', label: 'Δp' });
-        sc.dim([1, 2 * (1 - e)], [1, 2], 'ΔV (exaggerated)', 30);
+        sc.dim([1.15, 2 * (1 - e)], [1.15, 2], `ΔV/V = ${f(g.strain)} (drawn exaggerated)`, -0.01, { anchor: 'start', ldx: 8 });
+        sc.line([1, 2], [1.2, 2], { stroke: '#7f8c8d', dash: '3 3' });
         sc.autoBounds(0.15); return sc;
       }
       if (T === 'surf') {
@@ -333,6 +335,7 @@
       // chart-style topics: water, vlaw, visc → a beaker for 3D, chart in 2D
       sc.lathe([[0, 0], [0.9, 0], [0.9, 1.4], [0, 1.4]], 0, T === 'visc' || T === 'vlaw' ? OIL : WATER, 0.55);
       sc.lathe([[0.9, 0], [1, 0], [1, 2], [0.9, 2]], 0, '#d6eaf8', 0.25);
+      { const lab = T === 'water' ? `${f(g.Tq)} ${u.T}: p_v = ${f(g.pv)} ${g.pvUnit}` : T === 'vlaw' ? `μ = ${f(g.q[1])} ${u.mu} at ${f(g.q[0])} ${u.T}` : (res.out[0] ? `${res.out[0].k} = ${f(res.out[0].v)} ${res.out[0].u}` : ''); if (lab) sc.text([0, 2.3], lab, { anchor: 'middle', color: '#c0392b', in3: true }); }
       sc.chart = true;
       sc.bounds = { xmin: 0, xmax: 1, ymin: 0, ymax: 1 };
       return sc;

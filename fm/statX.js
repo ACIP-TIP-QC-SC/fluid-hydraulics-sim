@@ -198,22 +198,59 @@
       return Physics.planeAny(Object.assign({}, x, { ppts }), U);
     },
     scene(x, res, U) {
-      const g = res.geo, sc = Scene.Scene();
-      const pts = g.pts.map((q) => [q[0], -q[1]]);
-      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
-      const x0 = Math.min(...xs), x1 = Math.max(...xs), yb = Math.min(...ys), span = Math.max(x1 - x0, -yb, 1e-6);
-      sc.rect(x0 - span * 0.35, yb - span * 0.1, x1 + span * 0.35, 0, { fill: WATER, stroke: 'none', fop: 0.18 }, false);
-      sc.line([x0 - span * 0.35, 0], [x1 + span * 0.35, 0], { stroke: WATERD, sw: 2 });
-      sc.text([x0 - span * 0.33, span * 0.04], g.th < 90 ? `surface line (wall at ${f(g.th)}°)` : 'free surface', { color: WATERD, size: 12 });
-      if (g.sEq) { sc.line([x0 - span * 0.35, g.sEq], [x1 + span * 0.35, g.sEq], { stroke: '#8e44ad', dash: '6 4' }); sc.text([x1 + span * 0.05, g.sEq + span * 0.03], 'imaginary surface', { color: '#8e44ad', size: 11 }); }
-      sc.poly(pts, { fill: GATE, stroke: '#a04000', sw: 2, fop: 0.75 }, { fill: GATE, alpha: 0.85, z0: -span * 0.02, z1: span * 0.02 });
-      sc.dot([g.G.xc, -g.G.sc], '#16a085', 'G');
-      sc.dot([g.xp, -g.yp], '#c0392b', 'CP');
-      sc.line([g.G.xc, 0], [g.G.xc, -g.G.sc], { stroke: '#16a085', dash: '3 3' });
-      sc.dim([x1 + span * 0.12, 0], [x1 + span * 0.12, -g.yp], `y_p = ${f(g.yp)} ${U.len}`, 22);
-      if (Math.abs(g.xp - g.G.xc) > span * 0.01) sc.dim([g.G.xc, yb - span * 0.04], [g.xp, yb - span * 0.04], `x_p − x̄ = ${f(g.xp - g.G.xc)}`, -16);
-      sc.text([g.xp + span * 0.04, -g.yp - span * 0.08], `F = ${f(g.F)} ${U.force}`, { color: '#c0392b', size: 13, in3: true });
-      sc.depth = span * 0.3;
+      // Two views (2026-11-26): side section of the wall with the liquid, and the front view (true shape) of the plate.
+      const g = res.geo, sc = Scene.Scene(), th = g.th * DEG, sn = Math.sin(th), cs = Math.cos(th);
+      const xs = g.pts.map((q) => q[0]), ss = g.pts.map((q) => q[1]);
+      const xmn = Math.min(...xs), xmx = Math.max(...xs), sTop = Math.min(...ss), sBot = Math.max(...ss);
+      const span = Math.max(xmx - xmn, sBot, 1e-6), Lw = sBot + span * 0.18;
+      const d = [-cs, -sn], W = (sv) => [d[0] * sv, d[1] * sv]; // point on the wall s down from the surface line
+      const Wb = W(Lw), xl = Math.min(Wb[0], 0) - span * 0.75, nL = [-sn, cs];
+      // side section
+      sc.poly([[xl, 0], [0, 0], Wb, [xl, Wb[1]]], { fill: liqCol(x.sgA), stroke: 'none', fop: 0.3 }, false);
+      sc.line([xl, 0], [span * 0.05, 0], { stroke: WATERD, sw: 1.6, no3: true });
+      sc.fs([xl + span * 0.15, 0], { label: x.psA > 0 ? `p_s = ${f(x.psA)} ${U.press}` : `Sg = ${f(x.sgA)}` });
+      sc.ground([0 + d[0] * -span * 0.08, d[1] * -span * 0.08], Wb, [sn, -cs], {}).only2d = true;
+      sc.ground([xl, Wb[1]], Wb, [0, -1], {}).only2d = true;
+      if (g.sEq) { sc.line([xl, g.sEq * sn], [span * 0.05, g.sEq * sn], { stroke: '#8e44ad', dash: '6 4', no3: true }); sc.text([xl, g.sEq * sn], 'imaginary surface', { color: '#8e44ad', size: 10.5, dy: -4 }); }
+      const strip = Scene.strip([W(sTop), W(sBot)], span * 0.035);
+      sc.poly(strip, { fill: GATE, stroke: '#a04000', sw: 1 }, false);
+      const CPs = W(g.yp), Gs = W(g.G.sc);
+      sc.arrow([CPs[0] + nL[0] * span * 0.38, CPs[1] + nL[1] * span * 0.38], CPs, { color: '#c0392b', w: 3, label: `F = ${f(g.F)} ${U.force}`, no3: true });
+      sc.dot(Gs, '#16a085', '', { r: 4 }); sc.dot(CPs, '#c0392b', '', { r: 4 });
+            if (g.th < 89.9) sc.add({ t: 'arc', c: Wb, r: 30, a0: 0, a1: g.th, s: `θ = ${f(g.th)}°`, only2d: true });
+      sc.text([xl, Wb[1] - span * 0.12], 'Side section', { color: '#52606d', size: 12 }).only2d = true;
+      // front view, to the right of the section (s measured down from the surface line)
+      const X0 = span * 0.55 - xmn, F = (q) => [X0 + q[0], -q[1]];
+      const fx0 = X0 + xmn - span * 0.25, fx1 = X0 + xmx + span * 0.25;
+      sc.rect(fx0, -Lw, fx1, 0, { fill: '#e9edf1', stroke: '#9aa3ad', sw: 1 }, false);
+      sc.line([fx0, 0], [fx1, 0], { stroke: WATERD, sw: 1.6, no3: true });
+      sc.text([fx0, 0], g.th < 89.9 ? 'surface line (along the wall)' : 'free surface', { color: WATERD, size: 10.5, dy: -5 });
+      sc.poly(g.pts.map(F), { fill: GATE, stroke: '#a04000', sw: 2, fop: 0.8 }, false);
+      sc.line(F([g.G.xc, 0]), F([g.G.xc, g.G.sc]), { stroke: '#16a085', dash: '3 3', no3: true });
+      sc.dot(F([g.G.xc, g.G.sc]), '#16a085', 'G'); sc.dot(F([g.xp, g.yp]), '#c0392b', 'CP');
+      sc.dim([fx1 - span * 0.06, 0], [fx1 - span * 0.06, -g.G.sc], `ȳ = ${f(g.G.sc)}`, -0.01).only2d = true;
+      sc.dim([fx1 + span * 0.08, 0], [fx1 + span * 0.08, -g.yp], `y_p = ${f(g.yp)} ${U.len}`, 0).only2d = true;
+      if (Math.abs(g.xp - g.G.xc) > span * 0.005) sc.dim(F([g.G.xc, sBot + span * 0.08]), F([g.xp, sBot + span * 0.08]), `x_p − x̄ = ${f(g.xp - g.G.xc)}`, 0).only2d = true;
+      sc.dim(F([xmn, sBot + span * 0.16]), F([xmx, sBot + span * 0.16]), `${f(xmx - xmn)} ${U.len}`, 0).only2d = true;
+      sc.text([fx0, -Lw - span * 0.12], 'Front view (true shape)', { color: '#52606d', size: 12 }).only2d = true;
+      sc.items.forEach((it) => { if (it.t !== 'text' || !it.o.in3) it.only2d = true; });
+      // 3D: wall slab in the plane of the plate, liquid block in front, plate set into the wall, F normal at CP
+      const dep = span * 0.9;
+      sc.add({ t: 'custom3', only3d: true, fn: (V) => {
+        const P3 = (xx, sv, z) => [xx, -sv * sn, z - sv * cs]; // wall plane leans back by (90° − θ)
+        const wx0 = xmn - span * 0.3, wx1 = xmx + span * 0.3;
+        V.face([P3(wx0, 0, -0.001), P3(wx1, 0, -0.001), P3(wx1, Lw, -0.001), P3(wx0, Lw, -0.001)], '#b8c0c8', 0.35, '#7f8c8d');
+        V.face(g.pts.map((q) => P3(q[0], q[1], 0)), GATE, 1, '#a04000');
+        const top = [P3(wx0, 0, dep), P3(wx1, 0, dep), P3(wx1, 0, 0), P3(wx0, 0, 0)];
+        V.face(top, WATER, 0.25, WATERD);
+        V.face([P3(wx0, 0, dep), P3(wx1, 0, dep), [wx1, -Lw * sn, dep], [wx0, -Lw * sn, dep]], WATER, 0.12, null);
+        [wx0, wx1].forEach((xx) => V.face([P3(xx, 0, dep), P3(xx, 0, 0), P3(xx, Lw, 0), [xx, -Lw * sn, dep]], WATER, 0.12, null));
+        const cp = P3(g.xp, g.yp, 0), nrm = [0, cs, sn], tail = [cp[0] + nrm[0] * span * 0.5, cp[1] + nrm[1] * span * 0.5, cp[2] + nrm[2] * span * 0.5];
+        V.line([tail, cp], '#c0392b', 3); V.label(tail, `F = ${f(g.F)} ${U.force}`, '#c0392b');
+        V.label(P3(g.G.xc, g.G.sc, 0), 'G', '#16a085'); V.label(cp, 'CP', '#c0392b');
+        V.dim(P3(wx1, 0, 0), P3(wx1, g.yp, 0), `y_p = ${f(g.yp)} ${U.len}`, [span * 0.15, 0, 0]);
+      } });
+      sc.autoBounds(0.06);
       return sc;
     },
   };
@@ -553,57 +590,151 @@
       }
     },
     compute(x, U) { return Physics.gateEq(x, U); },
-    scene(x, res, U) {
-      const g = res.geo, sc = Scene.Scene();
-      if (g.cpe) {
-        const sbar = g.sbar, top = (res.out[0] || {}).v || 0, span = Math.max(sbar, 1);
-        sc.line([-span * 0.8, 0], [span * 0.8, 0], { stroke: WATERD, sw: 2 });
-        sc.rect(-span * 0.8, -(top + span * 0.6), span * 0.8, 0, { fill: WATER, stroke: 'none', fop: 0.18 }, false);
-        const L = x.cpShape === 'circ' ? x.Dcp : x.Lg, sn = Math.sin(x.thG * DEG);
-        const yT = -top, yB = -top - L * sn;
-        sc.line([0, yT], [0, yB], { stroke: GATE, sw: 8 });
-        sc.dot([0, -(sbar * sn)], '#16a085', 'G'); sc.dot([0, -((sbar + x.eCP) * sn)], '#c0392b', 'CP');
-        sc.dim([span * 0.3, 0], [span * 0.3, yT], `top ${f(top)} ${U.len}`, 20);
-        sc.depth = span * 0.3; return sc;
-      }
-      const pts = g.pts, xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]).concat([g.yS]);
-      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys, 0), y1 = Math.max(...ys);
-      const span = Math.max(x1 - x0, y1 - y0, 1e-6), pad = span * 0.6;
-      // free surfaces
-      sc.line([x0 - pad, g.yS], [x1 + pad * 0.2, g.yS], { stroke: WATERD, sw: 2 });
-      sc.text([x0 - pad, g.yS + span * 0.04], `liquid 1 surface (h = ${f(g.yS)} ${U.len})`, { color: WATERD, size: 11 });
-      if (g.y2 !== null && g.y2 !== undefined) { sc.line([x0 - pad * 0.2, g.y2], [x1 + pad, g.y2], { stroke: '#1e8449', sw: 2 }); sc.text([x1 + pad * 0.1, g.y2 + span * 0.04], 'liquid 2', { color: '#1e8449', size: 11 }); }
-      // pressure prisms (drawn on the liquid side)
-      const pmax = Math.max(1e-9, ...g.loads.filter((l) => !l.w).map((l) => Math.max(l.p0 || 0, l.p1 || 0)));
-      const ks = (span * 0.35) / pmax;
-      for (let i = 0; i < pts.length - 1; i++) {
-        g.loads.filter((l) => !l.w && l.seg === i).forEach((l) => {
-          const A = pts[i], B = pts[i + 1], n = l.dir, N = 24, poly = [];
-          const pAt = (t) => { const y = A[1] + (B[1] - A[1]) * t, yS = l.liq === 1 ? g.yS : g.y2, gg = l.liq === 1 ? (l.F > 0 ? 1 : 1) : 1; return Math.max(0, (l.liq === 1 ? (x.psG || 0) : 0) + (yS - y) * (l.liq === 1 ? x.sgG : x.sg2G) * (x.gwG > 0 ? x.gwG : U.gw) * gg); };
-          for (let k = 0; k <= N; k++) { const t = k / N; poly.push([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]); }
-          for (let k = N; k >= 0; k--) { const t = k / N, pr = pAt(t) * ks; poly.push([A[0] + (B[0] - A[0]) * t - n[0] * pr, A[1] + (B[1] - A[1]) * t - n[1] * pr]); }
-          sc.poly(poly, { fill: l.liq === 1 ? WATER : '#7fc6a4', stroke: 'none', fop: 0.35 }, false);
-        });
-      }
-      sc.pline(pts, { stroke: GATE, sw: 8 });
-      // loads
-      const aL = span * 0.3;
-      g.loads.forEach((l) => {
-        const a = [l.pt[0] - l.dir[0] * aL, l.pt[1] - l.dir[1] * aL];
-        sc.arrow(a, l.pt, { color: l.w ? '#6c3483' : l.liq === 2 ? '#1e8449' : '#c0392b', sw: 2.5 });
-        sc.text([a[0], a[1] + span * 0.03], `${l.w ? (l.name === 'Counterweight' ? 'W_c' : 'W') : 'F'} = ${f(l.F)} ${U.force}`, { color: l.w ? '#6c3483' : '#c0392b', size: 11, in3: true });
-      });
-      if (g.hinge) { sc.dot(g.hinge, '#2c3e50', 'hinge'); }
-      if (g.sup) {
-        const d = g.sup.dir, P = g.sup.P, a = [g.sup.pt[0] - d[0] * aL, g.sup.pt[1] - d[1] * aL];
-        sc.arrow(a, g.sup.pt, { color: '#2471a3', sw: 3 });
-        sc.text([a[0], a[1] - span * 0.05], `P = ${f(P)} ${U.force}`, { color: '#2471a3', size: 12, in3: true });
-      }
-      if (g.cw) sc.line(g.hinge, g.cw, { stroke: '#6c3483', dash: '4 3' });
-      sc.depth = span * 0.3;
-      return sc;
-    },
+    scene(x, res, U) { return gateScene(x, res, U); },
   };
+
+  /* Gate equilibrium figure (rebuilt 2026-11-26): liquid regions closed by the gate and the wall
+     it sits in, pink pressure diagrams, F at each CP, hinge pin with its reactions, support, weights. */
+  const LIQ2 = '#5dbb8a', INK = '#2c3e50', RED = '#c0392b', BLUE = '#2471a3', PURP = '#6c3483', PINK = '#e74c3c';
+  const sub2 = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+  function gateScene(x, res, U) {
+    const g = res.geo, sc = Scene.Scene(), gw = x.gwG > 0 ? x.gwG : U.gw;
+    const unit = (a, c) => { const d = [c[0] - a[0], c[1] - a[1]], L = Math.hypot(d[0], d[1]) || 1; return [d[0] / L, d[1] / L]; };
+    if (g.cpe) {
+      const sn = Math.sin(g.th), top = Math.max(0, -g.pts[1][1]), B = g.pts[0], T = g.pts[1], u = unit(B, T);
+      const L = Math.hypot(T[0] - B[0], T[1] - B[1]), span = Math.max(top + L * sn, L, 1);
+      const S0 = [T[0] + u[0] * (top / Math.max(sn, 1e-6)), 0]; // where the plate line meets the surface
+      const xl = Math.min(B[0], T[0], S0[0]) - span * 0.55, xr = Math.max(B[0], T[0], S0[0]) + span * 0.35, yb = B[1] - span * 0.2;
+      sc.rect(xl, yb, xr, 0, { fill: WATER, stroke: 'none', fop: 0.28 }, { fill: WATER, alpha: 0.18 });
+      sc.line([xl, 0], [xr, 0], { stroke: WATERD, sw: 2 });
+      sc.fs([xl + span * 0.12, 0], { label: `Sg = ${f(x.sgG)}` });
+      sc.line(T, S0, { stroke: '#7f8c8d', dash: '5 4', sw: 1, no3: true });
+      sc.poly(Scene.strip([B, T], span * 0.025), { fill: GATE, stroke: '#a04000', sw: 1 }, { fill: GATE, alpha: 1 });
+      const Gp = [S0[0] - u[0] * g.sbar, -g.sbar * sn], CPp = [S0[0] - u[0] * (g.sbar + g.e), -(g.sbar + g.e) * sn];
+      const nL = [-u[1], u[0]];
+      sc.arrow([CPp[0] + nL[0] * span * 0.3, CPp[1] + nL[1] * span * 0.3], CPp, { color: RED, w: 3, label: `F = ${f((res.out[3] || {}).v)} ${U.force}` });
+      sc.dot(Gp, '#16a085', 'G'); sc.dot(CPp, RED, 'CP');
+      sc.dim([xr - span * 0.12, 0], [xr - span * 0.12, T[1]], `top ${f(top)} ${U.len}`, 0);
+      const nR = [u[1], -u[0]], off = span * 0.12;
+      sc.dim([S0[0] + nR[0] * off, S0[1] + nR[1] * off], [Gp[0] + nR[0] * off, Gp[1] + nR[1] * off], `ȳ = ${f(g.sbar)}`, 0);
+      sc.dim([Gp[0] + nR[0] * off * 1.9, Gp[1] + nR[1] * off * 1.9], [CPp[0] + nR[0] * off * 1.9, CPp[1] + nR[1] * off * 1.9], `e = ${f(g.e)} ${U.len}`, 0);
+      sc.depth = span * 0.4; sc.autoBounds(0.06); return sc;
+    }
+    const pts = g.pts, n = pts.length, xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+    const hasL2 = g.y2 !== null && g.y2 !== undefined;
+    const ytop = Math.max(...ys, g.yS, hasL2 ? g.y2 : -Infinity), ybot = Math.min(...ys);
+    const span = Math.max(Math.max(...xs) - Math.min(...xs), ytop - ybot, 1e-6);
+    const box = { x0: Math.min(...xs) - span * 0.55, x1: Math.max(...xs) + span * 0.55, y0: ybot - span * 0.14, y1: ytop + span * 0.1 };
+    // the fixed wall the gate sits in: each end continues along its end segment, then turns vertical
+    const u0 = unit(pts[0], pts[1]), u1 = unit(pts[n - 2], pts[n - 1]);
+    const wb = Object.assign({}, box, { y1: Math.max(g.yS, hasL2 ? g.y2 : -Infinity, ...ys) + span * 0.06 });
+    const bend = (p, u) => {
+      if (Math.abs(u[1]) < 1e-6 || Math.abs(u[0]) < 1e-6) return [];
+      const q = [p[0] + u[0] * (span * 0.4) / Math.abs(u[0]), p[1] + u[1] * (span * 0.4) / Math.abs(u[0])];
+      if (q[1] <= wb.y0 || q[1] >= wb.y1) return [];
+      return [q, [q[0], q[1] + Math.sign(u[1]) * span * 0.05]];
+    };
+    const ext0 = bend(pts[0], [-u0[0], -u0[1]]), ext1 = bend(pts[n - 1], u1);
+    const full = ext0.slice().reverse().concat(pts, ext1), nf = full.length;
+    const wall = (path) => { // path from the gate end outward; last leg runs to the box edge
+      const m = path.length, uu = unit(path[m - 2], path[m - 1]), e = Scene.rayExit(path[m - 1], uu, wb), all = path.concat([e]);
+      for (let i = 0; i < all.length - 1; i++) { const a = all[i], c = all[i + 1], d = unit(a, c); if (Math.hypot(c[0] - a[0], c[1] - a[1]) > span * 0.01) sc.ground(a, c, path.dry ? [-d[1], d[0]] : [d[1], -d[0]], {}); }
+    };
+    { const w0 = [pts[0]].concat(ext0); if (w0.length === 1) w0.push([pts[0][0] - u0[0] * 1e-3, pts[0][1] - u0[1] * 1e-3]); w0.dry = true; wall(w0); }
+    { const w1 = [pts[n - 1]].concat(ext1); if (w1.length === 1) w1.push([pts[n - 1][0] + u1[0] * 1e-3, pts[n - 1][1] + u1[1] * 1e-3]); wall(w1); }
+    // liquid regions (liquid 1 on the left of the corner order, liquid 2 on the right)
+    const col1 = liqCol(x.sgG);
+    if (x.psG > 0) { const gas = Scene.leftRegion(full, Object.assign({}, box, { y0: g.yS, y1: box.y1 })); if (gas.length > 2) sc.poly(gas, { fill: '#d5dde4', stroke: 'none', fop: 0.6 }, { fill: '#d5dde4', alpha: 0.15 }); }
+    const reg1 = Scene.leftRegion(full, Object.assign({}, box, { y1: g.yS }));
+    if (reg1.length > 2) sc.poly(reg1, { fill: col1, stroke: 'none', fop: 0.32 }, { fill: col1, alpha: 0.2 });
+    let reg2 = [];
+    if (hasL2) { reg2 = Scene.leftRegion(full.slice().reverse(), Object.assign({}, box, { y1: g.y2 })); if (reg2.length > 2) sc.poly(reg2, { fill: LIQ2, stroke: 'none', fop: 0.32 }, { fill: LIQ2, alpha: 0.2 }); }
+    const topEdge = (reg, y) => { const q = reg.filter((p) => Math.abs(p[1] - y) < 1e-9 * (1 + Math.abs(y))).map((p) => p[0]); return q.length >= 2 ? [Math.min(...q), Math.max(...q)] : null; };
+    const t1 = topEdge(reg1, g.yS);
+    if (t1) { sc.line([t1[0], g.yS], [t1[1], g.yS], { stroke: WATERD, sw: 1.6 }); sc.fs([t1[0] + (t1[1] - t1[0]) * 0.12, g.yS], { label: x.psG > 0 ? `p_s = ${f(x.psG)} ${U.press}` : `Sg = ${f(x.sgG)}` }); }
+    if (hasL2) { const t2 = topEdge(reg2, g.y2); if (t2) { sc.line([t2[0], g.y2], [t2[1], g.y2], { stroke: '#1e8449', sw: 1.6 }); sc.fs([t2[1] - (t2[1] - t2[0]) * 0.22, g.y2], { color: '#1e8449', label: `Sg₂ = ${f(x.sg2G)}` }); } }
+    [reg1, reg2].forEach((reg) => {
+      for (let i = 0; i < reg.length; i++) { const P = reg[i], Q = reg[(i + 1) % reg.length]; if (Math.abs(P[1] - box.y0) < 1e-9 && Math.abs(Q[1] - box.y0) < 1e-9 && Math.abs(P[0] - Q[0]) > 1e-9) sc.ground(P, Q, [0, -1], {}); }
+    });
+    // pressure diagrams (pink) on the liquid side of every wetted segment
+    const segs = [];
+    for (let i = 0; i < n - 1; i++) {
+      const A = pts[i], B = pts[i + 1], d = unit(A, B), left = [-d[1], d[0]];
+      const add = (liq, yS, gam, ps, nrm) => {
+        const pAt = (q) => (q[1] <= yS ? ps + gam * (yS - q[1]) : ps);
+        // split at the surface so the diagram stays linear on each piece
+        const ts = [0, 1]; if (Math.abs(B[1] - A[1]) > 1e-12) { const tc = (yS - A[1]) / (B[1] - A[1]); if (tc > 0 && tc < 1) ts.splice(1, 0, tc); }
+        for (let k = 0; k < ts.length - 1; k++) {
+          const P = [A[0] + (B[0] - A[0]) * ts[k], A[1] + (B[1] - A[1]) * ts[k]], Q = [A[0] + (B[0] - A[0]) * ts[k + 1], A[1] + (B[1] - A[1]) * ts[k + 1]];
+          const pP = pAt(P), pQ = pAt(Q); if (pP > 1e-12 || pQ > 1e-12) segs.push({ P, Q, pP, pQ, nrm, liq });
+        }
+      };
+      add(1, g.yS, x.sgG * gw, x.psG || 0, left);
+      if (hasL2) add(2, g.y2, x.sg2G * gw, 0, [-left[0], -left[1]]);
+    }
+    const pmax = Math.max(1e-12, ...segs.map((q) => Math.max(q.pP, q.pQ))), k = (span * 0.26) / pmax;
+    segs.forEach((q) => sc.pdiag(q.P, q.Q, q.pP, q.pQ, q.nrm, k, { unit: U.press, color: q.liq === 2 ? '#1e8449' : PINK }));
+    // the gate itself
+    sc.poly(Scene.strip(pts, span * 0.022), { fill: GATE, stroke: '#a04000', sw: 1 }, { fill: GATE, alpha: 1 });
+    if (n > 2) pts.forEach((q, i) => sc.text(q, String.fromCharCode(65 + i), { color: '#a04000', size: 12, dx: -14, dy: -6 }));
+    // loads
+    const aL = span * 0.3, liqLoads = g.loads.filter((l) => !l.w), multi = n > 2;
+    liqLoads.forEach((l) => {
+      const tail = [l.pt[0] - l.dir[0] * aL, l.pt[1] - l.dir[1] * aL], c = l.liq === 2 ? '#1e8449' : RED;
+      const nm = (l.liq === 2 ? 'F′' : 'F') + (multi ? sub2[l.seg + 1] || '' : '');
+      sc.arrow(tail, l.pt, { color: c, w: 3, label: `${nm} = ${f(l.F)} ${U.force}` });
+      sc.dot(l.pt, c, '', { r: 4 });
+    });
+    g.loads.filter((l) => l.w).forEach((l) => {
+      const isC = l.name === 'Counterweight', len = span * 0.22;
+      if (isC) { const s2 = span * 0.035; sc.rect(l.pt[0] - s2, l.pt[1] - s2, l.pt[0] + s2, l.pt[1] + s2, { fill: '#7f8c8d', stroke: INK, sw: 1 }, { fill: '#7f8c8d', alpha: 1 }); if (g.hinge) sc.line(g.hinge, l.pt, { stroke: PURP, dash: '4 3' }); }
+      else sc.dot(l.pt, PURP, 'G', { r: 4 });
+      sc.arrow(l.pt, [l.pt[0], l.pt[1] - len], { color: PURP, w: 2.6, label: `${isC ? 'W_c' : 'W'} = ${f(l.F)} ${U.force}`, lp: 'head', ldy: 16 });
+    });
+    if (g.hinge) {
+      sc.hinge(g.hinge, { label: 'hinge', base: false });
+      if (g.R && !g.lift) {
+        const aR = span * 0.2, R = g.R, tiny = 1e-9 * (1 + Math.abs(R[0]) + Math.abs(R[1]));
+        if (Math.abs(R[0]) > tiny) sc.arrow([g.hinge[0] - Math.sign(R[0]) * aR, g.hinge[1]], g.hinge, { color: BLUE, w: 2.4, label: `R_x = ${f(Math.abs(R[0]))} ${U.force}` });
+        if (Math.abs(R[1]) > tiny) sc.arrow([g.hinge[0], g.hinge[1] - Math.sign(R[1]) * aR], g.hinge, { color: BLUE, w: 2.4, label: `R_y = ${f(Math.abs(R[1]))} ${U.force}` });
+      }
+    }
+    if (g.sup) {
+      const d0 = g.sup.dir, P = g.sup.P, d = P < 0 ? [-d0[0], -d0[1]] : d0, at = g.sup.pt, tail = [at[0] - d[0] * aL, at[1] - d[1] * aL];
+      // stop face on the side the push comes from (a tie when the answer is negative)
+      const t = [-d0[1], d0[0]], w = span * 0.05, o = [at[0] - d0[0] * span * 0.018, at[1] - d0[1] * span * 0.018];
+      if (P >= 0) sc.ground([o[0] - t[0] * w, o[1] - t[1] * w], [o[0] + t[0] * w, o[1] + t[1] * w], [-d0[0], -d0[1]], { sw: 2.5 });
+      sc.arrow(tail, at, { color: BLUE, w: 3, label: `P = ${f(Math.abs(P))} ${U.force}${P < 0 ? ' (pull)' : ''}` });
+    }
+    if (g.lift) {
+      const B = pts[0], T = pts[1], u = unit(B, T), nr = [u[1], -u[0]], o = span * 0.045;
+      [1, -1].forEach((sg) => sc.line([B[0] + nr[0] * o * sg - u[0] * span * 0.05, B[1] + nr[1] * o * sg - u[1] * span * 0.05], [T[0] + nr[0] * o * sg + u[0] * span * 0.05, T[1] + nr[1] * o * sg + u[1] * span * 0.05], { stroke: INK, sw: 1.4, dash: '6 3' }));
+      const up = (res.out.find((q) => /raise/.test(q.k)) || {}).v, fr = (res.out.find((q) => /Friction/.test(q.k)) || {}).v;
+      const T2 = [T[0] + nr[0] * o * 2.2, T[1] + nr[1] * o * 2.2]; sc.line(T, T2, { stroke: BLUE, sw: 1.5 }); sc.arrow(T2, [T2[0] + u[0] * aL, T2[1] + u[1] * aL], { color: BLUE, w: 3, label: `T = ${f(up)} ${U.force}`, lp: 'head' });
+      const mid = [B[0] + (T[0] - B[0]) * 0.25 + nr[0] * o * 2.2, B[1] + (T[1] - B[1]) * 0.25 + nr[1] * o * 2.2];
+      sc.arrow([mid[0] + u[0] * aL * 0.5, mid[1] + u[1] * aL * 0.5], mid, { color: '#7f8c8d', w: 2, label: `μN = ${f(fr)}` });
+      sc.text([T[0] + nr[0] * o * 2, T[1] + nr[1] * o * 2 - span * 0.05], 'guides', { color: INK, size: 11 });
+    }
+    // dimensions
+    const xd = box.x1 - span * 0.06;
+    if (g.plate) {
+      sc.dim([xd, 0], [xd, g.yS], `h = ${f(g.yS)} ${U.len}`, 0);
+      if (hasL2) sc.dim([xd - span * 0.12, 0], [xd - span * 0.12, g.y2], `h₂ = ${f(g.y2)}`, 0);
+      const B = pts[0], T = pts[1], u = unit(B, T), dry = [u[1], -u[0]], off = span * 0.1;
+      if (!g.lift) sc.dim([B[0] + dry[0] * off, B[1] + dry[1] * off], [T[0] + dry[0] * off, T[1] + dry[1] * off], `L = ${f(x.Lg)} ${U.len}`, 0);
+      if (x.thG < 89.9) {
+        const ang = Math.atan2(T[1] - B[1], T[0] - B[0]) / DEG;
+        sc.add({ t: 'arc', c: B, r: 34, a0: ang > 90 ? ang : 0, a1: ang > 90 ? 180 : ang, s: `θ = ${f(x.thG)}°`, only2d: true });
+        sc.line(B, [B[0] + (ang > 90 ? -1 : 1) * span * 0.22, B[1]], { stroke: '#7f8c8d', dash: '3 3', sw: 1, no3: true });
+      }
+    } else {
+      sc.dim([xd, 0], [xd, g.yS], `h = ${f(g.yS)} ${U.len}`, 0);
+      sc.text([xd, 0], 'y = 0', { color: '#7f8c8d', size: 10, dx: 6, dy: 12 });
+    }
+    sc.depth = Math.min(Math.max(x.bG || 1, span * 0.3), span * 1.1);
+    sc.bounds = { xmin: box.x0, xmax: box.x1, ymin: box.y0, ymax: box.y1 };
+    return sc;
+  }
 
   /* ---------------- Hydrostatic forces: cylinder / log on contacts -------- */
   X.cyl = {
@@ -634,25 +765,46 @@
     },
     compute(x, U) { return Physics.cylEq(x, U); },
     scene(x, res, U) {
-      const g = res.geo, sc = Scene.Scene(), R = g.R, span = 2 * R;
-      const xl = -2.4 * R, xr = 2.4 * R;
-      if (g.h1 > 0) sc.rect(xl, 0, 0, g.h1, { fill: liqCol(x.sg1C), stroke: 'none', fop: 0.5 }, { fill: liqCol(x.sg1C), alpha: 0.3 });
-      if (g.h2 > 0) sc.rect(0, 0, xr, g.h2, { fill: liqCol(x.sg2C), stroke: 'none', fop: 0.5 }, { fill: liqCol(x.sg2C), alpha: 0.3 });
-      sc.line([xl, 0], [xr, 0], { stroke: '#2c3e50', sw: 3 });
-      sc.circle([0, R], R, { fill: STEEL, stroke: '#2c3e50', sw: 2 }, true, STEEL);
-      [[g.a1, g.N1, '1'], [g.a2, g.N2, '2']].forEach(([a, N, k]) => {
-        const c = [R * Math.cos(a), R + R * Math.sin(a)], t = [-Math.sin(a), Math.cos(a)], o = [Math.cos(a), Math.sin(a)];
-        sc.line([c[0] - t[0] * R * 0.5 + o[0] * 0.02 * R, c[1] - t[1] * R * 0.5 + o[1] * 0.02 * R], [c[0] + t[0] * R * 0.5, c[1] + t[1] * R * 0.5], { stroke: '#2c3e50', sw: 4 });
-        const a0 = [c[0] + o[0] * R * 0.7, c[1] + o[1] * R * 0.7];
-        sc.arrow(a0, c, { color: '#2471a3', sw: 3 });
-        sc.text([a0[0], a0[1] + R * 0.12], `N${k === '1' ? '₁' : '₂'} = ${f(N)} ${U.force}`, { color: '#2471a3', size: 12, in3: true });
+      // rebuilt 2026-11-26: liquid closed against the cylinder, liquid resultants through O, contacts as walls
+      const g = res.geo, sc = Scene.Scene(), R = g.R, O = [0, R], xl = -2.6 * R, xr = 2.6 * R;
+      const P = (a) => [R * Math.cos(a), R + R * Math.sin(a)];
+      const region = (h, w, far) => {
+        if (!(h > 0)) return null;
+        const a0 = w[0] * DEG, a1 = w[1] * DEG, N = 72, arc = [];
+        for (let i = 0; i <= N; i++) { const q = P(a0 + ((a1 - a0) * i) / N); if (q[1] <= h + 1e-9) arc.push(q); }
+        if (!arc.length) return [[far, 0], [far, h], [0, h], [0, 0]];
+        if (arc[0][1] < arc[arc.length - 1][1]) arc.reverse();
+        return [[far, 0], [far, h], [arc[0][0], h]].concat(arc, [[arc[arc.length - 1][0], 0]]);
+      };
+      const c1 = liqCol(x.sg1C), c2 = liqCol(x.sg2C);
+      const r1 = region(g.h1, g.w1, xl), r2 = g.h2 > 0 ? region(g.h2, g.w2, xr) : null;
+      if (r1) { sc.poly(r1, { fill: c1, stroke: 'none', fop: 0.4 }, { fill: c1, alpha: 0.22 }); sc.line([xl, g.h1], [r1[2][0], g.h1], { stroke: WATERD, sw: 1.6, no3: true }); sc.fs([xl + R * 0.35, g.h1], { label: `Sg₁ = ${f(x.sg1C)}` }); }
+      if (r2) { sc.poly(r2, { fill: c2, stroke: 'none', fop: 0.4 }, { fill: c2, alpha: 0.22 }); sc.line([r2[2][0], g.h2], [xr, g.h2], { stroke: WATERD, sw: 1.6, no3: true }); sc.fs([xr - R * 0.6, g.h2], { label: `Sg₂ = ${f(x.sg2C)}` }); }
+      sc.circle(O, R, { fill: STEEL, stroke: INK, sw: 2, fop: 0.95 }, 'disc', STEEL);
+      // contacts: the floor (or a wall / stop tangent at the contact) with the reaction toward O
+      [[g.a1, g.N1, '₁'], [g.a2, g.N2, '₂']].forEach(([a, N, k]) => {
+        const c = P(a), o = [Math.cos(a), Math.sin(a)], t = [-o[1], o[0]];
+        const isFloor = Math.abs(c[1]) < 1e-6 * R;
+        if (isFloor) sc.ground([xl, 0], [xr, 0], [0, -1], {});
+        else sc.ground([c[0] - t[0] * R * 0.6, c[1] - t[1] * R * 0.6], [c[0] + t[0] * R * 0.6, c[1] + t[1] * R * 0.6], o, {});
+        const tail = [c[0] + o[0] * R * 0.75, c[1] + o[1] * R * 0.75];
+        sc.arrow(tail, c, { color: BLUE, w: 3, label: `N${k} = ${f(N)} ${U.force}` });
       });
-      sc.arrow([0, R], [0, R - R * 0.8], { color: '#6c3483', sw: 2.5 });
-      sc.text([R * 0.08, R * 0.35], `W = ${f(g.W)}`, { color: '#6c3483', size: 11, in3: true });
-      sc.dot([0, R], '#2c3e50', 'O');
-      if (g.h1 > 0) sc.dim([xl + R * 0.2, 0], [xl + R * 0.2, g.h1], `h₁ = ${f(g.h1)} ${U.len}`, 20);
-      if (g.h2 > 0) sc.dim([xr - R * 0.2, 0], [xr - R * 0.2, g.h2], `h₂ = ${f(g.h2)} ${U.len}`, -20);
-      sc.depth = Math.max(x.Lc, span * 0.3);
+      if (!(Math.abs(P(g.a1)[1]) < 1e-6 * R || Math.abs(P(g.a2)[1]) < 1e-6 * R)) sc.ground([xl, 0], [xr, 0], [0, -1], {});
+      // liquid resultants pass through O: arrow hits the surface on the line through O
+      [[g.L1, '₁', g.h1 > 0], [g.L2, '₂', g.h2 > 0]].forEach(([L, k, on]) => {
+        const F = Math.hypot(L.Fx, L.Fy); if (!on || !(F > 0)) return;
+        const u = [L.Fx / F, L.Fy / F], hit = [O[0] - u[0] * R, O[1] - u[1] * R], tail = [O[0] - u[0] * R * 1.8, O[1] - u[1] * R * 1.8];
+        sc.arrow(tail, hit, { color: RED, w: 3, label: `F${k} = ${f(F)} ${U.force}` });
+        sc.line(hit, O, { stroke: RED, dash: '4 3', sw: 1, no3: true });
+      });
+      sc.arrow(O, [0, R - R * 0.75], { color: PURP, w: 2.6, label: `W = ${f(g.W)} ${U.force}`, lp: 'head', ldy: 14 });
+      sc.dot(O, INK, 'O');
+      if (g.h1 > 0) sc.dim([xl - R * 0.15, 0], [xl - R * 0.15, g.h1], `h₁ = ${f(g.h1)} ${U.len}`, -0.01);
+      if (g.h2 > 0) sc.dim([xr + R * 0.15, 0], [xr + R * 0.15, g.h2], `h₂ = ${f(g.h2)} ${U.len}`, 0.01);
+      sc.dim([-R, 2 * R + R * 0.25], [R, 2 * R + R * 0.25], `D = ${f(2 * R)} ${U.len}`, 0.01).only2d = true;
+      sc.depth = Math.min(Math.max(x.Lc, 0.8 * R), 4 * R);
+      sc.autoBounds(0.05);
       return sc;
     },
   };

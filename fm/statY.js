@@ -91,19 +91,47 @@
         const wet = arc.filter((q) => q[1] <= g.hs + 1e-9);
         sc.poly([[0, Math.min(g.yBot, g.yTop)]].concat(wet).concat([[wet.slice(-1)[0][0], Math.min(g.hs, top)], [0, Math.min(g.hs, top)]]), { fill: WATER, stroke: 'none', fop: 0.45 }, { fill: WATER, alpha: 0.25 });
       }
-      sc.line([left, g.hs], [Math.max(0.2 * R, 0), g.hs], { stroke: WATERD, sw: 1.5 });
-      sc.fs([left + 0.15 * R, g.hs]);
+      sc.line([left, g.hs], [Math.max(0.2 * R, 0), g.hs], { stroke: WATERD, sw: 1.5, no3: true });
+      sc.fs([left + 0.15 * R, g.hs], { label: `Sg = ${f(x.sgS)}` });
+      const gam = x.sgS * U.gw, wetArc = arc.filter((q) => q[1] <= g.hs + 1e-9);
+      // liquid (real or imaginary) between the wetted arc and the surface: its weight is F_V
+      if (wetArc.length > 1) {
+        sc.poly(wetArc.concat([[wetArc[wetArc.length - 1][0], g.hs], [wetArc[0][0], g.hs]]), { fill: 'url(#hatchPrism)', stroke: '#8e44ad', sw: 0.8, dash: '4 3' }, false);
+      }
+      // pressure arrows normal to the arc (pink), longest at the bottom
+      const pmax = Math.max(1e-12, gam * (g.hs - Math.min(g.yTop, g.yBot))), kp = (0.32 * R) / pmax;
+      const env = [];
+      for (let i = 0; i <= 10; i++) {
+        const a = g.a1 + ((g.a2 - g.a1) * i) / 10, q = [-R * Math.cos(a), R * Math.sin(a)], pr = Math.max(0, gam * (g.hs - q[1]));
+        const away = g.outer ? [-Math.cos(a), Math.sin(a)] : [Math.cos(a), -Math.sin(a)], w = pr * kp, tail = [q[0] + away[0] * w, q[1] + away[1] * w];
+        env.push(tail);
+        if (w > 0.02 * R && i % 2 === 0) sc.arrow(tail, q, { color: '#e74c3c', w: 1, head: 6, no3: true }).only2d = true;
+      }
+      sc.pline(env, { stroke: '#e74c3c', sw: 1, no3: true }).only2d = true;
       sc.pline(arc, { stroke: GATE, sw: 5 });
       sc.poly(arc.concat(arc.slice().reverse().map((q) => [q[0] * 0.985, q[1] * 0.985])), { fill: GATE, stroke: 'none' }, { fill: GATE, alpha: 0.9 });
       sc.line([0, 0], [g.xBot, g.yBot], { stroke: '#7f8c8d', dash: '4 3' }); sc.line([0, 0], [g.xTop, g.yTop], { stroke: '#7f8c8d', dash: '4 3' });
       sc.dot([0, 0], INK, 'O');
-      const mid = (g.a1 + g.a2) / 2, pm = [-R * Math.cos(mid), R * Math.sin(mid)];
-      sc.arrow([pm[0] - 0.35 * R, pm[1]], [pm[0] - 0.02 * R, pm[1]], { color: RED, label: `F_H = ${f(Math.abs(g.Fx))} ${U.force}` });
-      const fvA = g.Fy < 0 ? [pm[0], pm[1] + 0.35 * R] : [pm[0], pm[1] - 0.35 * R];
-      sc.arrow(fvA, [pm[0], pm[1] + (g.Fy < 0 ? 0.02 : -0.02) * R], { color: BLUE, label: `F_V = ${f(Math.abs(g.Fy))}` });
-      const dl = R * 0.9; sc.line([0, 0], [Math.cos(g.dir) * dl, Math.sin(g.dir) * dl], { stroke: RED, dash: '6 4', sw: 1.4 });
+      const arcAtY = (y) => { let best = wetArc[0] || arc[0]; arc.forEach((q) => { if (Math.abs(q[1] - y) < Math.abs(best[1] - y)) best = q; }); return best; };
+      const arcAtX = (xx) => { let best = arc[0]; arc.forEach((q) => { if (Math.abs(q[0] - xx) < Math.abs(best[0] - xx)) best = q; }); return best; };
+      // F_H at the centre of pressure of the vertical projection
+      const ya = Math.min(g.yTop, g.yBot), yb = Math.min(g.hs, Math.max(g.yTop, g.yBot)), z1 = g.hs - yb, z2 = g.hs - ya;
+      const hp = z2 > z1 ? (2 / 3) * (z2 ** 3 - z1 ** 3) / (z2 ** 2 - z1 ** 2) : z2, yH = g.hs - hp;
+      const pH = arcAtY(yH), sx = Math.sign(g.Fx) || 1;
+      sc.arrow([pH[0] - sx * 0.4 * R, pH[1]], pH, { color: RED, w: 3, label: `F_H = ${f(Math.abs(g.Fx))} ${U.force}` });
+      // F_V on its own line: moments about O vanish, so x_V = y_H·F_H / F_V
+      if (Math.abs(g.Fy) > 1e-9) {
+        const xv = (yH * g.Fx) / g.Fy, pV = arcAtX(xv), sy = Math.sign(g.Fy);
+        sc.arrow([pV[0], pV[1] - sy * 0.4 * R], pV, { color: BLUE, w: 3, label: `F_V = ${f(Math.abs(g.Fy))} ${U.force}` });
+      }
+      // resultant through the pivot
+      const F = Math.hypot(g.Fx, g.Fy), u = [g.Fx / F, g.Fy / F], pR = [-u[0] * R, -u[1] * R];
+      sc.arrow([pR[0] - u[0] * 0.45 * R, pR[1] - u[1] * 0.45 * R], pR, { color: '#8e44ad', w: 3, label: `R = ${f(F)} ${U.force}` });
+      sc.line(pR, [0, 0], { stroke: '#8e44ad', dash: '6 4', sw: 1.2, no3: true });
+      sc.dim([0, 0], [g.xTop, g.yTop], `R = ${f(R)} ${U.len}`, 14).only2d = true;
       sc.dim([0.12 * R, 0], [0.12 * R, g.hs], `h_s = ${f(g.hs)} ${U.len}`, -18);
-      sc.text([-R * Math.cos(g.a2) - 0.05 * R, R * Math.sin(g.a2) + 0.08 * R], `R = ${f(R)} ${U.len}`, { anchor: 'end', size: 11 });
+      const deg = (r) => r / DEG;
+      sc.add({ t: 'arc', c: [0, 0], r: 26, a0: 180 - deg(g.a2), a1: 180 - deg(g.a1), s: `${f(deg(g.a2 - g.a1))}°`, only2d: true });
       sc.depth = Math.max(0.5 * R, x.Ls * 0.25);
       return sc;
     },

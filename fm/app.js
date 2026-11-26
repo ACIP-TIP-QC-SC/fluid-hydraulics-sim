@@ -66,6 +66,7 @@
       $('resetIso').hidden = true;
       svg.style.cursor = '';
       m.draw2D(svg, res, U, { showP: App.showP });
+      if (!m.noDeclutter) UI.declutter(svg);
     } else {
       svg.setAttribute('hidden', ''); cv.removeAttribute('hidden');
       $('resetIso').hidden = false;

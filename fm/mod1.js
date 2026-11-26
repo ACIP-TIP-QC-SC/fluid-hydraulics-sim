@@ -162,18 +162,19 @@
     D.force(CP, F.n, 40 + 70 * (g.F / fmax), { color: COL.force, label: `F = ${f(g.F)} ${U.force}`, lp: 'tail', anchor: 'end', ldx: -6 });
     if (both) {
       const CP2 = F.at(both.sCP2);
-      D.force(CP2, [-F.n[0], -F.n[1]], 40 + 70 * (both.F2 / fmax), { color: '#1e8449', label: `F₂ = ${f(both.F2)}`, lp: 'tail', ldx: 6 });
+      D.force(CP2, [-F.n[0], -F.n[1]], 40 + 70 * (both.F2 / fmax), { color: '#1e8449', label: `F₂ = ${f(both.F2)} ${U.force}`, lp: 'tail', ldx: 6 });
       if (isFinite(both.sR) && both.sR >= -G.Lp && both.sR <= 2 * G.Lp) {
         const RP = F.at(both.sR);
-        D.force(RP, [F.n[0] * Math.sign(both.Fnet || 1), F.n[1] * Math.sign(both.Fnet || 1)], 60, { color: COL.force2, label: `R = ${f(both.Fnet)}`, lp: 'head', ldx: 8, ldy: 16 });
+        D.force(RP, [F.n[0] * Math.sign(both.Fnet || 1), F.n[1] * Math.sign(both.Fnet || 1)], 60, { color: COL.force2, label: `R = ${f(both.Fnet)} ${U.force}`, lp: 'tail', anchor: 'end', ldx: -6, ldy: -8 });
       }
     }
     // hinge
     if (g.hinge) {
       const Hp = g.hinge.at === 'top' ? F.T : B, Op = g.hinge.at === 'top' ? B : F.T;
       D.el('circle', { cx: D.X(Hp[0]), cy: D.Y(Hp[1]), r: 7, fill: '#fff', stroke: '#2c3e50', 'stroke-width': 2.5 });
-      D.text(Hp, 'hinge', { dx: 10, dy: -8, color: '#2c3e50' });
-      D.force(Op, [-F.n[0] * Math.sign(g.hinge.P || 1), -F.n[1] * Math.sign(g.hinge.P || 1)], 55, { color: '#2c3e50', label: `P = ${f(g.hinge.P)} ${U.force}`, lp: 'tail', ldx: 6, ldy: -14 });
+      D.el('circle', { cx: D.X(Hp[0]), cy: D.Y(Hp[1]), r: 2, fill: '#2c3e50' });
+      D.text(Hp, 'hinge', { dx: 12, dy: -10, color: '#2c3e50' });
+      D.force(Op, [-F.n[0] * Math.sign(g.hinge.P || 1), -F.n[1] * Math.sign(g.hinge.P || 1)], 55, { color: '#2471a3', label: `P = ${f(Math.abs(g.hinge.P))} ${U.force}`, lp: 'tail', ldx: 8, ldy: 4 });
     }
     // dimensions
     const xd = F.wallX(0) + 0.15;
@@ -189,7 +190,7 @@
       D.line([bx, yBot], [bx - 2.5, yBot], { stroke: COL.dim, sw: 0.6 });
       D.arc([bx, yBot], 46, 0, g.thDeg, `θ = ${f(g.thDeg)}°`);
     }
-    if (g.thDeg < 89.9) D.dim(F.T, B, `L = ${f(G.Lp)}`, 30);
+    if (g.thDeg < 89.9) D.dim(F.T, B, `L = ${f(G.Lp)}`, 64);
     // front-view inset
     inset(D, G, g, U);
     void xd;
@@ -313,8 +314,7 @@
     // pressure prism
     D.poly(cg.prism, { fill: 'url(#hatchPrism)', stroke: COL.meta, sw: 1.4, dash: g.vDown ? null : '6 4' });
     const pc = cg.prism.reduce((a, p) => [a[0] + p[0], a[1] + p[1]], [0, 0]).map((v) => v / cg.prism.length);
-    D.text([pc[0], g.yFS], 'Pressure prism: ' + (g.vDown ? 'REAL liquid above (F_V ↓)' : 'IMAGINARY liquid above (F_V ↑)'), { color: COL.meta, anchor: 'middle', size: 11.5, dy: -10 });
-    if (g.type !== 'quarter') D.text([pc[0], g.yFS], 'net prism = half circle', { color: COL.meta, anchor: 'middle', size: 10.5, dy: -26 });
+    D.text([pc[0], g.yFS], (g.vDown ? 'real' : 'imaginary') + ' liquid above → F_V ' + (g.vDown ? '↓' : '↑') + (g.type !== 'quarter' ? ' (net = half circle)' : ''), { color: COL.meta, anchor: 'middle', size: 11, dy: -10 });
     D.pline(cg.arc, { stroke: COL.gate, sw: 7 });
     // free surface
     const fsx = [Math.min(...cg.liquid.map((p) => p[0])), Math.max(...cg.liquid.map((p) => p[0]))];

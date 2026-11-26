@@ -33,6 +33,12 @@
       dot(p, c, s, o) { return S.add({ t: 'dot', p, c, s, o: o || {} }); },
       text(p, s, o) { return S.add({ t: 'text', p, s, o: o || {} }); },
       fs(p, o) { return S.add({ t: 'fs', p, o: o || {} }); },
+      /** pin / hinge support symbol at p (pin circle on a hatched base) */
+      hinge(p, o) { return S.add({ t: 'hinge', p, o: o || {} }); },
+      /** fixed wall or floor from a to b; hatching on the side of unit vector n */
+      ground(a, b, n, o) { return S.add({ t: 'ground', a, b, n, o: o || {} }); },
+      /** pink pressure diagram on face A→B: pressures pA, pB drawn toward unit n at k world units per pressure unit */
+      pdiag(A, B, pA, pB, n, k, o) { return S.add({ t: 'pdiag', A, B, pA, pB, n, k, o: o || {} }); },
       autoBounds(padFrac) {
         const mn = [Infinity, Infinity], mx = [-Infinity, -Infinity];
         const up = (p) => { if (!p || !isFinite(p[0]) || !isFinite(p[1])) return; mn[0] = Math.min(mn[0], p[0]); mn[1] = Math.min(mn[1], p[1]); mx[0] = Math.max(mx[0], p[0]); mx[1] = Math.max(mx[1], p[1]); };
@@ -67,6 +73,57 @@
         case 'dot': D.dot(it.p, it.c, it.s, it.o); break;
         case 'text': D.text(it.p, it.s, it.o); break;
         case 'fs': D.fs(it.p, it.o); break;
+        case 'arc': D.arc(it.c, it.r, it.a0, it.a1, it.s, it.o); break;
+        case 'hinge': {
+          const x = D.X(it.p[0]), y = D.Y(it.p[1]), c = it.o.color || '#2c3e50', r = it.o.r || 6;
+          const base = it.o.base === false ? null : 1;
+          if (base) {
+            D.el('polygon', { points: `${x},${y} ${x - 11},${y + 17} ${x + 11},${y + 17}`, fill: '#ecf0f1', stroke: c, 'stroke-width': 1.5 });
+            D.el('line', { x1: x - 16, y1: y + 17, x2: x + 16, y2: y + 17, stroke: c, 'stroke-width': 2 });
+            for (let i = -14; i <= 12; i += 6) D.el('line', { x1: x + i, y1: y + 18, x2: x + i - 5, y2: y + 24, stroke: c, 'stroke-width': 1 });
+          }
+          D.el('circle', { cx: x, cy: y, r, fill: '#fff', stroke: c, 'stroke-width': 2.2 });
+          D.el('circle', { cx: x, cy: y, r: 1.8, fill: c });
+          if (it.o.label) D.text([x + (it.o.ldx === undefined ? 14 : it.o.ldx), y + (it.o.ldy === undefined ? -8 : it.o.ldy)], it.o.label, { px: true, color: c, size: 12, weight: 700, anchor: it.o.anchor });
+          break;
+        }
+        case 'ground': {
+          const c = it.o.color || '#2c3e50';
+          D.line(it.a, it.b, { stroke: c, sw: it.o.sw || 3 });
+          const x1 = D.X(it.a[0]), y1 = D.Y(it.a[1]), x2 = D.X(it.b[0]), y2 = D.Y(it.b[1]);
+          const L = Math.hypot(x2 - x1, y2 - y1); if (L < 2) break;
+          const nx = it.n[0], ny = -it.n[1], ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+          for (let d = 4; d < L; d += 9) {
+            const px = x1 + ux * d, py = y1 + uy * d;
+            const l = D.el('line', { x1: px, y1: py, x2: px + nx * 8 - ux * 5, y2: py + ny * 8 - uy * 5, stroke: c, 'stroke-width': 1, opacity: 0.8 });
+            l.dataset.free = '1';
+          }
+          break;
+        }
+        case 'pdiag': {
+          const N = 24, col = it.o.color || '#e74c3c', pts = [];
+          const at = (t) => [it.A[0] + (it.B[0] - it.A[0]) * t, it.A[1] + (it.B[1] - it.A[1]) * t];
+          const pr = (t) => Math.max(0, it.pA + (it.pB - it.pA) * t);
+          for (let i = 0; i <= N; i++) pts.push(at(i / N));
+          for (let i = N; i >= 0; i--) { const q = at(i / N), w = pr(i / N) * it.k; pts.push([q[0] + it.n[0] * w, q[1] + it.n[1] * w]); }
+          D.poly(pts, { fill: col, fop: 0.16, stroke: col, sw: 1.2 });
+          const L = Math.hypot((it.B[0] - it.A[0]) * D.sc, (it.B[1] - it.A[1]) * D.sc), m = Math.max(2, Math.min(9, Math.floor(L / 22)));
+          for (let i = 1; i < m; i++) {
+            const t = i / m, q = at(t), w = pr(t) * it.k;
+            if (w * D.sc < 6) continue;
+            const tail = [q[0] + it.n[0] * w, q[1] + it.n[1] * w];
+            D.arrow(tail, q, { color: col, w: 1, head: 6 });
+          }
+          if (it.o.labels !== false) {
+            const u = it.o.unit || '';
+            [[0, it.pA], [1, it.pB]].forEach(([t, p]) => {
+              if (!(p > 0)) return;
+              const q = at(t), w = p * it.k, e = [q[0] + it.n[0] * w, q[1] + it.n[1] * w];
+              D.text(e, `${root.Physics.fmt(p)}${u ? ' ' + u : ''}`, { color: '#b03a2e', size: 10.5, anchor: it.n[0] < -0.3 ? 'end' : it.n[0] > 0.3 ? 'start' : 'middle', dx: it.n[0] * 4, dy: t === 0 ? -4 : 12 });
+            });
+          }
+          break;
+        }
         default: break;
       }
     });
@@ -105,12 +162,42 @@
           break;
         }
         case 'lathe': V.lathe(it.prof, it.fill, it.alpha, null, 36, it.cx, 0); break;
+        case 'custom3': it.fn(V, dep); break;
         case 'line': if (!it.o.no3) V.line([[it.a[0], it.a[1], 0], [it.b[0], it.b[1], 0]], it.o.stroke || '#555', it.o.sw || 1.2); break;
         case 'pline': if (!it.o.no3) V.line(it.pts.map((p) => [p[0], p[1], 0]), it.o.stroke || '#555', it.o.sw || 1.4); break;
         case 'arrow': {
-          const c = it.o.color || '#c0392b';
-          V.line([[it.a[0], it.a[1], 0], [it.b[0], it.b[1], 0]], c, 3);
-          if (it.o.label) V.label([it.b[0], it.b[1], 0], it.o.label, c);
+          if (it.o.no3) break;
+          const c = it.o.color || '#c0392b', z = it.o.z3 || 0;
+          V.line([[it.a[0], it.a[1], z], [it.b[0], it.b[1], z]], c, it.o.w3 || 3);
+          const dx = it.b[0] - it.a[0], dy = it.b[1] - it.a[1], L = Math.hypot(dx, dy);
+          if (L > 0) {
+            const h = Math.min(L * 0.3, it.o.h3 || L * 0.22), ux = dx / L, uy = dy / L;
+            [[-uy, ux], [0, 0, 1]].forEach((n) => {
+              const p1 = [it.b[0] - ux * h + (n[0] || 0) * h * 0.4, it.b[1] - uy * h + (n[1] || 0) * h * 0.4, z + (n[2] || 0) * h * 0.4];
+              const p2 = [it.b[0] - ux * h - (n[0] || 0) * h * 0.4, it.b[1] - uy * h - (n[1] || 0) * h * 0.4, z - (n[2] || 0) * h * 0.4];
+              V.face([[it.b[0], it.b[1], z], p1, p2], c, 1, null);
+            });
+          }
+          if (it.o.label) V.label([it.a[0], it.a[1], z], it.o.label, c);
+          break;
+        }
+        case 'hinge': {
+          const r = it.o.r3 || dep * 0.05, pts = [];
+          for (let i = 0; i < 20; i++) { const a = (2 * Math.PI * i) / 20; pts.push([it.p[0] + r * Math.cos(a), it.p[1] + r * Math.sin(a)]); }
+          V.extrude(pts, -dep / 2 - r * 2, dep / 2 + r * 2, '#2c3e50', 1, null);
+          if (it.o.label) V.label([it.p[0], it.p[1], dep / 2 + r * 2], it.o.label, '#2c3e50');
+          break;
+        }
+        case 'ground': {
+          const t = it.o.t3 || dep * 0.06, a = it.a, b = it.b, n = it.n;
+          V.extrude([a, b, [b[0] + n[0] * t, b[1] + n[1] * t], [a[0] + n[0] * t, a[1] + n[1] * t]], -dep / 2, dep / 2, '#b8c0c8', 0.9, '#7f8c8d');
+          break;
+        }
+        case 'pdiag': {
+          const N = 12, pts = [], at = (t) => [it.A[0] + (it.B[0] - it.A[0]) * t, it.A[1] + (it.B[1] - it.A[1]) * t];
+          for (let i = 0; i <= N; i++) pts.push(at(i / N));
+          for (let i = N; i >= 0; i--) { const q = at(i / N), w = Math.max(0, it.pA + (it.pB - it.pA) * (i / N)) * it.k; pts.push([q[0] + it.n[0] * w, q[1] + it.n[1] * w]); }
+          if (it.o.d3 !== false) V.extrude(pts, -dep / 2, dep / 2, '#e74c3c', 0.18, null, { sideStroke: null });
           break;
         }
         case 'dim': V.dim([it.a[0], it.a[1], dep / 2], [it.b[0], it.b[1], dep / 2], it.s, it.o3 || [0, 0, dep * 0.5]); break;
@@ -155,5 +242,54 @@
     return { X, Y };
   }
 
-  root.Scene = { Scene, draw2D, draw3D, chart };
+  /* ---------- geometry helpers ---------- */
+  /** Sutherland–Hodgman clip of polygon `poly` to the box {x0,x1,y0,y1}. */
+  function clipBox(poly, b) {
+    const edges = [[(p) => p[0] >= b.x0, (p, q) => { const t = (b.x0 - p[0]) / (q[0] - p[0]); return [b.x0, p[1] + t * (q[1] - p[1])]; }],
+      [(p) => p[0] <= b.x1, (p, q) => { const t = (b.x1 - p[0]) / (q[0] - p[0]); return [b.x1, p[1] + t * (q[1] - p[1])]; }],
+      [(p) => p[1] >= b.y0, (p, q) => { const t = (b.y0 - p[1]) / (q[1] - p[1]); return [p[0] + t * (q[0] - p[0]), b.y0]; }],
+      [(p) => p[1] <= b.y1, (p, q) => { const t = (b.y1 - p[1]) / (q[1] - p[1]); return [p[0] + t * (q[0] - p[0]), b.y1]; }]];
+    let out = poly.slice();
+    edges.forEach(([inside, cut]) => {
+      const inp = out; out = [];
+      for (let i = 0; i < inp.length; i++) {
+        const P = inp[i], Q = inp[(i + 1) % inp.length], pi = inside(P), qi = inside(Q);
+        if (pi) out.push(P);
+        if (pi !== qi) out.push(cut(P, Q));
+      }
+    });
+    return out;
+  }
+  /** Region to the LEFT of an open polyline (ends extended along their end segments), clipped to box b. */
+  function leftRegion(path, b) {
+    const n = path.length; if (n < 2) return [];
+    const BIG = 1e3 * Math.max(b.x1 - b.x0, b.y1 - b.y0, 1e-6);
+    const unit = (a, c) => { const d = [c[0] - a[0], c[1] - a[1]], L = Math.hypot(d[0], d[1]) || 1; return [d[0] / L, d[1] / L]; };
+    const u0 = unit(path[0], path[1]), u1 = unit(path[n - 2], path[n - 1]);
+    const e0 = [path[0][0] - u0[0] * BIG, path[0][1] - u0[1] * BIG], e1 = [path[n - 1][0] + u1[0] * BIG, path[n - 1][1] + u1[1] * BIG];
+    const l0 = [-u0[1], u0[0]], l1 = [-u1[1], u1[0]];
+    const poly = [e0].concat(path).concat([e1, [e1[0] + l1[0] * BIG, e1[1] + l1[1] * BIG], [e0[0] + l0[0] * BIG, e0[1] + l0[1] * BIG]]);
+    return clipBox(poly, b);
+  }
+  /** Where the ray from p along unit u leaves box b. */
+  function rayExit(p, u, b) {
+    let t = Infinity;
+    if (u[0] > 1e-12) t = Math.min(t, (b.x1 - p[0]) / u[0]); if (u[0] < -1e-12) t = Math.min(t, (b.x0 - p[0]) / u[0]);
+    if (u[1] > 1e-12) t = Math.min(t, (b.y1 - p[1]) / u[1]); if (u[1] < -1e-12) t = Math.min(t, (b.y0 - p[1]) / u[1]);
+    if (!isFinite(t) || t < 0) t = 0;
+    return [p[0] + u[0] * t, p[1] + u[1] * t];
+  }
+  /** Polygon of a thick strip along a polyline (offset t to the side of each segment's right normal). */
+  function strip(path, t) {
+    const a = [], b = [];
+    path.forEach((p, i) => {
+      const q = path[Math.min(i + 1, path.length - 1)], r = path[Math.max(i - 1, 0)];
+      const d = i < path.length - 1 ? [q[0] - p[0], q[1] - p[1]] : [p[0] - r[0], p[1] - r[1]], L = Math.hypot(d[0], d[1]) || 1;
+      const nrm = [d[1] / L, -d[0] / L];
+      a.push([p[0] - nrm[0] * t / 2, p[1] - nrm[1] * t / 2]); b.push([p[0] + nrm[0] * t / 2, p[1] + nrm[1] * t / 2]);
+    });
+    return a.concat(b.reverse());
+  }
+
+  root.Scene = { Scene, draw2D, draw3D, chart, clipBox, leftRegion, rayExit, strip };
 })(window);

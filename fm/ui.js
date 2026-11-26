@@ -255,5 +255,74 @@
     return D;
   }
 
-  root.UI = { h, Controls, Draw2D, svgEl: s, COL, fmt, SG_PRESETS };
+  /**
+   * Label placer (2026-11-26 diagram review). After a 2D diagram is drawn, moves any
+   * label that overprints another label, a force arrow, a thick structure line or a
+   * dot to the nearest free spot, with a faint leader back to where it was.
+   * Dimension labels and labels marked data-fixed stay put (they are obstacles).
+   */
+  function declutter(svg) {
+    if (!svg || svg.hasAttribute('hidden')) return;
+    const vb = svg.viewBox && svg.viewBox.baseVal;
+    const W = (vb && vb.width) || svg.clientWidth, H = (vb && vb.height) || svg.clientHeight;
+    const texts = [...svg.querySelectorAll('text.lbl')].filter((t) => (t.textContent || '').trim());
+    if (!texts.length) return;
+    const num = (e, k) => parseFloat(e.getAttribute(k)) || 0;
+    const segs = [];
+    svg.querySelectorAll('line').forEach((l) => {
+      if (l.closest('.dim') || l.closest('defs') || l.dataset.free) return;
+      const w = num(l, 'stroke-width') || 1;
+      if (w < 1.5) return;
+      segs.push([num(l, 'x1'), num(l, 'y1'), num(l, 'x2'), num(l, 'y2'), w / 2]);
+    });
+    svg.querySelectorAll('polyline').forEach((l) => {
+      if (l.closest('.dim') || l.closest('defs') || l.dataset.free) return;
+      const w = num(l, 'stroke-width') || 1;
+      if (w < 3.5) return;
+      const p = (l.getAttribute('points') || '').trim().split(/\s+/).map((q) => q.split(',').map(Number));
+      for (let i = 0; i < p.length - 1; i++) segs.push([p[i][0], p[i][1], p[i + 1][0], p[i + 1][1], w / 2]);
+    });
+    const boxes = [];
+    svg.querySelectorAll('circle').forEach((c) => {
+      if (c.closest('defs')) return;
+      const r = num(c, 'r');
+      if (r > 0 && r <= 8) boxes.push({ x: num(c, 'cx') - r, y: num(c, 'cy') - r, w: 2 * r, h: 2 * r });
+    });
+    const hitBox = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    const segHit = (b, s) => {
+      const [x1, y1, x2, y2, r] = s, bx0 = b.x - r, by0 = b.y - r, bx1 = b.x + b.w + r, by1 = b.y + b.h + r;
+      let t0 = 0, t1 = 1;
+      const dx = x2 - x1, dy = y2 - y1;
+      const clip = (p, q) => { if (Math.abs(p) < 1e-12) return q >= 0; const t = q / p; if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; } return true; };
+      return clip(-dx, x1 - bx0) && clip(dx, bx1 - x1) && clip(-dy, y1 - by0) && clip(dy, by1 - y1) && t0 <= t1;
+    };
+    const placed = [];
+    const fixed = (t) => t.closest('.dim') || t.dataset.fixed || t.getAttribute('transform');
+    const bbOf = (t) => { try { const b = t.getBBox(); return { x: b.x - 1.5, y: b.y - 1, w: b.width + 3, h: b.height + 2 }; } catch (e) { return null; } };
+    texts.filter(fixed).forEach((t) => { const b = bbOf(t); if (b) placed.push(b); });
+    const cand = [[0, 0]];
+    for (let r = 7; r <= 84; r += 7) cand.push([0, -r], [0, r], [r * 1.6, 0], [-r * 1.6, 0], [r * 1.2, -r], [-r * 1.2, -r], [r * 1.2, r], [-r * 1.2, r]);
+    texts.filter((t) => !fixed(t)).forEach((t) => {
+      const b = bbOf(t);
+      if (!b || !b.w) return;
+      const free = (q) => q.x >= 2 && q.y >= 2 && q.x + q.w <= W - 2 && q.y + q.h <= H - 2 && !placed.some((p) => hitBox(q, p)) && !boxes.some((p) => hitBox(q, p)) && !segs.some((sg) => segHit(q, sg));
+      let best = null;
+      for (const [dx, dy] of cand) { const q = { x: b.x + dx, y: b.y + dy, w: b.w, h: b.h }; if (free(q)) { best = [dx, dy, q]; break; } }
+      if (!best) { placed.push(b); return; }
+      const [dx, dy, q] = best;
+      if (dx || dy) {
+        t.setAttribute('x', num(t, 'x') + dx); t.setAttribute('y', num(t, 'y') + dy);
+        if (Math.hypot(dx, dy) > 16) {
+          const ox = num(t, 'x') - dx, oy = num(t, 'y') - dy - b.h * 0.3;
+          const nx = Math.min(Math.max(ox, q.x), q.x + q.w), ny = Math.min(Math.max(oy, q.y), q.y + q.h);
+          const ln = s('line', { x1: ox, y1: oy, x2: nx, y2: ny, stroke: t.getAttribute('fill') || '#555', 'stroke-width': 0.8, opacity: 0.55, 'stroke-dasharray': '2 2' });
+          ln.dataset.free = '1';
+          t.parentNode.insertBefore(ln, t);
+        }
+      }
+      placed.push(q);
+    });
+  }
+
+  root.UI = { h, Controls, Draw2D, svgEl: s, COL, fmt, SG_PRESETS, declutter };
 })(window);

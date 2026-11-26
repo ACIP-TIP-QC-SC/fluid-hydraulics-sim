@@ -221,9 +221,21 @@
     // force arrows with cone heads: F1 pushes down on the small piston, F2 is the load lifted by the large one
     const al = Math.max(0.25, 1.2 * r2), hh = 0.18 * al, hr = 0.06 * al;
     const a1 = Math.max(al, dz + tp2 + 0.25 - tp); // keep the F1 label clear of the large cylinder
-    V.line([[x1, tp + a1, 0], [x1, tp + hh, 0]], '#c0392b', 3);
-    V.lathe([[0, tp], [hr, tp + hh], [0, tp + hh]], '#c0392b', 1, null, 16, x1, 0);
-    V.label([x1, tp + a1, 0], `F₁ = ${f(g.F1)} ${U.force}`, '#c0392b');
+    if (s.lever) {
+      const yL = tp + 0.45 * al, b = Math.max(1.5 * r1, 0.05), xp = x1 + b, xh = xp - b * s.ratio;
+      V.line([[x1, tp, 0], [x1, yL, 0]], '#2c3e50', 3);
+      V.box(xh, yL - 0.012, -0.012, xp + 0.02, yL + 0.012, 0.012, '#7f8c8d', 1, '#2c3e50');
+      V.line([[xp, yL, 0], [xp, base, 0]], '#2c3e50', 2);
+      V.line([[xh, yL + 0.6 * al, 0], [xh, yL + 0.012 + hh, 0]], '#c0392b', 3);
+      V.lathe([[0, yL + 0.012], [hr, yL + 0.012 + hh], [0, yL + 0.012 + hh]], '#c0392b', 1, null, 16, xh, 0);
+      V.label([xh, yL + 0.6 * al, 0], `F_h = ${f(s.Fh)} ${U.force}`, '#c0392b');
+      V.label([x1, tp + 0.2 * al, 0], `F₁ = ${f(g.F1)} ${U.force}`, '#c0392b');
+      V.label([xp, yL, 0], 'pivot', '#2c3e50');
+    } else {
+      V.line([[x1, tp + a1, 0], [x1, tp + hh, 0]], '#c0392b', 3);
+      V.lathe([[0, tp], [hr, tp + hh], [0, tp + hh]], '#c0392b', 1, null, 16, x1, 0);
+      V.label([x1, tp + a1, 0], `F₁ = ${f(g.F1)} ${U.force}`, '#c0392b');
+    }
     V.line([[x2, dz + tp2, 0], [x2, dz + tp2 + al - hh, 0]], '#1e8449', 3);
     V.lathe([[0, dz + tp2 + al], [hr, dz + tp2 + al - hh], [0, dz + tp2 + al - hh]], '#1e8449', 1, null, 16, x2, 0);
     V.label([x2, dz + tp2 + al, 0], `F₂ = ${f(g.F2)} ${U.force}`, '#1e8449');
@@ -250,6 +262,7 @@
       g.L.forEach((l, i) => {
         box(0, -z - l.t, W, -z, fluidCol(l.sg), { op: 0.85, box3: 'tank', a3: 0.35 });
         text([0.06 * W, -z - l.t / 2], `Sg${i + 1} = ${f(l.sg)} (${fluidName(l.sg)})`, { base: 'middle', in3: true });
+        if (g.L.length > 1) dim([-0.1 * W, -z], [-0.1 * W, -z - l.t], `${f(l.t)} ${Lu}`, -14, { anchor: 'end', ldx: -6 }, [-0.25 * W, 0, 0]);
         z += l.t;
       });
       if (gas) { box(0, 0, W, gh, '#eaf3f9', { box3: 'tank', a3: 0.2 }); text([0.06 * W, gh / 2], `gas p₀ = ${f(g.p0)} ${Pu}`, { base: 'middle', in3: true }); box(0, gh, W, gh + 0.03 * Z, '#2c3e50', { box3: 'tank', a3: 1 }); }
@@ -261,8 +274,10 @@
       items.push({ t: 'line', a: [x0, 0.05 * Z], b: [x0, -Z - 0.05 * Z], o: { stroke: '#2c3e50', sw: 1.2 } });
       g.pts.forEach((q, i) => { if (i) text([x0 + q.p * sx, -q.z], `${f(q.p)} ${Pu}`, { dx: 6, dy: 4, color: '#c0392b', size: 11 }); });
       dot([0.5 * W, -g.zq], '#c0392b', `p = ${f(g.pq)} ${Pu}`, {});
-      dim([-0.1 * W, 0], [-0.1 * W, -g.zq], `${f(g.zq)} ${Lu}`, -14, { anchor: 'end', ldx: -8 }, [-0.3 * W, 0, 0]);
-      bounds = { xmin: -0.4 * W, xmax: x0 + W, ymin: -Z - 0.2 * W, ymax: gh + 0.15 * Z };
+      dim([-0.1 * W, 0], [-0.1 * W, -g.zq], `point at ${f(g.zq)} ${Lu}`, g.L.length > 1 ? -80 : -14, { anchor: 'end', ldx: -8 }, [g.L.length > 1 ? -0.6 * W : -0.3 * W, 0, 0]);
+      items.push({ t: 'line', a: [0, -g.zq], b: [W, -g.zq], o: { stroke: '#c0392b', dash: '3 4', sw: 0.8 } });
+      text([x0, 0.04 * Z], gas ? `p₀ = ${f(g.p0)} ${Pu}` : '0 (gauge)', { dx: 4, dy: -4, color: '#c0392b', size: 11 });
+      bounds = { xmin: g.L.length > 1 ? -1.0 * W : -0.45 * W, xmax: x0 + W, ymin: -Z - 0.2 * W, ymax: gh + 0.15 * Z };
       tw = 0.1 * W; depth = W * 0.8;
     } else if (s.sub === 'utube' && g.type === 'piezo') {
       const r = 0.15, hp = g.hp;
@@ -334,7 +349,7 @@
       bounds.ymin -= 0.15; text([w / 2, bounds.ymin + 0.06], `p_A − p_B = ${f(g.dP)} ${Pu}`, { anchor: 'middle', color: '#c0392b', size: 13, in3: true });
       tw = 2 * tb; depth = 0.3;
     } else if (s.sub === 'multi') {
-      const legs = g.legs, w = 0.45, tb = 0.05;
+      const legs = g.legs, w = 0.75, tb = 0.05;
       let z = 0; const zs = [0];
       legs.forEach((l) => { z += l.dz; zs.push(z); });
       const zmin = Math.min(...zs), zmax = Math.max(...zs);
@@ -353,11 +368,11 @@
         // connector from previous node x to this leg at z0
         const xp = i === 0 ? xA : (i - 0.5) * w;
         box(Math.min(xp, x) - tb, z0 - tb, Math.max(xp, x) + tb, z0 + tb, fluidCol(l.sg), { op: 0.95 });
-        text([x, (z0 + z1) / 2], `${f(l.sg)}`, { dx: 8, size: 10.5, color: '#5d6b7a' });
+        text([x, (z0 + z1) / 2], `Sg ${f(l.sg)}`, { dx: -8, anchor: 'end', size: 10.5, color: '#5d6b7a' });
         dim([x + 0.18, z0], [x + 0.18, z1], `${f(Math.abs(l.dz))}`, -4, { anchor: 'start', ldx: 4 }, [0.12, 0, 0]);
       });
       if (legs.length) { const xl = (legs.length - 0.5) * w; box(xl - tb, zs[legs.length] - tb, xB + tb, zs[legs.length] + tb, fluidCol(legs[legs.length - 1].sg), { op: 0.95 }); }
-      g.nodes.forEach((q, i) => { const x = i === 0 ? xA : i === legs.length ? xB : (i - 0.5) * w; if (i > 0 && i < legs.length) dot([x, zs[i]], '#8e44ad', f(q), { r: 3.5, dx: -6, dy: -8, anchor: 'end' }); });
+      g.nodes.forEach((q, i) => { const x = i === 0 ? xA : i === legs.length ? xB : (i - 0.5) * w; if (i > 0 && i < legs.length) dot([x, zs[i]], '#8e44ad', f(q), { r: 3.5, dx: 8, dy: zs[i + 1] > zs[i] ? 14 : -8 }); });
       chamber(xA, 0, g.gasA, 'A', g.pA);
       chamber(xB, zs[legs.length], g.gasB, 'B', g.pB);
       bounds = { xmin: -0.6, xmax: xB + 0.8, ymin: zmin - 0.3, ymax: Math.max(zmax, zs[legs.length]) + ch + 0.25 };
@@ -373,14 +388,25 @@
       box(x1 - r1, 0, x1 + r1, 0.06, '#5d6d7e', { box3: 'tank', c3: '#5d6d7e', a3: 1, sw: 1.5 });
       box(x2 - r2, dz, x2 + r2, dz + 0.08, '#5d6d7e', { box3: 'tank', c3: '#5d6d7e', a3: 1, sw: 1.5 });
       const al = Math.max(0.25, 1.2 * r2);
-      arrow([x1, 0.06 + al], [x1, 0.06], { color: '#c0392b', w: 3, label: `F₁ = ${f(g.F1)} ${U.force}`, lp: 'tail', ldx: -8, anchor: 'end' });
+      if (s.lever) {
+        // handle: pivot to the right of the small piston at distance b, hand at distance a = ratio × b to the left
+        const yL = 0.06 + 0.45 * al, b = Math.max(1.5 * r1, 0.05), a = b * s.ratio, xp = x1 + b, xh = xp - a;
+        items.push({ t: 'line', a: [x1, 0.06], b: [x1, yL], o: { stroke: '#2c3e50', sw: 3 } });
+        box(xh, yL - 0.012, xp + 0.02, yL + 0.012, '#7f8c8d', { box3: 'tube', c3: '#7f8c8d', a3: 1, sw: 1 });
+        items.push({ t: 'line', a: [xp, yL], b: [xp, base - 0.08], o: { stroke: '#2c3e50', sw: 2 } });
+        dot([xp, yL], '#2c3e50', 'pivot', { r: 4, dx: 8, dy: -6 });
+        arrow([xh, yL + 0.6 * al], [xh, yL + 0.012], { color: '#c0392b', w: 3, label: `F_h = ${f(s.Fh)} ${U.force}`, lp: 'tail', ldx: -8, anchor: 'end' });
+        dim([xh, yL], [xp, yL], `a = ${f(s.ratio)} b`, 26, {}, [0, 0.12, 0]);
+        dim([x1, yL], [xp, yL], 'b', -14, {}, [0, -0.08, 0]);
+        text([x1, 0.06 + 0.2 * al], `F₁ = F_h a/b = ${f(g.F1)} ${U.force}`, { dx: -8, anchor: 'end', color: '#c0392b', size: 11.5, in3: true });
+      } else arrow([x1, 0.06 + al], [x1, 0.06], { color: '#c0392b', w: 3, label: `F₁ = ${f(g.F1)} ${U.force}`, lp: 'tail', ldx: -8, anchor: 'end' });
       arrow([x2, dz + 0.08], [x2, dz + 0.08 + al], { color: '#1e8449', w: 3, label: `F₂ = ${f(g.F2)} ${U.force}`, lp: 'head', ldx: 8 });
       dim([x1 - r1, base - 0.1], [x1 + r1, base - 0.1], `d₁ = ${f(g.d1)}`, 14, {}, [0, -0.1, 0]);
       dim([x2 - r2, base - 0.1], [x2 + r2, base - 0.1], `d₂ = ${f(g.d2)} ${Lu}`, 14, {}, [0, -0.1, 0]);
       if (Math.abs(dz) > 1e-6) dim([x2 + r2 + 0.1, 0], [x2 + r2 + 0.1, dz], `Δz = ${f(dz)} ${Lu}`, -10, { anchor: 'start', ldx: 8 }, [0.2, 0, 0]);
       text([x1 - r1, base / 2], `p₁ = ${f(g.p1)} ${Pu}`, { anchor: 'end', dx: -6, color: '#5d6b7a', size: 11 });
       text([x2 + r2, (dz + base) / 2], `p₂ = ${f(g.p2)} ${Pu}`, { dx: 6, color: '#5d6b7a', size: 11 });
-      bounds = { xmin: x1 - r1 - 0.5, xmax: x2 + r2 + 0.7, ymin: base - 0.35, ymax: Math.max(0, dz) + al + 0.25 };
+      bounds = { xmin: (s.lever ? x1 + Math.max(1.5 * r1, 0.05) * (1 - s.ratio) : x1 - r1) - 0.5, xmax: x2 + r2 + 0.7, ymin: base - 0.35, ymax: Math.max(0, dz) + al + 0.25 };
       tw = 0.1; depth = Math.max(2 * r2, 0.3);
       void hS;
     }

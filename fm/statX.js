@@ -146,21 +146,31 @@
     compute: (x, U) => Physics.inclined(x, U),
     scene(x, res, U) {
       const g = res.geo, sc = Scene.Scene(), th = g.th * DEG, col = liqCol(x.sgM);
-      const Lt = 3, tw = 0.08, Lv = Math.max(0.15, Math.min(Lt * 0.9, 1.2 + 0 * g.L));
-      sc.rect(-1.2, -0.4, 0, 0.9, { fill: 'none', stroke: '#2c3e50', sw: 2 }, { fill: '#d6eaf8', alpha: 0.25 });
-      sc.rect(-1.2, -0.4, 0, 0.5, { fill: col, stroke: 'none', fop: 0.75 }, { fill: col, alpha: 0.6 });
-      sc.line([-1.2, 0.56], [0, 0.56], { stroke: '#7f8c8d', dash: '4 3' });
-      sc.text([-1.15, 0.7], 'zero line', { color: '#7f8c8d', size: 11 });
-      const ux = Math.cos(th), uy = Math.sin(th), nx = -uy * tw, ny = ux * tw;
-      const A0 = [0, -0.3];
-      const at = (s) => [A0[0] + ux * s, A0[1] + uy * s];
-      const quad = (s0, s1) => [[at(s0)[0] - nx, at(s0)[1] - ny], [at(s1)[0] - nx, at(s1)[1] - ny], [at(s1)[0] + nx, at(s1)[1] + ny], [at(s0)[0] + nx, at(s0)[1] + ny]];
+      const ux = Math.cos(th), uy = Math.sin(th), tw = 0.07, nx = -uy * tw, ny = ux * tw;
+      const y0 = 0.5, s0 = 0.9, Lv = 1.7, A0 = [0, y0 - s0 * uy];
+      const at = (q) => [A0[0] + ux * q, A0[1] + uy * q];
+      const Lt = s0 + Lv + 0.7, yr = g.useRes ? y0 - 0.08 : y0, bot = Math.min(-0.4, A0[1] - 0.2);
+      // reservoir: liquid at the rest (zero) level, lowered a little when the reservoir drop is allowed for
+      sc.rect(-1.2, bot, 0, y0 + 0.5, { fill: 'none', stroke: '#2c3e50', sw: 2 }, { fill: '#d6eaf8', alpha: 0.25 });
+      sc.rect(-1.2, bot, 0, yr, { fill: col, stroke: 'none', fop: 0.75 }, { fill: col, alpha: 0.6 });
+      sc.line([-1.2, y0], [at(s0)[0] + 0.3, y0], { stroke: '#7f8c8d', dash: '4 3' });
+      sc.text([-1.15, y0 + 0.12], g.useRes ? 'zero (rest) level, reservoir drops slightly' : 'zero (rest) level', { color: '#7f8c8d', size: 11 });
+      const quad = (q0, q1) => [[at(q0)[0] - nx, at(q0)[1] - ny], [at(q1)[0] - nx, at(q1)[1] - ny], [at(q1)[0] + nx, at(q1)[1] + ny], [at(q0)[0] + nx, at(q0)[1] + ny]];
       sc.poly(quad(0, Lt), { fill: '#ffffff', stroke: '#2c3e50', sw: 1.5 }, { fill: '#d6eaf8', alpha: 0.3, z0: -tw, z1: tw });
-      sc.poly(quad(0, Lv), { fill: col, stroke: 'none', fop: 0.85 }, { fill: col, alpha: 0.7, z0: -tw * 0.8, z1: tw * 0.8 });
-      sc.arrow([-0.6, 1.5], [-0.6, 0.95], { color: '#c0392b', label: 'p_A' });
+      sc.poly(quad(0, s0 + Lv), { fill: col, stroke: 'none', fop: 0.85 }, { fill: col, alpha: 0.7, z0: -tw * 0.8, z1: tw * 0.8 });
+      // zero mark on the tube and the meniscus level
+      const z0p = at(s0), top = at(s0 + Lv);
+      sc.line([z0p[0] - 1.6 * nx, z0p[1] - 1.6 * ny], [z0p[0] + 1.6 * nx, z0p[1] + 1.6 * ny], { stroke: '#2c3e50', sw: 2 });
+      sc.line(top, [top[0] + 0.5, top[1]], { stroke: '#7f8c8d', dash: '4 3' });
+      sc.dim(z0p, top, `L = ${f(g.L)} ${U.len}`, -0.01, { anchor: 'end' });
+      sc.dim([top[0] + 0.4, y0], [top[0] + 0.4, top[1]], `h = L sin θ = ${f(g.L * Math.sin(th))} ${U.len}`, -0.01, { anchor: 'start', ldx: 8 });
+      sc.line([at(s0)[0] + 0.3, y0], [top[0] + 0.5, y0], { stroke: '#7f8c8d', dash: '4 3' });
+      // θ between the tube and the horizontal, at the tube base
+      sc.line(A0, [A0[0] + 0.7, A0[1]], { stroke: '#7f8c8d', sw: 1 });
+      sc.add({ t: 'arc', c: A0, r: 55, a0: 0, a1: g.th, s: `θ = ${f(g.th)}°` });
+      sc.arrow([-0.6, y0 + 1.1], [-0.6, y0 + 0.5], { color: '#c0392b', label: 'p_A (higher)' });
       sc.arrow([at(Lt)[0] + 0.3, at(Lt)[1] + 0.5], at(Lt), { color: '#2980b9', label: 'p_B' });
-      sc.dim(at(Lv * 0.38), at(Lv), `L = ${f(g.L)} ${U.len}`, -26);
-      sc.text([0.25, -0.2], `θ = ${f(g.th)}°`, { color: '#52606d' });
+      sc.text([-1.15, bot + 0.12], `gauge liquid Sg = ${f(x.sgM)}`, { color: '#52606d', size: 11, in3: true });
       sc.depth = 0.5;
       return sc;
     },
